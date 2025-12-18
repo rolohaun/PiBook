@@ -39,6 +39,9 @@ class DisplayDriver:
         # Physical hardware dimensions (always 800x480 for this display)
         self.hw_width = 800
         self.hw_height = 480
+        
+        # Track if partial refresh mode has been initialized
+        self.partial_mode_initialized = False
 
         # Try to import Waveshare library
         try:
@@ -117,6 +120,8 @@ class DisplayDriver:
                 self.logger.info(f"Performing FULL refresh (count reset from {self.partial_refresh_count})")
                 self.epd.display(self.epd.getbuffer(image))
                 self.partial_refresh_count = 0
+                # Reset partial mode so it gets re-initialized next time
+                self.partial_mode_initialized = False
             else:
                 # Partial refresh - faster but may cause ghosting
                 buffer_data = self.epd.getbuffer(image)
@@ -125,6 +130,14 @@ class DisplayDriver:
                 # IMPORTANT: Use physical hardware dimensions, not logical rotated dimensions
                 if hasattr(self.epd, 'display_Partial'):
                     try:
+                        # Initialize partial refresh mode if not already done
+                        # This is required for Waveshare 7.5" V2 - without init_part(),
+                        # the display does a full refresh internally before partial update
+                        if not self.partial_mode_initialized and hasattr(self.epd, 'init_part'):
+                            self.logger.info("Initializing partial refresh mode (init_part)")
+                            self.epd.init_part()
+                            self.partial_mode_initialized = True
+                        
                         # Full screen partial refresh with HARDWARE coordinates (always 800x480)
                         self.epd.display_Partial(buffer_data, 0, 0, self.hw_width, self.hw_height)
                         self.partial_refresh_count += 1
@@ -133,6 +146,7 @@ class DisplayDriver:
                         self.logger.warning(f"Partial refresh failed: {e}, using full refresh")
                         self.epd.display(buffer_data)
                         self.partial_refresh_count = 0
+                        self.partial_mode_initialized = False
                 else:
                     # Fallback: try other method names
                     partial_method = None
