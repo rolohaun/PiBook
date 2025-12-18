@@ -61,16 +61,19 @@ class EPUBRenderer:
             # Get page from PyMuPDF
             page = self.doc[page_num]
 
-            # Render at high DPI for quality (don't use matrix here)
-            # This ensures crisp text rendering
-            pix = page.get_pixmap(dpi=self.dpi)
+            # Render at high DPI for quality
+            # Use higher DPI (200+) for crisp text on e-ink
+            render_dpi = max(self.dpi, 200)
+            pix = page.get_pixmap(dpi=render_dpi)
 
             # Convert PyMuPDF pixmap to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-            # Calculate target size with margins
-            usable_width = self.width - 40  # 20px margin on each side
-            usable_height = self.height - 60 if show_page_number else self.height - 40
+            # Calculate target size with minimal margins (8px on each side)
+            margin_h = 16  # 8px margin on each side
+            margin_v = 40 if show_page_number else 16  # Room for page number at bottom
+            usable_width = self.width - margin_h
+            usable_height = self.height - margin_v
 
             # Calculate zoom to fit within usable area
             zoom_x = usable_width / img.width
@@ -87,7 +90,7 @@ class EPUBRenderer:
 
             # Center the rendered page
             x_offset = (self.width - img.width) // 2
-            y_offset = 10 + (usable_height - img.height) // 2
+            y_offset = 8 + (usable_height - img.height) // 2
             background.paste(img, (x_offset, y_offset))
 
             # Add page number overlay if requested
@@ -109,10 +112,16 @@ class EPUBRenderer:
                 except:
                     text_x = self.width // 2 - 50
 
-                draw.text((text_x, self.height - 30), page_text, fill='black', font=font)
+                draw.text((text_x, self.height - 25), page_text, fill='black', font=font)
 
             # Convert to 1-bit (black and white) for e-ink display
-            img = background.convert('1')
+            # Use threshold conversion instead of dithering to avoid "holes" in text
+            # Dithering (default) creates patterns that look bad on e-ink
+            grayscale = background.convert('L')  # Convert to grayscale first
+            # Apply threshold: pixels darker than 200 become black, lighter become white
+            # Higher threshold = more black (darker text)
+            threshold = 200
+            img = grayscale.point(lambda x: 0 if x < threshold else 255, '1')
 
             self.logger.debug(f"Rendered page {page_num + 1}/{self.page_count}")
             return img
