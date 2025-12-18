@@ -58,8 +58,11 @@ echo ""
 
 # Install Python dependencies
 echo "Step 4/6: Installing Python packages..."
-pip3 install --upgrade pip
-pip3 install -r requirements.txt
+# Use --user to install to user site-packages (avoids externally-managed-environment error)
+pip3 install --user --upgrade pip
+pip3 install --user -r requirements.txt
+echo ""
+echo "Python packages installed to user directory (~/.local)"
 echo ""
 
 # Setup Waveshare library
