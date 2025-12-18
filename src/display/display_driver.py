@@ -44,7 +44,8 @@ class DisplayDriver:
         self.partial_mode_initialized = False
         
         # Grayscale mode support - 4-bit grayscale for smooth anti-aliased text
-        self.use_grayscale = True  # Enable grayscale mode by default
+        # DISABLED: Too slow (no partial refresh support) and didn't improve text quality
+        self.use_grayscale = False  # Disabled - use 1-bit mode with partial refresh
         self.grayscale_initialized = False
 
         # Try to import Waveshare library
