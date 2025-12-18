@@ -61,6 +61,11 @@ class EPUBRenderer:
             # Get page from PyMuPDF
             page = self.doc[page_num]
 
+            # Disable anti-aliasing for crisp text rendering on e-ink
+            # Level 0 = no anti-aliasing (sharp pixel edges)
+            # This is crucial for 1-bit e-ink displays
+            fitz.TOOLS.set_aa_level(0)
+
             # Render at high DPI for quality - higher = sharper source
             render_dpi = max(self.dpi, 300)
             pix = page.get_pixmap(dpi=render_dpi)
@@ -116,19 +121,24 @@ class EPUBRenderer:
             
             if is_image_page:
                 # For images/covers: use Floyd-Steinberg dithering to preserve shading
+                # Re-enable anti-aliasing for smooth gradients in images
+                fitz.TOOLS.set_aa_level(8)
                 self.logger.debug("Using dithering for image page")
                 bw = gray.convert('1')  # Default dithering preserves gradients
             else:
-                # For text: boost contrast and use threshold for solid black text
+                # For text: use threshold conversion WITHOUT dithering
+                # The dither=False parameter is crucial - it prevents Pillow from
+                # creating gray dithering patterns that look fuzzy on e-ink
                 enhancer = ImageEnhance.Contrast(gray)
-                gray = enhancer.enhance(1.5)  # Slight contrast boost
+                gray = enhancer.enhance(1.3)  # Slight contrast boost
                 
                 # Apply sharpening for crisper text edges
                 gray = gray.filter(ImageFilter.SHARPEN)
                 
-                # Threshold to pure black/white
-                threshold = 180
-                bw = gray.point(lambda x: 0 if x < threshold else 255, '1')
+                # Convert to 1-bit with dither=False for crisp threshold
+                # This uses simple threshold at 128 (midpoint) without dithering
+                bw = gray.convert('1', dither=Image.Dither.NONE)
+                self.logger.debug("Using threshold (no dither) for text page")
 
             # Create white 1-bit background
             background = Image.new('1', (self.width, self.height), 1)  # 1 = white
