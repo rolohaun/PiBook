@@ -88,19 +88,27 @@ class DisplayDriver:
             use_partial: Use partial refresh if True, full refresh if False
         """
         # Ensure image is correct size
+        # NOTE: If this resize happens, there's a bug in the renderer - it should produce
+        # images at exactly the right size
         if image.size != (self.width, self.height):
-            self.logger.warning(f"Resizing image from {image.size} to ({self.width}, {self.height})")
-            image = image.resize((self.width, self.height), Image.Resampling.LANCZOS)
+            self.logger.warning(f"UNEXPECTED RESIZE from {image.size} to ({self.width}, {self.height}) - check renderer!")
+            # Use NEAREST for 1-bit images to avoid creating gray pixels
+            # LANCZOS would interpolate and create artifacts
+            if image.mode == '1':
+                image = image.resize((self.width, self.height), Image.Resampling.NEAREST)
+            else:
+                image = image.resize((self.width, self.height), Image.Resampling.LANCZOS)
 
         # Ensure image is 1-bit (black and white)
         if image.mode != '1':
             self.logger.debug(f"Converting image from {image.mode} to 1-bit")
-            image = image.convert('1')
+            image = image.convert('1', dither=Image.Dither.NONE)
 
         # Apply rotation if needed (for portrait mode)
         if self.rotation != 0:
             # Rotate the image (negative angle for clockwise rotation in PIL)
-            image = image.rotate(-self.rotation, expand=True)
+            # Use NEAREST for rotation to avoid creating gray pixels on 1-bit images
+            image = image.rotate(-self.rotation, expand=True, resample=Image.Resampling.NEAREST)
             self.logger.debug(f"Rotated image by {self.rotation} degrees")
 
         if not self.hardware_available or not self.epd:
