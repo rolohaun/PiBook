@@ -142,25 +142,46 @@ class PillowTextRenderer:
             self.logger.warning(f"Failed to save cache: {e}")
 
     def _load_epub(self):
-        # Try cache first
-        if self._load_cache():
-            return
+        self.logger.info(f"Loading EPUB: {self.epub_path}")
+        
+        # DEBUG: Parsing issue - disable cache
+        # if self._load_cache():
+        #    return
 
         self.book = epub.read_epub(self.epub_path)
         all_tokens = []
         
-        for item in self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+        items = list(self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT))
+        self.logger.info(f"Found {len(items)} items in EPUB")
+
+        for i, item in enumerate(items):
             try:
-                html = item.get_content().decode('utf-8')
+                content = item.get_content()
+                self.logger.debug(f"Item {i} raw size: {len(content)}")
+                
+                try:
+                    html = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    html = content.decode('latin-1', errors='ignore')
+                    
+                self.logger.debug(f"Item {i} HTML size: {len(html)}")
+                
                 tokens = self._parse_html(html)
-                all_tokens.extend(tokens)
-                # Add chapter break
-                all_tokens.append(TextToken("", "normal", new_paragraph=True)) 
+                self.logger.debug(f"Item {i} tokens: {len(tokens)}")
+                
+                if tokens:
+                    all_tokens.extend(tokens)
+                    all_tokens.append(TextToken("", "normal", new_paragraph=True)) 
             except Exception as e:
                 self.logger.warning(f"Chapter error: {e}")
                 
+        self.logger.info(f"Total tokens parsed: {len(all_tokens)}")
         self._reflow_pages(all_tokens)
-        self._save_cache()
+        
+        # Only save cache if we have content
+        if len(all_tokens) > 100:
+            self._save_cache()
+            
         self.logger.info(f"Loaded EPUB: {self.page_count} pages")
 
     # ... (keep _parse_html as is) ...
