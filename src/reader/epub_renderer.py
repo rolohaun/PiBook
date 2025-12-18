@@ -128,7 +128,7 @@ class EPUBRenderer:
 
             # Center the content
             x_offset = (self.width - bw.width) // 2
-            y_offset = (usable_height - bw.height) // 2
+            y_offset = (screen_height - bw.height) // 2
             background.paste(bw, (x_offset, y_offset))
 
             # Add page number overlay if requested
