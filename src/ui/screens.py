@@ -8,6 +8,19 @@ from PIL import Image, ImageDraw, ImageFont
 from typing import List, Optional, Dict
 import os
 import logging
+import socket
+
+
+def get_ip_address():
+    """Get the Pi's local IP address"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "No Network"
 
 
 class LibraryScreen:
@@ -113,9 +126,21 @@ class LibraryScreen:
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
 
+        # Draw IP address at top center
+        ip_address = get_ip_address()
+        ip_text = f"IP: {ip_address}"
+        try:
+            # Get text bounding box for centering
+            bbox = draw.textbbox((0, 0), ip_text, font=self.font)
+            ip_width = bbox[2] - bbox[0]
+            ip_x = (self.width - ip_width) // 2
+        except:
+            ip_x = self.width // 2 - 60
+        draw.text((ip_x, 5), ip_text, font=self.font, fill=0)
+
         # Draw title
-        draw.text((40, 20), "Library", font=self.title_font, fill=0)
-        draw.line([(40, 60), (self.width - 40, 60)], fill=0, width=2)
+        draw.text((40, 30), "Library", font=self.title_font, fill=0)
+        draw.line([(40, 65), (self.width - 40, 65)], fill=0, width=2)
 
         if not self.books:
             # No books available
@@ -129,8 +154,8 @@ class LibraryScreen:
         end_idx = min(start_idx + self.items_per_page, len(self.books))
 
         # Draw book list
-        y = 80
-        line_height = 40
+        y = 85
+        line_height = 38
 
         for i in range(start_idx, end_idx):
             book = self.books[i]

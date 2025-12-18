@@ -19,6 +19,7 @@ from src.display.display_driver import DisplayDriver
 from src.hardware.gpio_handler import GPIOHandler
 from src.ui.navigation import NavigationManager, Screen
 from src.ui.screens import LibraryScreen, ReaderScreen
+from src.web.webserver import PiBookWebServer
 
 
 class PiBookApp:
@@ -72,6 +73,9 @@ class PiBookApp:
         self.page_turn_count = 0
         self.gc_threshold = self.config.get('performance.gc_threshold', 100)
 
+        # Web server
+        self.web_server = None
+
     def _setup_logging(self):
         """Configure logging"""
         log_level = getattr(logging, self.config.get('logging.level', 'INFO'))
@@ -106,6 +110,12 @@ class PiBookApp:
             # Load library
             books_dir = self.config.get('library.books_directory', '/home/pi/PiBook/books')
             self.library_screen.load_books(books_dir)
+
+            # Start web server
+            web_port = self.config.get('web.port', 5000)
+            self.web_server = PiBookWebServer(books_dir, self, web_port)
+            self.web_server.run()
+            self.logger.info(f"Web interface available at http://<pi-ip>:{web_port}")
 
             # Set running flag
             self.running = True

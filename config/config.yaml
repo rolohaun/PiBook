@@ -23,3 +23,6 @@ logging:
   level: "INFO"               # DEBUG, INFO, WARNING, ERROR
   file: "/home/pi/PiBook/logs/app.log"
   console: true
+
+web:
+  port: 5000                  # Web interface port

@@ -7,6 +7,12 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 - **EPUB Support**: Renders EPUBs with full formatting using PyMuPDF
 - **E-ink Display**: Optimized for Waveshare 7.5" e-Paper HAT (800×480)
 - **Button Navigation**: GPIO-based controls for page turning and menu navigation
+- **Web Interface**: Manage books and control e-reader from any device
+  - Upload/delete EPUB files wirelessly
+  - Remote page navigation (Next/Prev/Select)
+  - File management (rename, delete)
+  - Works on phone, tablet, or computer
+- **IP Address Display**: Shows Pi's IP on library screen
 - **Memory Efficient**: Designed for Pi Zero 2 W (512MB RAM)
 - **100% Portable**: Same code runs on Pi 3B+ and Pi Zero 2 W
 
@@ -220,16 +226,30 @@ PiBook/
 
 ## Usage
 
-### Library Screen
+### Web Interface (Recommended for Easy Management)
 
-- **Next/Prev buttons**: Navigate book list
-- **Select button**: Open selected book
+1. **Find the IP address**: Displayed at the top of the library screen
+2. **Open in browser**: Navigate to `http://<pi-ip>:5000` on any device
+3. **Upload books**: Click "Choose File" and upload EPUB files
+4. **Remote control**: Use on-screen buttons to navigate:
+   - **Previous/Next**: Navigate through book list or pages
+   - **Select**: Open selected book
+   - **Back**: Return to library from book
+   - **Menu**: Always return to library
+   - **Refresh**: Reload the page to see updated book list
 
-### Reader Screen
+### Physical Buttons (Optional)
 
+Wire buttons to GPIO pins as specified in `config/gpio_mapping.yaml`:
+
+#### Library Screen
+- **Next/Prev buttons** (GPIO 5/6): Navigate book list
+- **Select button** (GPIO 13): Open selected book
+
+#### Reader Screen
 - **Next/Prev buttons**: Turn pages
-- **Back button**: Return to library
-- **Menu button**: Return to library
+- **Back button** (GPIO 19): Return to library
+- **Menu button** (GPIO 26): Return to library
 
 ## Development
 
