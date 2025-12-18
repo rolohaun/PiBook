@@ -62,41 +62,56 @@ class EPUBRenderer:
             page = self.doc[page_num]
 
             # Render at high DPI for quality
-            # Use higher DPI (250+) for crisp text on e-ink
-            render_dpi = max(self.dpi, 250)
+            # Use higher DPI (300) for crisp text on e-ink
+            render_dpi = max(self.dpi, 300)
             pix = page.get_pixmap(dpi=render_dpi)
 
             # Convert PyMuPDF pixmap to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            
+            # AUTO-CROP: Remove whitespace margins from the EPUB's internal styling
+            # This crops out the empty borders that the EPUB CSS creates
+            # Convert to grayscale for better edge detection
+            gray_for_crop = img.convert('L')
+            # Invert so white becomes black (background) - getbbox finds non-zero pixels
+            from PIL import ImageOps, ImageFilter
+            inverted = ImageOps.invert(gray_for_crop)
+            # Get bounding box of content (non-white areas)
+            bbox = inverted.getbbox()
+            if bbox:
+                # Add small padding (10px) around content
+                padding = 10
+                left = max(0, bbox[0] - padding)
+                top = max(0, bbox[1] - padding)
+                right = min(img.width, bbox[2] + padding)
+                bottom = min(img.height, bbox[3] + padding)
+                img = img.crop((left, top, right, bottom))
+                self.logger.debug(f"Auto-cropped from {pix.width}x{pix.height} to {img.width}x{img.height}")
 
-            # Calculate target size - use FULL screen width, minimal vertical margin for page number
-            margin_v = 30 if show_page_number else 0  # Room for page number at bottom only
-            usable_width = self.width  # Use full width
+            # Calculate target size - use FULL screen, minimal margin for page number
+            margin_v = 25 if show_page_number else 0
+            usable_width = self.width
             usable_height = self.height - margin_v
 
-            # Calculate zoom to FILL the width (prioritize horizontal fill for reading)
+            # Calculate zoom to fill screen while maintaining aspect ratio
             zoom_x = usable_width / img.width
             zoom_y = usable_height / img.height
-            
-            # Use the width zoom to fill horizontally, allow vertical overflow to be cropped
-            # This makes text larger and more readable
-            zoom = zoom_x * self.zoom_factor
-            
-            # But don't exceed vertical bounds too much
-            if zoom > zoom_y * 1.1:  # Allow 10% overflow max
-                zoom = zoom_y * self.zoom_factor
+            zoom = min(zoom_x, zoom_y) * self.zoom_factor
 
-            # Resize image to fit screen with zoom applied
+            # Resize image to fit screen
             target_width = int(img.width * zoom)
             target_height = int(img.height * zoom)
             img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            # Apply sharpening filter for crisper text on e-ink
+            img = img.filter(ImageFilter.SHARPEN)
 
             # Create white background with full dimensions
             background = Image.new('RGB', (self.width, self.height), 'white')
 
-            # Center horizontally, align to top vertically
+            # Center the content
             x_offset = (self.width - img.width) // 2
-            y_offset = max(0, (usable_height - img.height) // 2)
+            y_offset = (usable_height - img.height) // 2
             background.paste(img, (x_offset, y_offset))
 
             # Add page number overlay if requested
