@@ -35,6 +35,10 @@ class DisplayDriver:
         self.logger = logging.getLogger(__name__)
         self.partial_refresh_count = 0
         self.full_refresh_interval = 5  # Full refresh every N page turns
+        
+        # Physical hardware dimensions (always 800x480 for this display)
+        self.hw_width = 800
+        self.hw_height = 480
 
         # Try to import Waveshare library
         try:
@@ -118,10 +122,11 @@ class DisplayDriver:
                 buffer_data = self.epd.getbuffer(image)
 
                 # Waveshare 7.5" V2 uses display_Partial(Image, Xstart, Ystart, Xend, Yend)
+                # IMPORTANT: Use physical hardware dimensions, not logical rotated dimensions
                 if hasattr(self.epd, 'display_Partial'):
                     try:
-                        # Full screen partial refresh with coordinates
-                        self.epd.display_Partial(buffer_data, 0, 0, self.width, self.height)
+                        # Full screen partial refresh with HARDWARE coordinates (always 800x480)
+                        self.epd.display_Partial(buffer_data, 0, 0, self.hw_width, self.hw_height)
                         self.partial_refresh_count += 1
                         self.logger.info(f"PARTIAL refresh {self.partial_refresh_count}/{self.full_refresh_interval} (0.4s)")
                     except Exception as e:
