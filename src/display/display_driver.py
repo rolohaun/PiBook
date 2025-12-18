@@ -34,11 +34,12 @@ class DisplayDriver:
 
         # Try to import Waveshare library
         try:
-            from waveshare_epd import epd7in5
-            self.epd_module = epd7in5
+            from waveshare_epd import epd7in5_V2
+            self.epd_module = epd7in5_V2
             self.hardware_available = True
+            self.logger.info("Using Waveshare 7.5inch V2 driver (800x480)")
         except ImportError:
-            self.logger.warning("Waveshare library not found. Running in mock mode.")
+            self.logger.warning("Waveshare V2 library not found. Running in mock mode.")
             self.hardware_available = False
 
     def initialize(self):
