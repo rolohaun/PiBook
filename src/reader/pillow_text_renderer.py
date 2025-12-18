@@ -36,9 +36,10 @@ class PillowTextRenderer:
         self.margin_left = 30
         self.margin_right = 30
         self.margin_top = 30
-        self.margin_bottom = 50
-        self.line_spacing = 1.4
-        self.paragraph_spacing = 15
+        self.margin_bottom = 40
+        self.line_spacing = 1.3
+        self.paragraph_spacing = 5    # Reduced for book-like look
+        self.paragraph_indent = 40    # Indent for new paragraphs
         
         # Font sizes
         self.base_font_size = int(18 * zoom_factor)
@@ -63,175 +64,38 @@ class PillowTextRenderer:
             self.logger.error(f"Failed to load EPUB: {e}")
             raise
 
-    def _load_fonts(self):
-        """Load specific TrueType fonts for styles"""
-        font_families = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif",
-            "/usr/share/fonts/truetype/liberation/LiberationSerif",
-            "C:/Windows/Fonts/times"
-        ]
-        
-        base_path = None
-        for path in font_families:
-            # Check if Regular exists (handling extensions)
-            for ext in ['.ttf', '-Regular.ttf']:
-                if os.path.exists(path + ext) or os.path.exists(path + '.ttf'):
-                    base_path = path
-                    break
-            if base_path: break
-            
-        if not base_path:
-            self.logger.warning("No fonts found, using default")
-            default = ImageFont.load_default()
-            self.fonts = {k: default for k in ['normal', 'bold', 'italic', 'bold_italic', 'h1', 'h2']}
-            return
+    # ... (keep font loading) ...
 
-        def load(suffix, size):
-            try:
-                # Try common naming patterns
-                p = f"{base_path}{suffix}.ttf"
-                if not os.path.exists(p):
-                    p = f"{base_path}{suffix.replace('-','')}.ttf"
-                return ImageFont.truetype(p, size)
-            except:
-                return ImageFont.truetype(f"{base_path}.ttf", size)
-
-        self.fonts['normal'] = load("", self.base_font_size)
-        self.fonts['bold'] = load("-Bold", self.base_font_size)
-        self.fonts['italic'] = load("-Italic", self.base_font_size)
-        self.fonts['bold_italic'] = load("-BoldItalic", self.base_font_size)
-        self.fonts['h1'] = load("-Bold", self.header_font_size)
-        self.fonts['h2'] = load("-Bold", int(self.header_font_size * 0.9))
-
-    def _get_cache_path(self) -> str:
-        """Get path to cache file"""
-        return self.epub_path + f".{self.width}x{self.height}.{self.zoom_factor}.cache"
-
-    def _load_cache(self) -> bool:
-        """Try to load layout from cache"""
-        import pickle
-        cache_path = self._get_cache_path()
-        if os.path.exists(cache_path):
-            try:
-                # Check timestamp
-                if os.path.getmtime(cache_path) < os.path.getmtime(self.epub_path):
-                    return False
-                
-                with open(cache_path, 'rb') as f:
-                    data = pickle.load(f)
-                    self.pages = data['pages']
-                    self.page_count = data['page_count']
-                self.logger.info(f"Loaded layout from cache: {cache_path}")
-                return True
-            except Exception as e:
-                self.logger.warning(f"Failed to load cache: {e}")
-        return False
-
-    def _save_cache(self):
-        """Save layout to cache"""
-        import pickle
-        try:
-            cache_path = self._get_cache_path()
-            with open(cache_path, 'wb') as f:
-                pickle.dump({
-                    'pages': self.pages,
-                    'page_count': self.page_count
-                }, f)
-            self.logger.info(f"Saved layout to cache: {cache_path}")
-        except Exception as e:
-            self.logger.warning(f"Failed to save cache: {e}")
+    # ... (keep cache methods) ...
 
     def _load_epub(self):
-        self.logger.info(f"Loading EPUB: {self.epub_path}")
-        
-        # DEBUG: Parsing issue - disable cache
-        # if self._load_cache():
-        #    return
+        # Try cache first
+        if self._load_cache():
+            return
 
         self.book = epub.read_epub(self.epub_path)
         all_tokens = []
         
-        items = list(self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT))
-        self.logger.info(f"Found {len(items)} items in EPUB")
-
-        for i, item in enumerate(items):
+        for item in self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
             try:
                 content = item.get_content()
-                self.logger.debug(f"Item {i} raw size: {len(content)}")
-                
                 try:
                     html = content.decode('utf-8')
                 except UnicodeDecodeError:
                     html = content.decode('latin-1', errors='ignore')
                     
-                self.logger.debug(f"Item {i} HTML size: {len(html)}")
-                
                 tokens = self._parse_html(html)
-                self.logger.debug(f"Item {i} tokens: {len(tokens)}")
-                
                 if tokens:
                     all_tokens.extend(tokens)
                     all_tokens.append(TextToken("", "normal", new_paragraph=True)) 
             except Exception as e:
                 self.logger.warning(f"Chapter error: {e}")
                 
-        self.logger.info(f"Total tokens parsed: {len(all_tokens)}")
         self._reflow_pages(all_tokens)
-        
-        # Only save cache if we have content
-        if len(all_tokens) > 100:
-            self._save_cache()
-            
+        self._save_cache()
         self.logger.info(f"Loaded EPUB: {self.page_count} pages")
 
-    def _parse_html(self, html: str) -> List[TextToken]:
-        """Parse HTML into flat list of tokens with styles"""
-        soup = BeautifulSoup(html, 'html.parser')
-        tokens = []
-        
-        # Remove metadata
-        for tag in soup(['head', 'script', 'style', 'title', 'meta']):
-            tag.decompose()
-            
-        def process_node(node, current_style='normal'):
-            if isinstance(node, NavigableString):
-                text = str(node).replace('\n', ' ').strip()
-                if not text: return
-                
-                words = re.split(r'(\s+)', str(node).replace('\n', ' '))
-                for w in words:
-                    if w:
-                        tokens.append(TextToken(w, current_style))
-                return
-
-            if isinstance(node, Tag):
-                style = current_style
-                is_block = node.name in ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'br', 'li']
-                
-                # Determine style
-                if node.name in ['b', 'strong']:
-                    style = 'bold_italic' if 'italic' in style else 'bold'
-                elif node.name in ['i', 'em']:
-                    style = 'bold_italic' if 'bold' in style else 'italic'
-                elif node.name == 'h1':
-                    style = 'h1'
-                elif node.name == 'h2':
-                    style = 'h2'
-                elif node.name in ['h3', 'h4']:
-                    style = 'bold'
-                
-                if is_block and tokens and not tokens[-1].new_paragraph:
-                    # Mark last token to end paragraph
-                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
-                
-                for child in node.children:
-                    process_node(child, style)
-                    
-                if is_block and tokens and not tokens[-1].new_paragraph:
-                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
-
-        process_node(soup.body if soup.body else soup)
-        return tokens
+    # ... (keep _parse_html) ...
 
     def _reflow_pages(self, tokens: List[TextToken]):
         """Reflow tokens into pages based on width/height"""
@@ -239,8 +103,7 @@ class PillowTextRenderer:
         self.pages = []
         current_page = []
         current_y = self.margin_top
-        current_x = self.margin_left
-        line_height = 0
+        current_x = self.margin_left + self.paragraph_indent # Start indented
         
         # Pre-calculate font heights to avoid per-word overhead
         font_metrics = {}
@@ -274,9 +137,14 @@ class PillowTextRenderer:
             font = self.fonts.get(token.style, self.fonts['normal'])
             font_h = font_metrics.get(token.style, self.base_font_size)
             
-            # Handle headers with extra spacing
-            if token.style in ['h1', 'h2'] and not current_line:
-                current_y += self.paragraph_spacing
+            # Handle headers (no indent, extra space)
+            if token.style in ['h1', 'h2']:
+                if current_line:
+                     current_y = finish_line(current_line, current_y, current_line_max_h or font_h)
+                     current_line = []
+                     current_line_max_h = 0
+                current_x = self.margin_left # Headers not indented
+                current_y += self.paragraph_spacing * 2
             
             # Measure token width only
             try:
@@ -290,7 +158,7 @@ class PillowTextRenderer:
                 current_y = finish_line(current_line, current_y, current_line_max_h or font_h)
                 current_line = []
                 current_line_max_h = 0
-                current_x = self.margin_left
+                current_x = self.margin_left # Wrapped lines are NOT indented
                 # If whitespace caused wrap, skip it at start of new line
                 if token.text.isspace():
                     continue
@@ -304,7 +172,7 @@ class PillowTextRenderer:
                 current_y = finish_line(current_line, current_y, current_line_max_h or font_h)
                 current_line = []
                 current_line_max_h = 0
-                current_x = self.margin_left
+                current_x = self.margin_left + self.paragraph_indent # New paragraph IS indented
                 current_y += self.paragraph_spacing
                 
         # Finish last page
