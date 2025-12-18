@@ -216,29 +216,10 @@ class ReaderScreen:
         self.renderer = None
         self.page_cache = None
         self.epub_path = None
-        self.renderer_type = None  # Track which renderer is in use
+        self.renderer_type = None
 
-        # Pillow text renderer - Primary (Crisp text + Formatting)
-        # We upgraded this to support Bold/Italic so it's the best option
-        try:
-            from src.reader.pillow_text_renderer import PillowTextRenderer
-            self.PillowTextRenderer = PillowTextRenderer
-            self.logger.info("Pillow text renderer enabled (Crisp + Rich Text)")
-        except ImportError as e:
-            self.PillowTextRenderer = None
-            self.logger.info(f"Pillow text renderer not available: {e}")
-
-        # RAW renderer - DISABLED
-        self.RawRenderer = None
-
-        # WeasyPrint renderer - DISABLED
-        self.WeasyPrintRenderer = None
-
-        # Import PyMuPDF renderer as fallback
-        from src.reader.epub_renderer import EPUBRenderer
+        # Helper for page caching
         from src.reader.page_cache import PageCache
-
-        self.EPUBRenderer = EPUBRenderer
         self.PageCache = PageCache
         self.cache_size = cache_size
 
@@ -262,44 +243,29 @@ class ReaderScreen:
             if dpi is not None:
                 self.dpi = dpi
 
-            # Try RAW renderer first (zero processing - for baseline testing)
-            if self.RawRenderer:
-                try:
-                    self.renderer = self.RawRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
-                    self.renderer_type = 'raw'
-                    self.logger.info(f"Using RAW renderer (zero processing) for: {epub_path}")
-                except Exception as e:
-                    self.logger.warning(f"RAW renderer failed: {e}")
-                    self.renderer = None
+            # Initialize PillowTextRenderer
+            from src.reader.pillow_text_renderer import PillowTextRenderer
+            self.renderer = PillowTextRenderer(
+                epub_path, 
+                width=self.width, 
+                height=self.height, 
+                zoom_factor=self.zoom_factor, 
+                dpi=self.dpi
+            )
+            self.renderer_type = 'pillow'
+            self.logger.info(f"Using PillowTextRenderer for: {epub_path}")
 
-            # Try Pillow text renderer
-            if self.renderer is None and self.PillowTextRenderer:
-                try:
-                    self.renderer = self.PillowTextRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
-                    self.renderer_type = 'pillow'
-                    self.logger.info(f"Using Pillow text renderer for: {epub_path}")
-                except Exception as e:
-                    self.logger.warning(f"Pillow text renderer failed: {e}")
-                    self.renderer = None
-
-            # Try WeasyPrint renderer
-            if self.renderer is None and self.WeasyPrintRenderer:
-                try:
-                    self.renderer = self.WeasyPrintRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
-                    self.renderer_type = 'weasyprint'
-                    self.logger.info(f"Using WeasyPrint renderer for: {epub_path}")
-                except Exception as e:
-                    self.logger.warning(f"WeasyPrint renderer failed: {e}")
-                    self.renderer = None
-
-            # Fallback to PyMuPDF renderer
-            if self.renderer is None:
-                self.renderer = self.EPUBRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
-                self.renderer_type = 'pymupdf'
-                self.logger.info(f"Using PyMuPDF renderer for: {epub_path}")
+            self.epub_path = epub_path
 
             self.page_cache = self.PageCache(self.cache_size)
             self.current_page = 0
+            
+            # Pre-fill cache for first few pages
+            if self.page_cache:
+                self.page_cache.reset()
+                self._update_cache(0) # Cache surrounding pages
+
+        except Exception as e:
             self.epub_path = epub_path
 
             self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages, renderer={self.renderer_type}, zoom={self.zoom_factor}, dpi={self.dpi})")

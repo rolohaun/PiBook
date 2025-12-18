@@ -1,10 +1,7 @@
-PyMuPDF>=1.23.0
 Pillow>=10.0.0
 gpiozero>=2.0
 spidev>=3.6
 PyYAML>=6.0
 Flask>=3.0.0
-# WeasyPrint renderer dependencies
 EbookLib>=0.18
-WeasyPrint>=60.0
 beautifulsoup4>=4.12.0
