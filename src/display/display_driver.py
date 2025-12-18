@@ -42,13 +42,17 @@ class DisplayDriver:
         
         # Track if partial refresh mode has been initialized
         self.partial_mode_initialized = False
+        
+        # Grayscale mode support - 4-bit grayscale for smooth anti-aliased text
+        self.use_grayscale = True  # Enable grayscale mode by default
+        self.grayscale_initialized = False
 
         # Try to import Waveshare library
         try:
             from waveshare_epd import epd7in5_V2
             self.epd_module = epd7in5_V2
             self.hardware_available = True
-            self.logger.info("Using Waveshare 7.5inch V2 driver (800x480)")
+            self.logger.info("Using Waveshare 7.5inch V2 driver (800x480, 4-gray mode)")
         except ImportError:
             self.logger.warning("Waveshare V2 library not found. Running in mock mode.")
             self.hardware_available = False
@@ -93,22 +97,28 @@ class DisplayDriver:
         if image.size != (self.width, self.height):
             self.logger.warning(f"UNEXPECTED RESIZE from {image.size} to ({self.width}, {self.height}) - check renderer!")
             # Use NEAREST for 1-bit images to avoid creating gray pixels
-            # LANCZOS would interpolate and create artifacts
+            # LANCZOS for grayscale/color for smooth scaling
             if image.mode == '1':
                 image = image.resize((self.width, self.height), Image.Resampling.NEAREST)
             else:
                 image = image.resize((self.width, self.height), Image.Resampling.LANCZOS)
 
-        # Ensure image is 1-bit (black and white)
-        if image.mode != '1':
-            self.logger.debug(f"Converting image from {image.mode} to 1-bit")
-            image = image.convert('1', dither=Image.Dither.NONE)
+        # For grayscale mode, keep the image as grayscale (mode 'L')
+        # Only convert to 1-bit if NOT using grayscale mode
+        if not self.use_grayscale:
+            if image.mode != '1':
+                self.logger.debug(f"Converting image from {image.mode} to 1-bit (grayscale mode disabled)")
+                image = image.convert('1', dither=Image.Dither.NONE)
+        else:
+            # For grayscale mode, ensure image is 'L' (8-bit grayscale)
+            if image.mode == '1':
+                image = image.convert('L')
 
         # Apply rotation if needed (for portrait mode)
         if self.rotation != 0:
-            # Rotate the image (negative angle for clockwise rotation in PIL)
-            # Use NEAREST for rotation to avoid creating gray pixels on 1-bit images
-            image = image.rotate(-self.rotation, expand=True, resample=Image.Resampling.NEAREST)
+            # Use BILINEAR for grayscale rotation (smooth), NEAREST for 1-bit (sharp)
+            resample = Image.Resampling.NEAREST if image.mode == '1' else Image.Resampling.BILINEAR
+            image = image.rotate(-self.rotation, expand=True, resample=resample)
             self.logger.debug(f"Rotated image by {self.rotation} degrees")
 
         if not self.hardware_available or not self.epd:
@@ -127,14 +137,28 @@ class DisplayDriver:
                 # Full refresh - clears ghosting
                 self.logger.info(f"Performing FULL refresh (count reset from {self.partial_refresh_count})")
                 
-                # If we were in partial mode, reinitialize for full refresh
-                # The display needs init() to properly do a full refresh after init_part()
-                if self.partial_mode_initialized:
-                    self.logger.info("Reinitializing display for full refresh mode")
-                    self.epd.init()
+                # Use grayscale mode for better text quality
+                if self.use_grayscale and hasattr(self.epd, 'init_4Gray'):
+                    if not self.grayscale_initialized:
+                        self.logger.info("Initializing 4-Gray mode for anti-aliased text")
+                        self.epd.init_4Gray()
+                        self.grayscale_initialized = True
+                    
+                    # For grayscale, image should be mode 'L' (8-bit grayscale)
+                    if image.mode == '1':
+                        image = image.convert('L')
+                    
+                    self.epd.display_4Gray(self.epd.getbuffer_4Gray(image))
                     self.partial_mode_initialized = False
+                else:
+                    # Fallback to 1-bit mode
+                    if self.partial_mode_initialized:
+                        self.logger.info("Reinitializing display for full refresh mode")
+                        self.epd.init()
+                        self.partial_mode_initialized = False
+                    
+                    self.epd.display(self.epd.getbuffer(image))
                 
-                self.epd.display(self.epd.getbuffer(image))
                 self.partial_refresh_count = 0
             else:
                 # Partial refresh - faster but may cause ghosting
