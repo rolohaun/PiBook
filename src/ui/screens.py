@@ -218,14 +218,17 @@ class ReaderScreen:
         self.epub_path = None
         self.renderer_type = None  # Track which renderer is in use
 
-        # Try to import Pillow text renderer first (crispest text - direct TTF rendering)
-        try:
-            from src.reader.pillow_text_renderer import PillowTextRenderer
-            self.PillowTextRenderer = PillowTextRenderer
-            self.logger.info("Pillow text renderer available (best for e-ink)")
-        except ImportError as e:
-            self.PillowTextRenderer = None
-            self.logger.info(f"Pillow text renderer not available: {e}")
+        # Pillow text renderer (crispest text but loses EPUB formatting)
+        # DISABLED by default - use PyMuPDF which preserves formatting
+        # Set self.PillowTextRenderer = PillowTextRenderer to enable
+        self.PillowTextRenderer = None
+        # try:
+        #     from src.reader.pillow_text_renderer import PillowTextRenderer
+        #     self.PillowTextRenderer = PillowTextRenderer
+        #     self.logger.info("Pillow text renderer available (best for e-ink)")
+        # except ImportError as e:
+        #     self.PillowTextRenderer = None
+        #     self.logger.info(f"Pillow text renderer not available: {e}")
 
         # Try WeasyPrint renderer as second option
         try:

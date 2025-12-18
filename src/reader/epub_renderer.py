@@ -113,14 +113,21 @@ class EPUBRenderer:
                 self.logger.debug("Using dithering for image page")
                 bw = gray.convert('1')  # Default Floyd-Steinberg dithering
             else:
-                # For text: use threshold conversion for solid black text
-                # Boost contrast first
+                # For text: apply aggressive processing for crisp black text
+                # 1. Boost contrast significantly
                 enhancer = ImageEnhance.Contrast(gray)
-                gray = enhancer.enhance(1.3)
+                gray = enhancer.enhance(1.5)
                 
-                # Convert to 1-bit with NO dithering for crisp text edges
-                bw = gray.convert('1', dither=Image.Dither.NONE)
-                self.logger.debug("Using threshold (no dither) for text page")
+                # 2. Apply sharpening to enhance text edges
+                from PIL import ImageFilter
+                gray = gray.filter(ImageFilter.SHARPEN)
+                
+                # 3. Use manual threshold for crisp black/white conversion
+                # Higher threshold (200) = more aggressive black, crisper text
+                # This is the key to matching Pillow's direct text rendering
+                threshold = 200
+                bw = gray.point(lambda x: 0 if x < threshold else 255, '1')
+                self.logger.debug(f"Using manual threshold ({threshold}) for text page")
 
             # Create white 1-bit background
             background = Image.new('1', (self.width, self.height), 1)  # 1 = white
