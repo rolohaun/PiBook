@@ -1,0 +1,25 @@
+# PiBook E-Reader Configuration
+# This file works identically on Pi 3B+ and Pi Zero 2 W
+
+display:
+  width: 800
+  height: 480
+  dpi: 150                    # DPI for PyMuPDF rendering
+
+library:
+  books_directory: "/home/pi/PiBook/books"
+  items_per_page: 8
+  font_size: 20               # For library menu rendering only
+
+reader:
+  page_cache_size: 5          # Rendered page cache (reduce to 3 for Pi Zero 2 W)
+  zoom: 1.0                   # Page zoom factor (1.0 = fit to screen)
+
+performance:
+  gc_threshold: 100           # Reduce to 50 for Pi Zero 2 W
+  preload_next_page: false    # Preload next page in background (experimental)
+
+logging:
+  level: "INFO"               # DEBUG, INFO, WARNING, ERROR
+  file: "/home/pi/PiBook/logs/app.log"
+  console: true

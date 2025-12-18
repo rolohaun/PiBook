@@ -1,0 +1,34 @@
+# GPIO Button Configuration
+# Pin numbering uses BCM (Broadcom) mode
+# These pins work identically on Pi 3B+ and Pi Zero 2 W (both have 40-pin headers)
+
+buttons:
+  next_page:
+    pin: 5                    # BCM GPIO 5
+    pull: "up"                # Internal pull-up resistor
+    bounce_time: 0.2          # 200ms debounce time
+
+  prev_page:
+    pin: 6                    # BCM GPIO 6
+    pull: "up"
+    bounce_time: 0.2
+
+  select:
+    pin: 13                   # BCM GPIO 13
+    pull: "up"
+    bounce_time: 0.2
+
+  back:
+    pin: 19                   # BCM GPIO 19
+    pull: "up"
+    bounce_time: 0.2
+
+  menu:
+    pin: 26                   # BCM GPIO 26
+    pull: "up"
+    bounce_time: 0.2
+
+# Button wiring:
+# Connect one side of each button to the GPIO pin
+# Connect the other side to GND
+# The pull-up resistor keeps the pin HIGH, button press pulls it LOW

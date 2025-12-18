@@ -1,0 +1,18 @@
+[Unit]
+Description=PiBook E-Reader Application
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/PiBook
+Environment="PIBOOK_CONFIG=/home/pi/PiBook/config/config.yaml"
+ExecStart=/usr/bin/python3 /home/pi/PiBook/src/main.py
+Restart=on-failure
+RestartSec=10
+
+# Performance tuning (adjust if needed for Pi Zero 2 W)
+Nice=0
+
+[Install]
+WantedBy=multi-user.target
