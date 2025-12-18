@@ -107,21 +107,17 @@ class EPUBRenderer:
                 # 3. Convert to grayscale
                 gray = img.convert('L')
                 
-                # 4. TEXT THICKENING - Enhance contrast heavily
+                # 4. TEXT THICKENING - Enhance contrast
                 enhancer = ImageEnhance.Contrast(gray)
-                gray = enhancer.enhance(2.0)
+                gray = enhancer.enhance(1.5)
                 
-                # 5. GAMMA CORRECTION - Thicken text by darkening mid-tones
-                # Values < 1.0 make gray pixels blacker (effectively "bolds" the font)
-                gamma = 0.6
-                gray = gray.point(lambda p: int(255 * ((p / 255) ** gamma)))
-                
-                # 6. HARD THRESHOLD (Fixes the "Sand/Noise")
-                # Any pixel lighter than 200 becomes WHITE (cleans the off-white background)
+                # 5. HARD THRESHOLD (Fixes the "Sand/Noise")
+                # Any pixel lighter than 200 becomes WHITE
                 # Any pixel darker than 200 becomes BLACK
+                # Without the lightening gamma, this high threshold will naturally thicken text
                 threshold = 200
                 bw = gray.point(lambda x: 255 if x > threshold else 0, mode='1')
-                self.logger.debug(f"Clean e-ink: 3x super-sample, contrast 2.0, gamma {gamma}, threshold {threshold}")
+                self.logger.debug(f"Clean e-ink: 3x super-sample, contrast 1.5, threshold {threshold}")
 
             # Create white 1-bit background
             background = Image.new('1', (self.width, self.height), 1)  # 1 = white
