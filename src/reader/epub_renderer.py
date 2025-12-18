@@ -60,83 +60,65 @@ class EPUBRenderer:
         try:
             # Get page from PyMuPDF
             page = self.doc[page_num]
-
-            # Disable anti-aliasing for crisp text rendering on e-ink
-            # Level 0 = no anti-aliasing (sharp pixel edges)
-            # This is crucial for 1-bit e-ink displays
-            fitz.TOOLS.set_aa_level(0)
-
-            # Render at high DPI for quality - higher = sharper source
-            render_dpi = max(self.dpi, 300)
-            pix = page.get_pixmap(dpi=render_dpi)
-
-            # Convert PyMuPDF pixmap to PIL Image
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             
             # Import PIL filters
             from PIL import ImageOps, ImageFilter, ImageEnhance
-            
-            # AUTO-CROP: Remove whitespace margins from the EPUB's internal styling
-            gray_for_crop = img.convert('L')
-            inverted = ImageOps.invert(gray_for_crop)
-            bbox = inverted.getbbox()
-            if bbox:
-                padding = 10
-                left = max(0, bbox[0] - padding)
-                top = max(0, bbox[1] - padding)
-                right = min(img.width, bbox[2] + padding)
-                bottom = min(img.height, bbox[3] + padding)
-                img = img.crop((left, top, right, bottom))
-                self.logger.debug(f"Auto-cropped from {pix.width}x{pix.height} to {img.width}x{img.height}")
-
-            # Convert to grayscale
-            gray = img.convert('L')
-            
-            # Detect if this is an image-heavy page (like a cover) or text page
-            # Image pages have many unique gray values, text pages are mostly black/white
-            # Sample the image to check variance
-            small = gray.resize((100, 100), Image.Resampling.NEAREST)
-            pixels = list(small.getdata())
-            unique_values = len(set(pixels))
-            
-            # If many unique gray values (>50), this is likely an image - use dithering
-            # If few unique values, this is text - use threshold
-            is_image_page = unique_values > 50
-            self.logger.debug(f"Page {page_num}: unique gray values={unique_values}, is_image={is_image_page}")
             
             # Calculate target size
             margin_v = 25 if show_page_number else 0
             usable_width = self.width
             usable_height = self.height - margin_v
-
-            zoom_x = usable_width / gray.width
-            zoom_y = usable_height / gray.height
-            zoom = min(zoom_x, zoom_y) * self.zoom_factor
-
-            target_width = int(gray.width * zoom)
-            target_height = int(gray.height * zoom)
             
-            # Resize FIRST in grayscale (high quality), THEN convert to 1-bit
-            gray = gray.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            # Get page dimensions
+            page_rect = page.rect
+            page_width = page_rect.width
+            page_height = page_rect.height
+            
+            # Calculate zoom to fit screen - render DIRECTLY at target size
+            # This eliminates any resize step which causes quality loss
+            zoom_x = usable_width / page_width
+            zoom_y = usable_height / page_height
+            zoom = min(zoom_x, zoom_y) * self.zoom_factor
+            
+            # Create transformation matrix for direct rendering at target size
+            mat = fitz.Matrix(zoom, zoom)
+            
+            # Disable anti-aliasing for crisp text rendering on e-ink
+            # Level 0 = no anti-aliasing (sharp pixel edges)
+            fitz.TOOLS.set_aa_level(0)
+            
+            # Render page directly at target size - NO RESIZE NEEDED
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            self.logger.debug(f"Rendered at {pix.width}x{pix.height} (zoom={zoom:.3f})")
+
+            # Convert PyMuPDF pixmap to PIL Image
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            
+            # Convert to grayscale
+            gray = img.convert('L')
+            
+            # Detect if this is an image-heavy page (like a cover) or text page
+            small = gray.resize((50, 50), Image.Resampling.NEAREST)
+            pixels = list(small.getdata())
+            unique_values = len(set(pixels))
+            is_image_page = unique_values > 40
+            self.logger.debug(f"Page {page_num}: unique_values={unique_values}, is_image={is_image_page}")
             
             if is_image_page:
-                # For images/covers: use Floyd-Steinberg dithering to preserve shading
-                # Re-enable anti-aliasing for smooth gradients in images
+                # For images/covers: re-render with anti-aliasing and use dithering
                 fitz.TOOLS.set_aa_level(8)
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                gray = img.convert('L')
                 self.logger.debug("Using dithering for image page")
                 bw = gray.convert('1')  # Default dithering preserves gradients
             else:
-                # For text: use threshold conversion WITHOUT dithering
-                # The dither=False parameter is crucial - it prevents Pillow from
-                # creating gray dithering patterns that look fuzzy on e-ink
+                # For text: threshold conversion WITHOUT dithering
+                # Boost contrast slightly
                 enhancer = ImageEnhance.Contrast(gray)
-                gray = enhancer.enhance(1.3)  # Slight contrast boost
+                gray = enhancer.enhance(1.2)
                 
-                # Apply sharpening for crisper text edges
-                gray = gray.filter(ImageFilter.SHARPEN)
-                
-                # Convert to 1-bit with dither=False for crisp threshold
-                # This uses simple threshold at 128 (midpoint) without dithering
+                # Convert to 1-bit with NO dithering for crisp text
                 bw = gray.convert('1', dither=Image.Dither.NONE)
                 self.logger.debug("Using threshold (no dither) for text page")
 
