@@ -84,32 +84,51 @@ class EPUBRenderer:
                 img = img.crop((left, top, right, bottom))
                 self.logger.debug(f"Auto-cropped from {pix.width}x{pix.height} to {img.width}x{img.height}")
 
-            # Convert to grayscale for processing
+            # Convert to grayscale
             gray = img.convert('L')
             
-            # Boost contrast BEFORE thresholding - makes text darker and background lighter
-            enhancer = ImageEnhance.Contrast(gray)
-            gray = enhancer.enhance(2.0)  # Double the contrast
+            # Detect if this is an image-heavy page (like a cover) or text page
+            # Image pages have many unique gray values, text pages are mostly black/white
+            # Sample the image to check variance
+            small = gray.resize((100, 100), Image.Resampling.NEAREST)
+            pixels = list(small.getdata())
+            unique_values = len(set(pixels))
             
-            # Convert to 1-bit BEFORE resizing to avoid antialiasing creating gray pixels
-            # Use a threshold that makes text solid black
-            threshold = 180
-            bw = gray.point(lambda x: 0 if x < threshold else 255, '1')
+            # If many unique gray values (>50), this is likely an image - use dithering
+            # If few unique values, this is text - use threshold
+            is_image_page = unique_values > 50
+            self.logger.debug(f"Page {page_num}: unique gray values={unique_values}, is_image={is_image_page}")
             
-            # Now resize the 1-bit image - no antialiasing possible
+            # Calculate target size
             margin_v = 25 if show_page_number else 0
             usable_width = self.width
             usable_height = self.height - margin_v
 
-            zoom_x = usable_width / bw.width
-            zoom_y = usable_height / bw.height
+            zoom_x = usable_width / gray.width
+            zoom_y = usable_height / gray.height
             zoom = min(zoom_x, zoom_y) * self.zoom_factor
 
-            target_width = int(bw.width * zoom)
-            target_height = int(bw.height * zoom)
+            target_width = int(gray.width * zoom)
+            target_height = int(gray.height * zoom)
             
-            # Use NEAREST for 1-bit to avoid creating gray edges
-            bw = bw.resize((target_width, target_height), Image.Resampling.NEAREST)
+            # Resize FIRST in grayscale (high quality), THEN convert to 1-bit
+            gray = gray.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            if is_image_page:
+                # For images/covers: use Floyd-Steinberg dithering to preserve shading
+                self.logger.debug("Using dithering for image page")
+                bw = gray.convert('1')  # Default dithering preserves gradients
+            else:
+                # For text: boost contrast and use threshold for solid black text
+                enhancer = ImageEnhance.Contrast(gray)
+                gray = enhancer.enhance(1.5)  # Slight contrast boost
+                
+                # Apply sharpening for crisper text edges
+                gray = gray.filter(ImageFilter.SHARPEN)
+                
+                # Threshold to pure black/white
+                threshold = 180
+                bw = gray.point(lambda x: 0 if x < threshold else 255, '1')
 
             # Create white 1-bit background
             background = Image.new('1', (self.width, self.height), 1)  # 1 = white
