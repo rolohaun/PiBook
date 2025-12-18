@@ -30,14 +30,16 @@ sudo apt-get install -y \
     python3-dev \
     python3-yaml \
     libopenjp2-7 \
-    libtiff5 \
-    libfreetype6-dev \
+    libtiff-dev \
+    libfreetype-dev \
     libjpeg-dev \
-    libmupdf-dev \
-    fonts-dejavu \
-    fonts-dejavu-core \
     git \
     build-essential
+
+# Try to install mupdf (optional, may not be available on all systems)
+echo "Installing optional dependencies..."
+sudo apt-get install -y libmupdf-dev || echo "libmupdf-dev not available, will install via pip"
+sudo apt-get install -y fonts-dejavu fonts-dejavu-core || echo "Fonts already available"
 
 echo ""
 
