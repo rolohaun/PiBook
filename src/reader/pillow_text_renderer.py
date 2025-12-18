@@ -103,7 +103,49 @@ class PillowTextRenderer:
         self.fonts['h1'] = load("-Bold", self.header_font_size)
         self.fonts['h2'] = load("-Bold", int(self.header_font_size * 0.9))
 
+    def _get_cache_path(self) -> str:
+        """Get path to cache file"""
+        return self.epub_path + f".{self.width}x{self.height}.{self.zoom_factor}.cache"
+
+    def _load_cache(self) -> bool:
+        """Try to load layout from cache"""
+        import pickle
+        cache_path = self._get_cache_path()
+        if os.path.exists(cache_path):
+            try:
+                # Check timestamp
+                if os.path.getmtime(cache_path) < os.path.getmtime(self.epub_path):
+                    return False
+                
+                with open(cache_path, 'rb') as f:
+                    data = pickle.load(f)
+                    self.pages = data['pages']
+                    self.page_count = data['page_count']
+                self.logger.info(f"Loaded layout from cache: {cache_path}")
+                return True
+            except Exception as e:
+                self.logger.warning(f"Failed to load cache: {e}")
+        return False
+
+    def _save_cache(self):
+        """Save layout to cache"""
+        import pickle
+        try:
+            cache_path = self._get_cache_path()
+            with open(cache_path, 'wb') as f:
+                pickle.dump({
+                    'pages': self.pages,
+                    'page_count': self.page_count
+                }, f)
+            self.logger.info(f"Saved layout to cache: {cache_path}")
+        except Exception as e:
+            self.logger.warning(f"Failed to save cache: {e}")
+
     def _load_epub(self):
+        # Try cache first
+        if self._load_cache():
+            return
+
         self.book = epub.read_epub(self.epub_path)
         all_tokens = []
         
@@ -118,58 +160,10 @@ class PillowTextRenderer:
                 self.logger.warning(f"Chapter error: {e}")
                 
         self._reflow_pages(all_tokens)
+        self._save_cache()
         self.logger.info(f"Loaded EPUB: {self.page_count} pages")
 
-    def _parse_html(self, html: str) -> List[TextToken]:
-        """Parse HTML into flat list of tokens with styles"""
-        soup = BeautifulSoup(html, 'html.parser')
-        tokens = []
-        
-        # Remove metadata
-        for tag in soup(['head', 'script', 'style']):
-            tag.decompose()
-            
-        def process_node(node, current_style='normal'):
-            if isinstance(node, NavigableString):
-                text = str(node).replace('\n', ' ').strip()
-                if not text: return
-                # Split into words to allow wrapping, but keep them as one token for now
-                # We'll split tokens by spaces in reflow if needed, or here?
-                # Better to split by words here
-                words = re.split(r'(\s+)', str(node).replace('\n', ' '))
-                for w in words:
-                    if w:
-                        tokens.append(TextToken(w, current_style))
-                return
-
-            if isinstance(node, Tag):
-                style = current_style
-                is_block = node.name in ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'br', 'li']
-                
-                # Determine style
-                if node.name in ['b', 'strong']:
-                    style = 'bold_italic' if 'italic' in style else 'bold'
-                elif node.name in ['i', 'em']:
-                    style = 'bold_italic' if 'bold' in style else 'italic'
-                elif node.name == 'h1':
-                    style = 'h1'
-                elif node.name == 'h2':
-                    style = 'h2'
-                elif node.name in ['h3', 'h4']:
-                    style = 'bold'
-                
-                if is_block and tokens and not tokens[-1].new_paragraph:
-                    # Mark last token to end paragraph
-                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
-                
-                for child in node.children:
-                    process_node(child, style)
-                    
-                if is_block and tokens and not tokens[-1].new_paragraph:
-                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
-
-        process_node(soup.body if soup.body else soup)
-        return tokens
+    # ... (keep _parse_html as is) ...
 
     def _reflow_pages(self, tokens: List[TextToken]):
         """Reflow tokens into pages based on width/height"""
@@ -195,18 +189,18 @@ class PillowTextRenderer:
                 current_y = self.margin_top
                 y = current_y
             
-            for txt, fnt, x in line_items:
-                current_page.append((x, y, txt, fnt))
+            for txt, style, x in line_items:
+                current_page.append((x, y, txt, style))
             current_y += int(h * self.line_spacing)
             return current_y
 
-        current_line = [] # (text, font, x)
+        current_line = [] # (text, style, x)
         current_line_max_h = 0
         
         count = 0
         for token in tokens:
             count += 1
-            if count % 5000 == 0:
+            if count % 10000 == 0:
                 self.logger.debug(f"Reflow progress: {count}/{len(tokens)}")
 
             font = self.fonts.get(token.style, self.fonts['normal'])
@@ -233,7 +227,7 @@ class PillowTextRenderer:
                 if token.text.isspace():
                     continue
 
-            current_line.append((token.text, font, current_x))
+            current_line.append((token.text, token.style, current_x))
             current_x += width
             current_line_max_h = max(current_line_max_h, font_h)
             
@@ -263,7 +257,8 @@ class PillowTextRenderer:
         draw = ImageDraw.Draw(image)
         
         if 0 <= page_num < len(self.pages):
-            for x, y, text, font in self.pages[page_num]:
+            for x, y, text, style in self.pages[page_num]:
+                font = self.fonts.get(style, self.fonts['normal'])
                 draw.text((x, y), text, font=font, fill=0)
                 
         if show_page_number:
