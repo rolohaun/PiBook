@@ -104,37 +104,31 @@ class EPUBRenderer:
             is_image_page = unique_values > 40
             self.logger.debug(f"Page {page_num}: unique_values={unique_values}, is_image={is_image_page}")
             
-            # USE GRAYSCALE OUTPUT for smooth anti-aliased text
-            # The display driver will use 4-Gray mode to render this properly
-            # This gives us the crisp, smooth text like commercial e-readers
-            
             if is_image_page:
-                # For images/covers: keep full anti-aliasing
+                # For images/covers: use dithering to preserve gradients
                 fitz.TOOLS.set_aa_level(8)
                 pix = page.get_pixmap(matrix=mat, alpha=False)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                 gray = img.convert('L')
-                self.logger.debug("Rendering image page with full grayscale")
+                self.logger.debug("Using dithering for image page")
+                bw = gray.convert('1')  # Default Floyd-Steinberg dithering
             else:
-                # For text: enhance contrast slightly for better readability
-                # But keep anti-aliasing for smooth text edges
-                fitz.TOOLS.set_aa_level(8)  # Enable anti-aliasing for smooth text
-                pix = page.get_pixmap(matrix=mat, alpha=False)
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                gray = img.convert('L')
-                
-                # Boost contrast for text
+                # For text: use threshold conversion for solid black text
+                # Boost contrast first
                 enhancer = ImageEnhance.Contrast(gray)
                 gray = enhancer.enhance(1.3)
-                self.logger.debug("Rendering text page with anti-aliased grayscale")
+                
+                # Convert to 1-bit with NO dithering for crisp text edges
+                bw = gray.convert('1', dither=Image.Dither.NONE)
+                self.logger.debug("Using threshold (no dither) for text page")
 
-            # Create white grayscale background (mode 'L' = 8-bit grayscale)
-            background = Image.new('L', (self.width, self.height), 255)  # 255 = white
+            # Create white 1-bit background
+            background = Image.new('1', (self.width, self.height), 1)  # 1 = white
 
             # Center the content
-            x_offset = (self.width - gray.width) // 2
-            y_offset = (usable_height - gray.height) // 2
-            background.paste(gray, (x_offset, y_offset))
+            x_offset = (self.width - bw.width) // 2
+            y_offset = (usable_height - bw.height) // 2
+            background.paste(bw, (x_offset, y_offset))
 
             # Add page number overlay if requested
             if show_page_number:
@@ -154,10 +148,10 @@ class EPUBRenderer:
                 except:
                     text_x = self.width // 2 - 50
 
-                # For grayscale images, fill=0 is black
+                # For 1-bit images, fill=0 is black
                 draw.text((text_x, self.height - 22), page_text, fill=0, font=font)
 
-            self.logger.debug(f"Rendered page {page_num + 1}/{self.page_count} in grayscale mode")
+            self.logger.debug(f"Rendered page {page_num + 1}/{self.page_count}")
             return background
 
         except Exception as e:
