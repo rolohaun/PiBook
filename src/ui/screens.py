@@ -216,8 +216,18 @@ class ReaderScreen:
         self.renderer = None
         self.page_cache = None
         self.epub_path = None
+        self.renderer_type = None  # Track which renderer is in use
 
-        # Import after initialization to avoid circular dependencies
+        # Try to import WeasyPrint renderer first (better text quality)
+        try:
+            from src.reader.weasyprint_renderer import WeasyPrintRenderer
+            self.WeasyPrintRenderer = WeasyPrintRenderer
+            self.logger.info("WeasyPrint renderer available")
+        except ImportError as e:
+            self.WeasyPrintRenderer = None
+            self.logger.info(f"WeasyPrint renderer not available: {e}")
+
+        # Import PyMuPDF renderer as fallback
         from src.reader.epub_renderer import EPUBRenderer
         from src.reader.page_cache import PageCache
 
@@ -245,13 +255,27 @@ class ReaderScreen:
             if dpi is not None:
                 self.dpi = dpi
 
-            # Create new renderer and cache
-            self.renderer = self.EPUBRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
+            # Try WeasyPrint renderer first (better text quality)
+            if self.WeasyPrintRenderer:
+                try:
+                    self.renderer = self.WeasyPrintRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
+                    self.renderer_type = 'weasyprint'
+                    self.logger.info(f"Using WeasyPrint renderer for: {epub_path}")
+                except Exception as e:
+                    self.logger.warning(f"WeasyPrint renderer failed: {e}, falling back to PyMuPDF")
+                    self.renderer = None
+
+            # Fallback to PyMuPDF renderer
+            if self.renderer is None:
+                self.renderer = self.EPUBRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
+                self.renderer_type = 'pymupdf'
+                self.logger.info(f"Using PyMuPDF renderer for: {epub_path}")
+
             self.page_cache = self.PageCache(self.cache_size)
             self.current_page = 0
             self.epub_path = epub_path
 
-            self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages, zoom={self.zoom_factor}, dpi={self.dpi})")
+            self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages, renderer={self.renderer_type}, zoom={self.zoom_factor}, dpi={self.dpi})")
 
         except Exception as e:
             self.logger.error(f"Failed to load EPUB: {e}")
