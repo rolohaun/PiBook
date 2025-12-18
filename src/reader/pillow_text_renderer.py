@@ -64,9 +64,83 @@ class PillowTextRenderer:
             self.logger.error(f"Failed to load EPUB: {e}")
             raise
 
-    # ... (keep font loading) ...
+    def _load_fonts(self):
+        """Load specific TrueType fonts for styles"""
+        font_families = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif",
+            "/usr/share/fonts/truetype/liberation/LiberationSerif",
+            "C:/Windows/Fonts/times"
+        ]
+        
+        base_path = None
+        for path in font_families:
+            # Check if Regular exists (handling extensions)
+            for ext in ['.ttf', '-Regular.ttf']:
+                if os.path.exists(path + ext) or os.path.exists(path + '.ttf'):
+                    base_path = path
+                    break
+            if base_path: break
+            
+        if not base_path:
+            self.logger.warning("No fonts found, using default")
+            default = ImageFont.load_default()
+            self.fonts = {k: default for k in ['normal', 'bold', 'italic', 'bold_italic', 'h1', 'h2']}
+            return
 
-    # ... (keep cache methods) ...
+        def load(suffix, size):
+            try:
+                # Try common naming patterns
+                p = f"{base_path}{suffix}.ttf"
+                if not os.path.exists(p):
+                    p = f"{base_path}{suffix.replace('-','')}.ttf"
+                return ImageFont.truetype(p, size)
+            except:
+                return ImageFont.truetype(f"{base_path}.ttf", size)
+
+        self.fonts['normal'] = load("", self.base_font_size)
+        self.fonts['bold'] = load("-Bold", self.base_font_size)
+        self.fonts['italic'] = load("-Italic", self.base_font_size)
+        self.fonts['bold_italic'] = load("-BoldItalic", self.base_font_size)
+        self.fonts['h1'] = load("-Bold", self.header_font_size)
+        self.fonts['h2'] = load("-Bold", int(self.header_font_size * 0.9))
+
+    def _get_cache_path(self) -> str:
+        """Get path to cache file"""
+        return self.epub_path + f".{self.width}x{self.height}.{self.zoom_factor}.cache"
+
+    def _load_cache(self) -> bool:
+        """Try to load layout from cache"""
+        import pickle
+        cache_path = self._get_cache_path()
+        if os.path.exists(cache_path):
+            try:
+                # Check timestamp
+                if os.path.getmtime(cache_path) < os.path.getmtime(self.epub_path):
+                    return False
+                
+                with open(cache_path, 'rb') as f:
+                    data = pickle.load(f)
+                    self.pages = data['pages']
+                    self.page_count = data['page_count']
+                self.logger.info(f"Loaded layout from cache: {cache_path}")
+                return True
+            except Exception as e:
+                self.logger.warning(f"Failed to load cache: {e}")
+        return False
+
+    def _save_cache(self):
+        """Save layout to cache"""
+        import pickle
+        try:
+            cache_path = self._get_cache_path()
+            with open(cache_path, 'wb') as f:
+                pickle.dump({
+                    'pages': self.pages,
+                    'page_count': self.page_count
+                }, f)
+            self.logger.info(f"Saved layout to cache: {cache_path}")
+        except Exception as e:
+            self.logger.warning(f"Failed to save cache: {e}")
 
     def _load_epub(self):
         # Try cache first
