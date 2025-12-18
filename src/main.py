@@ -191,7 +191,39 @@ class PiBookApp:
             self.logger.error(f"Fatal error: {e}", exc_info=True)
             self.stop()
 
-    # ... (keep stop/signal handlers) ...
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals"""
+        self.logger.info(f"Received signal {signum}")
+        self.stop()
+        sys.exit(0)
+
+    def stop(self):
+        """Clean shutdown"""
+        self.logger.info("Shutting down...")
+        self.running = False
+
+        # Close reader
+        if self.reader_screen:
+            self.reader_screen.close()
+
+        # Cleanup hardware
+        if self.display:
+            self.display.cleanup()
+
+        if self.gpio:
+            self.gpio.cleanup()
+
+        self.logger.info("PiBook stopped")
+
+    def _register_gpio_callbacks(self):
+        """Register button callbacks"""
+        self.gpio.register_callback('next_page', self._handle_next)
+        self.gpio.register_callback('prev_page', self._handle_prev)
+        self.gpio.register_callback('select', self._handle_select)
+        self.gpio.register_callback('back', self._handle_back)
+        self.gpio.register_callback('menu', self._handle_menu)
+
+        self.logger.info("GPIO callbacks registered")
 
     def _monitor_inactivity(self):
         """Background thread to check for inactivity"""
