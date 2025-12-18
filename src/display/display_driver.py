@@ -130,82 +130,89 @@ class DisplayDriver:
             return
 
         try:
-            # Decide whether to use partial or full refresh
-            should_full_refresh = not use_partial or (self.partial_refresh_count >= self.full_refresh_interval)
-
-            if should_full_refresh:
-                # Full refresh - clears ghosting
-                self.logger.info(f"Performing FULL refresh (count reset from {self.partial_refresh_count})")
+            # In grayscale mode, always use full refresh (4Gray doesn't support partial)
+            # In 1-bit mode, use partial refresh as before
+            if self.use_grayscale:
+                # Grayscale 4-Gray mode - always full refresh
+                self.logger.info(f"Performing 4-Gray FULL refresh")
                 
-                # Use grayscale mode for better text quality
-                if self.use_grayscale and hasattr(self.epd, 'init_4Gray'):
-                    if not self.grayscale_initialized:
-                        self.logger.info("Initializing 4-Gray mode for anti-aliased text")
-                        self.epd.init_4Gray()
-                        self.grayscale_initialized = True
+                # Always reinitialize 4Gray mode for clean state
+                # This prevents ghosting and display corruption
+                self.logger.debug("Initializing 4-Gray mode")
+                self.epd.init_4Gray()
+                
+                # Ensure image is grayscale mode 'L'
+                if image.mode != 'L':
+                    image = image.convert('L')
+                
+                self.epd.display_4Gray(self.epd.getbuffer_4Gray(image))
+                self.partial_refresh_count = 0
+                self.partial_mode_initialized = False
+                self.grayscale_initialized = True
+            else:
+                # 1-bit mode - supports partial refresh
+                # Ensure image is 1-bit
+                if image.mode != '1':
+                    image = image.convert('1', dither=Image.Dither.NONE)
+                
+                # Decide whether to use partial or full refresh
+                should_full_refresh = not use_partial or (self.partial_refresh_count >= self.full_refresh_interval)
+
+                if should_full_refresh:
+                    # Full refresh - clears ghosting
+                    self.logger.info(f"Performing FULL refresh (count reset from {self.partial_refresh_count})")
                     
-                    # For grayscale, image should be mode 'L' (8-bit grayscale)
-                    if image.mode == '1':
-                        image = image.convert('L')
-                    
-                    self.epd.display_4Gray(self.epd.getbuffer_4Gray(image))
-                    self.partial_mode_initialized = False
-                else:
-                    # Fallback to 1-bit mode
+                    # Reinitialize for full refresh if we were in partial mode
                     if self.partial_mode_initialized:
                         self.logger.info("Reinitializing display for full refresh mode")
                         self.epd.init()
                         self.partial_mode_initialized = False
                     
                     self.epd.display(self.epd.getbuffer(image))
-                
-                self.partial_refresh_count = 0
-            else:
-                # Partial refresh - faster but may cause ghosting
-                buffer_data = self.epd.getbuffer(image)
-
-                # Waveshare 7.5" V2 uses display_Partial(Image, Xstart, Ystart, Xend, Yend)
-                # IMPORTANT: Use physical hardware dimensions, not logical rotated dimensions
-                if hasattr(self.epd, 'display_Partial'):
-                    try:
-                        # Initialize partial refresh mode if not already done
-                        # This is required for Waveshare 7.5" V2 - without init_part(),
-                        # the display does a full refresh internally before partial update
-                        if not self.partial_mode_initialized and hasattr(self.epd, 'init_part'):
-                            self.logger.info("Initializing partial refresh mode (init_part)")
-                            self.epd.init_part()
-                            self.partial_mode_initialized = True
-                        
-                        # Full screen partial refresh with HARDWARE coordinates (always 800x480)
-                        self.epd.display_Partial(buffer_data, 0, 0, self.hw_width, self.hw_height)
-                        self.partial_refresh_count += 1
-                        self.logger.info(f"PARTIAL refresh {self.partial_refresh_count}/{self.full_refresh_interval} (0.4s)")
-                    except Exception as e:
-                        self.logger.warning(f"Partial refresh failed: {e}, using full refresh")
-                        self.epd.display(buffer_data)
-                        self.partial_refresh_count = 0
-                        self.partial_mode_initialized = False
+                    self.partial_refresh_count = 0
                 else:
-                    # Fallback: try other method names
-                    partial_method = None
-                    if hasattr(self.epd, 'displayPartial'):
-                        partial_method = self.epd.displayPartial
-                    elif hasattr(self.epd, 'DisplayPartial'):
-                        partial_method = self.epd.DisplayPartial
+                    # Partial refresh - faster but may cause ghosting
+                    buffer_data = self.epd.getbuffer(image)
 
-                    if partial_method:
+                    # Waveshare 7.5" V2 uses display_Partial(Image, Xstart, Ystart, Xend, Yend)
+                    if hasattr(self.epd, 'display_Partial'):
                         try:
-                            partial_method(buffer_data)
+                            # Initialize partial refresh mode if not already done
+                            if not self.partial_mode_initialized and hasattr(self.epd, 'init_part'):
+                                self.logger.info("Initializing partial refresh mode (init_part)")
+                                self.epd.init_part()
+                                self.partial_mode_initialized = True
+                            
+                            # Full screen partial refresh with HARDWARE coordinates (always 800x480)
+                            self.epd.display_Partial(buffer_data, 0, 0, self.hw_width, self.hw_height)
                             self.partial_refresh_count += 1
                             self.logger.info(f"PARTIAL refresh {self.partial_refresh_count}/{self.full_refresh_interval}")
                         except Exception as e:
                             self.logger.warning(f"Partial refresh failed: {e}, using full refresh")
                             self.epd.display(buffer_data)
                             self.partial_refresh_count = 0
+                            self.partial_mode_initialized = False
                     else:
-                        # Partial refresh not supported
-                        self.logger.warning("Partial refresh not available on this display, using full refresh")
-                        self.epd.display(buffer_data)
+                        # Fallback: try other method names
+                        partial_method = None
+                        if hasattr(self.epd, 'displayPartial'):
+                            partial_method = self.epd.displayPartial
+                        elif hasattr(self.epd, 'DisplayPartial'):
+                            partial_method = self.epd.DisplayPartial
+
+                        if partial_method:
+                            try:
+                                partial_method(buffer_data)
+                                self.partial_refresh_count += 1
+                                self.logger.info(f"PARTIAL refresh {self.partial_refresh_count}/{self.full_refresh_interval}")
+                            except Exception as e:
+                                self.logger.warning(f"Partial refresh failed: {e}, using full refresh")
+                                self.epd.display(buffer_data)
+                                self.partial_refresh_count = 0
+                        else:
+                            # Partial refresh not supported
+                            self.logger.warning("Partial refresh not available on this display, using full refresh")
+                            self.epd.display(buffer_data)
 
         except Exception as e:
             self.logger.error(f"Display image failed: {e}")
