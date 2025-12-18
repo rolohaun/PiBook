@@ -61,7 +61,7 @@ class EPUBRenderer:
             # Get page from PyMuPDF
             page = self.doc[page_num]
             
-            # Import PIL filters
+            # Import PIL tools
             from PIL import ImageOps, ImageFilter, ImageEnhance
             
             # Calculate target size
@@ -74,60 +74,66 @@ class EPUBRenderer:
             page_width = page_rect.width
             page_height = page_rect.height
             
-            # Calculate zoom to fit screen - render DIRECTLY at target size
-            # This eliminates any resize step which causes quality loss
+            # ========== SUPER-SAMPLING FOR CRISP TEXT ==========
+            # Render at 2.5x the target resolution, then downscale with LANCZOS
+            # This acts as a high-quality anti-aliasing filter for sharp text
+            
+            # Calculate base zoom to fit screen
             zoom_x = usable_width / page_width
             zoom_y = usable_height / page_height
-            zoom = min(zoom_x, zoom_y) * self.zoom_factor
+            base_zoom = min(zoom_x, zoom_y) * self.zoom_factor
             
-            # Create transformation matrix for direct rendering at target size
+            # Super-sample: render 2.5x larger than needed
+            super_sample_factor = 2.5
+            zoom = base_zoom * super_sample_factor
+            
             mat = fitz.Matrix(zoom, zoom)
             
-            # Disable anti-aliasing for crisp text rendering on e-ink
-            # Level 0 = no anti-aliasing (sharp pixel edges)
-            fitz.TOOLS.set_aa_level(0)
+            # IMPORTANT: Enable anti-aliasing when super-sampling
+            # The LANCZOS downscale will convert AA to crisp edges
+            fitz.TOOLS.set_aa_level(8)
             
-            # Render page directly at target size - NO RESIZE NEEDED
+            # Render at high resolution
             pix = page.get_pixmap(matrix=mat, alpha=False)
-            self.logger.debug(f"Rendered at {pix.width}x{pix.height} (zoom={zoom:.3f})")
-
-            # Convert PyMuPDF pixmap to PIL Image
+            self.logger.debug(f"Super-sampled at {pix.width}x{pix.height} (zoom={zoom:.3f})")
+            
+            # Convert to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             
-            # Convert to grayscale
-            gray = img.convert('L')
+            # Calculate actual target dimensions (maintaining aspect ratio)
+            target_width = int(pix.width / super_sample_factor)
+            target_height = int(pix.height / super_sample_factor)
             
             # Detect if this is an image-heavy page (like a cover) or text page
-            small = gray.resize((50, 50), Image.Resampling.NEAREST)
+            small = img.convert('L').resize((50, 50), Image.Resampling.NEAREST)
             pixels = list(small.getdata())
             unique_values = len(set(pixels))
             is_image_page = unique_values > 40
             self.logger.debug(f"Page {page_num}: unique_values={unique_values}, is_image={is_image_page}")
             
             if is_image_page:
-                # For images/covers: use dithering to preserve gradients
-                fitz.TOOLS.set_aa_level(8)
-                pix = page.get_pixmap(matrix=mat, alpha=False)
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                # For images/covers: downscale and use dithering
+                img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
                 gray = img.convert('L')
                 self.logger.debug("Using dithering for image page")
                 bw = gray.convert('1')  # Default Floyd-Steinberg dithering
             else:
-                # For text: apply aggressive processing for crisp black text
-                # 1. Boost contrast significantly
+                # ========== CRISP TEXT PIPELINE ==========
+                # 1. High-quality downscale with LANCZOS (smooths edges beautifully)
+                img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                
+                # 2. Convert to grayscale
+                gray = img.convert('L')
+                
+                # 3. Boost contrast (makes dark grays pure black)
                 enhancer = ImageEnhance.Contrast(gray)
                 gray = enhancer.enhance(1.5)
                 
-                # 2. Apply sharpening to enhance text edges
-                from PIL import ImageFilter
-                gray = gray.filter(ImageFilter.SHARPEN)
-                
-                # 3. Use manual threshold for crisp black/white conversion
-                # Higher threshold (200) = more aggressive black, crisper text
-                # This is the key to matching Pillow's direct text rendering
-                threshold = 200
-                bw = gray.point(lambda x: 0 if x < threshold else 255, '1')
-                self.logger.debug(f"Using manual threshold ({threshold}) for text page")
+                # 4. Threshold - NO DITHERING (the "Kindle" trick)
+                # This forces crisp black/white edges
+                threshold = 128
+                bw = gray.point(lambda p: 255 if p > threshold else 0, mode='1')
+                self.logger.debug(f"Crisp text: super-sampled, LANCZOS downscale, threshold={threshold}")
 
             # Create white 1-bit background
             background = Image.new('1', (self.width, self.height), 1)  # 1 = white
