@@ -218,7 +218,16 @@ class ReaderScreen:
         self.epub_path = None
         self.renderer_type = None  # Track which renderer is in use
 
-        # Try to import WeasyPrint renderer first (better text quality)
+        # Try to import Pillow text renderer first (crispest text - direct TTF rendering)
+        try:
+            from src.reader.pillow_text_renderer import PillowTextRenderer
+            self.PillowTextRenderer = PillowTextRenderer
+            self.logger.info("Pillow text renderer available (best for e-ink)")
+        except ImportError as e:
+            self.PillowTextRenderer = None
+            self.logger.info(f"Pillow text renderer not available: {e}")
+
+        # Try WeasyPrint renderer as second option
         try:
             from src.reader.weasyprint_renderer import WeasyPrintRenderer
             self.WeasyPrintRenderer = WeasyPrintRenderer
@@ -227,7 +236,7 @@ class ReaderScreen:
             self.WeasyPrintRenderer = None
             self.logger.info(f"WeasyPrint renderer not available: {e}")
 
-        # Import PyMuPDF renderer as fallback
+        # Import PyMuPDF renderer as final fallback
         from src.reader.epub_renderer import EPUBRenderer
         from src.reader.page_cache import PageCache
 
@@ -255,14 +264,24 @@ class ReaderScreen:
             if dpi is not None:
                 self.dpi = dpi
 
-            # Try WeasyPrint renderer first (better text quality)
-            if self.WeasyPrintRenderer:
+            # Try Pillow text renderer first (crispest text for e-ink)
+            if self.PillowTextRenderer:
+                try:
+                    self.renderer = self.PillowTextRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
+                    self.renderer_type = 'pillow'
+                    self.logger.info(f"Using Pillow text renderer for: {epub_path}")
+                except Exception as e:
+                    self.logger.warning(f"Pillow text renderer failed: {e}")
+                    self.renderer = None
+
+            # Try WeasyPrint renderer as second option
+            if self.renderer is None and self.WeasyPrintRenderer:
                 try:
                     self.renderer = self.WeasyPrintRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
                     self.renderer_type = 'weasyprint'
                     self.logger.info(f"Using WeasyPrint renderer for: {epub_path}")
                 except Exception as e:
-                    self.logger.warning(f"WeasyPrint renderer failed: {e}, falling back to PyMuPDF")
+                    self.logger.warning(f"WeasyPrint renderer failed: {e}")
                     self.renderer = None
 
             # Fallback to PyMuPDF renderer
