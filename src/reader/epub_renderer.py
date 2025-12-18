@@ -62,23 +62,29 @@ class EPUBRenderer:
             page = self.doc[page_num]
 
             # Render at high DPI for quality
-            # Use higher DPI (200+) for crisp text on e-ink
-            render_dpi = max(self.dpi, 200)
+            # Use higher DPI (250+) for crisp text on e-ink
+            render_dpi = max(self.dpi, 250)
             pix = page.get_pixmap(dpi=render_dpi)
 
             # Convert PyMuPDF pixmap to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-            # Calculate target size with minimal margins (8px on each side)
-            margin_h = 16  # 8px margin on each side
-            margin_v = 40 if show_page_number else 16  # Room for page number at bottom
-            usable_width = self.width - margin_h
+            # Calculate target size - use FULL screen width, minimal vertical margin for page number
+            margin_v = 30 if show_page_number else 0  # Room for page number at bottom only
+            usable_width = self.width  # Use full width
             usable_height = self.height - margin_v
 
-            # Calculate zoom to fit within usable area
+            # Calculate zoom to FILL the width (prioritize horizontal fill for reading)
             zoom_x = usable_width / img.width
             zoom_y = usable_height / img.height
-            zoom = min(zoom_x, zoom_y) * self.zoom_factor  # Apply user zoom setting
+            
+            # Use the width zoom to fill horizontally, allow vertical overflow to be cropped
+            # This makes text larger and more readable
+            zoom = zoom_x * self.zoom_factor
+            
+            # But don't exceed vertical bounds too much
+            if zoom > zoom_y * 1.1:  # Allow 10% overflow max
+                zoom = zoom_y * self.zoom_factor
 
             # Resize image to fit screen with zoom applied
             target_width = int(img.width * zoom)
@@ -88,9 +94,9 @@ class EPUBRenderer:
             # Create white background with full dimensions
             background = Image.new('RGB', (self.width, self.height), 'white')
 
-            # Center the rendered page
+            # Center horizontally, align to top vertically
             x_offset = (self.width - img.width) // 2
-            y_offset = 8 + (usable_height - img.height) // 2
+            y_offset = max(0, (usable_height - img.height) // 2)
             background.paste(img, (x_offset, y_offset))
 
             # Add page number overlay if requested
@@ -118,9 +124,9 @@ class EPUBRenderer:
             # Use threshold conversion instead of dithering to avoid "holes" in text
             # Dithering (default) creates patterns that look bad on e-ink
             grayscale = background.convert('L')  # Convert to grayscale first
-            # Apply threshold: pixels darker than 200 become black, lighter become white
-            # Higher threshold = more black (darker text)
-            threshold = 200
+            # Apply threshold: pixels darker than threshold become black, lighter become white
+            # Lower threshold = more aggressive black (catches lighter gray text too)
+            threshold = 180  # Lowered to catch lighter decorative text
             img = grayscale.point(lambda x: 0 if x < threshold else 255, '1')
 
             self.logger.debug(f"Rendered page {page_num + 1}/{self.page_count}")
