@@ -193,7 +193,7 @@ class ReaderScreen:
     Uses EPUBRenderer (PyMuPDF) to display pages
     """
 
-    def __init__(self, width: int = 800, height: int = 480, dpi: int = 150, cache_size: int = 5):
+    def __init__(self, width: int = 800, height: int = 480, dpi: int = 150, cache_size: int = 5, show_page_numbers: bool = True):
         """
         Initialize reader screen
 
@@ -202,15 +202,18 @@ class ReaderScreen:
             height: Screen height
             dpi: DPI for PyMuPDF rendering
             cache_size: Number of pages to cache
+            show_page_numbers: Whether to show page numbers
         """
         self.logger = logging.getLogger(__name__)
         self.width = width
         self.height = height
         self.dpi = dpi
+        self.show_page_numbers = show_page_numbers
 
         self.current_page = 0
         self.renderer = None
         self.page_cache = None
+        self.epub_path = None
 
         # Import after initialization to avoid circular dependencies
         from src.reader.epub_renderer import EPUBRenderer
@@ -220,22 +223,28 @@ class ReaderScreen:
         self.PageCache = PageCache
         self.cache_size = cache_size
 
-    def load_epub(self, epub_path: str):
+    def load_epub(self, epub_path: str, dpi: int = None):
         """
         Load an EPUB file
 
         Args:
             epub_path: Path to EPUB file
+            dpi: Optional DPI override (uses self.dpi if not provided)
         """
         try:
             # Close previous book if open
             if self.renderer:
                 self.renderer.close()
 
+            # Use provided DPI or default
+            if dpi is not None:
+                self.dpi = dpi
+
             # Create new renderer and cache
             self.renderer = self.EPUBRenderer(epub_path, self.width, self.height, self.dpi)
             self.page_cache = self.PageCache(self.cache_size)
             self.current_page = 0
+            self.epub_path = epub_path
 
             self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages)")
 
@@ -296,7 +305,7 @@ class ReaderScreen:
             return cached
 
         # Render and cache
-        img = self.renderer.render_page(self.current_page)
+        img = self.renderer.render_page(self.current_page, show_page_number=self.show_page_numbers)
         self.page_cache.put(self.current_page, img)
 
         return img

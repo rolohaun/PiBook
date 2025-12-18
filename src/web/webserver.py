@@ -9,6 +9,7 @@ Provides web interface for:
 from flask import Flask, render_template_string, request, jsonify, send_from_directory, redirect, url_for
 import os
 import logging
+import json
 from werkzeug.utils import secure_filename
 from pathlib import Path
 
@@ -122,6 +123,45 @@ class PiBookWebServer:
 
             return jsonify({'status': 'ok', 'action': action})
 
+        @self.flask_app.route('/settings')
+        def settings():
+            """Settings page"""
+            settings_data = self._load_settings()
+            return render_template_string(SETTINGS_TEMPLATE, settings=settings_data)
+
+        @self.flask_app.route('/save_settings', methods=['POST'])
+        def save_settings():
+            """Save user settings"""
+            try:
+                settings_data = {
+                    'font_size': int(request.form.get('font_size', 12)),
+                    'full_refresh_interval': int(request.form.get('full_refresh_interval', 5)),
+                    'show_page_numbers': request.form.get('show_page_numbers') == 'on',
+                    'dpi': int(request.form.get('dpi', 150))
+                }
+
+                self._save_settings(settings_data)
+
+                # Apply settings to display driver
+                self.app_instance.display.set_full_refresh_interval(settings_data['full_refresh_interval'])
+
+                # Apply settings to reader screen if available
+                if hasattr(self.app_instance.reader_screen, 'renderer') and self.app_instance.reader_screen.renderer:
+                    # Reload current book with new settings
+                    current_page = self.app_instance.reader_screen.current_page
+                    epub_path = self.app_instance.reader_screen.epub_path
+                    self.app_instance.reader_screen.close()
+                    self.app_instance.reader_screen.load_epub(epub_path, dpi=settings_data['dpi'])
+                    self.app_instance.reader_screen.current_page = current_page
+                    self.app_instance._render_current_screen()
+
+                self.logger.info(f"Settings saved: {settings_data}")
+                return redirect(url_for('settings'))
+
+            except Exception as e:
+                self.logger.error(f"Failed to save settings: {e}")
+                return jsonify({'error': str(e)}), 400
+
     def _get_books(self):
         """Get list of EPUB files"""
         books = []
@@ -135,6 +175,36 @@ class PiBookWebServer:
                         'size': f"{size:.2f} MB"
                     })
         return books
+
+    def _load_settings(self):
+        """Load settings from settings.json"""
+        settings_file = 'settings.json'
+        default_settings = {
+            'font_size': 12,
+            'full_refresh_interval': 5,
+            'show_page_numbers': True,
+            'dpi': 150
+        }
+
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                self.logger.error(f"Failed to load settings: {e}")
+                return default_settings
+        else:
+            return default_settings
+
+    def _save_settings(self, settings_data):
+        """Save settings to settings.json"""
+        settings_file = 'settings.json'
+        try:
+            with open(settings_file, 'w') as f:
+                json.dump(settings_data, indent=2, fp=f)
+        except Exception as e:
+            self.logger.error(f"Failed to save settings: {e}")
+            raise
 
     def run(self):
         """Start the web server in a separate thread"""
@@ -243,6 +313,9 @@ HTML_TEMPLATE = '''
             <button class="btn btn-secondary" onclick="control('menu')">≡ Menu</button>
             <button class="btn" onclick="location.reload()">🔄 Refresh</button>
         </div>
+        <div class="controls" style="margin-top: 10px;">
+            <button class="btn btn-secondary" onclick="window.location.href='/settings'">⚙️ Settings</button>
+        </div>
     </div>
 
     <!-- File Upload -->
@@ -299,6 +372,126 @@ HTML_TEMPLATE = '''
                 .catch(error => console.error('Error:', error));
         }
     </script>
+</body>
+</html>
+'''
+
+# Settings template
+SETTINGS_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PiBook Settings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        .btn {
+            padding: 15px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            transition: background 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn:active {
+            background: #45a049;
+        }
+        .btn-secondary {
+            background: #008CBA;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>⚙️ PiBook Settings</h1>
+
+    <div class="section">
+        <form action="/save_settings" method="post">
+            <div class="form-group">
+                <label for="font_size">Font Size</label>
+                <input type="number" id="font_size" name="font_size"
+                       value="{{ settings.font_size }}" min="8" max="24" step="1">
+                <p class="help-text">Font size for EPUB rendering (8-24)</p>
+            </div>
+
+            <div class="form-group">
+                <label for="dpi">DPI (Resolution)</label>
+                <input type="number" id="dpi" name="dpi"
+                       value="{{ settings.dpi }}" min="72" max="300" step="1">
+                <p class="help-text">Rendering resolution (72-300). Higher = sharper but slower</p>
+            </div>
+
+            <div class="form-group">
+                <label for="full_refresh_interval">Full Refresh Interval</label>
+                <input type="number" id="full_refresh_interval" name="full_refresh_interval"
+                       value="{{ settings.full_refresh_interval }}" min="1" max="20" step="1">
+                <p class="help-text">Number of page turns before full refresh to clear ghosting (1-20)</p>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="show_page_numbers" name="show_page_numbers"
+                           {% if settings.show_page_numbers %}checked{% endif %}>
+                    <label for="show_page_numbers" style="margin: 0;">Show Page Numbers</label>
+                </div>
+                <p class="help-text">Display "Page X of Y" at bottom of screen when reading</p>
+            </div>
+
+            <button type="submit" class="btn">Save Settings</button>
+        </form>
+
+        <button class="btn btn-secondary" onclick="window.location.href='/'">Back to Library</button>
+    </div>
 </body>
 </html>
 '''

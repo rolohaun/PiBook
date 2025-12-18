@@ -44,13 +44,20 @@ class PiBookApp:
         self.logger.info("PiBook E-Reader starting...")
         self.logger.info("=" * 50)
 
+        # Load user settings
+        self.settings = self._load_settings()
+        self.logger.info(f"User settings loaded: {self.settings}")
+
         # Initialize components
         display_width = self.config.get('display.width', 800)
         display_height = self.config.get('display.height', 480)
         display_rotation = self.config.get('display.rotation', 0)
-        display_dpi = self.config.get('display.dpi', 150)
+        display_dpi = self.settings.get('dpi', self.config.get('display.dpi', 150))
 
         self.display = DisplayDriver(display_width, display_height, display_rotation)
+        # Set full refresh interval from settings
+        self.display.set_full_refresh_interval(self.settings.get('full_refresh_interval', 5))
+
         self.gpio = GPIOHandler(self.config.get('gpio_config', 'config/gpio_mapping.yaml'))
         self.navigation = NavigationManager(Screen.LIBRARY)
 
@@ -68,7 +75,8 @@ class PiBookApp:
             width=display_width,
             height=display_height,
             dpi=display_dpi,
-            cache_size=self.config.get('reader.page_cache_size', 5)
+            cache_size=self.config.get('reader.page_cache_size', 5),
+            show_page_numbers=self.settings.get('show_page_numbers', True)
         )
 
         # State
@@ -78,6 +86,35 @@ class PiBookApp:
 
         # Web server
         self.web_server = None
+
+    def _load_settings(self):
+        """Load user settings from settings.json"""
+        import json
+        settings_file = 'settings.json'
+        default_settings = {
+            'font_size': 12,
+            'full_refresh_interval': 5,
+            'show_page_numbers': True,
+            'dpi': 150
+        }
+
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.warning(f"Failed to load settings: {e}. Using defaults.")
+                return default_settings
+        else:
+            # Create default settings file
+            try:
+                with open(settings_file, 'w') as f:
+                    json.dump(default_settings, f, indent=2)
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.warning(f"Failed to create settings file: {e}")
+            return default_settings
 
     def _setup_logging(self):
         """Configure logging"""
@@ -275,10 +312,13 @@ class PiBookApp:
     def _render_current_screen(self):
         """Render the current screen to display"""
         try:
+            use_partial = False  # Default to full refresh
+
             if self.navigation.is_on_screen(Screen.LIBRARY):
                 image = self.library_screen.render()
             elif self.navigation.is_on_screen(Screen.READER):
                 image = self.reader_screen.get_current_image()
+                use_partial = True  # Use partial refresh for page turns
 
                 # Log page info
                 info = self.reader_screen.get_page_info()
@@ -293,8 +333,8 @@ class PiBookApp:
                 self.logger.warning(f"Unknown screen: {self.navigation.current_screen}")
                 return
 
-            # Display image
-            self.display.display_image(image)
+            # Display image with appropriate refresh mode
+            self.display.display_image(image, use_partial=use_partial)
 
         except Exception as e:
             self.logger.error(f"Render error: {e}", exc_info=True)

@@ -41,12 +41,13 @@ class EPUBRenderer:
             self.logger.error(f"Failed to open EPUB: {e}")
             raise
 
-    def render_page(self, page_num: int) -> Image.Image:
+    def render_page(self, page_num: int, show_page_number: bool = True) -> Image.Image:
         """
         Render an EPUB page to a PIL Image
 
         Args:
             page_num: Page number (0-indexed)
+            show_page_number: Whether to show page number overlay
 
         Returns:
             PIL Image (1-bit black/white, sized for e-ink display)
@@ -59,8 +60,12 @@ class EPUBRenderer:
             page = self.doc[page_num]
 
             # Calculate zoom to fit screen while maintaining aspect ratio
-            zoom_x = self.width / page.rect.width
-            zoom_y = self.height / page.rect.height
+            # Reserve space for page number at bottom
+            usable_width = self.width - 20  # 10px margin on each side
+            usable_height = self.height - 50 if show_page_number else self.height - 20
+
+            zoom_x = usable_width / page.rect.width
+            zoom_y = usable_height / page.rect.height
             zoom = min(zoom_x, zoom_y)
 
             # Create transformation matrix
@@ -72,21 +77,39 @@ class EPUBRenderer:
             # Convert PyMuPDF pixmap to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-            # Resize to exact screen dimensions (adding borders if needed)
-            if img.size != (self.width, self.height):
-                # Create white background
-                background = Image.new('RGB', (self.width, self.height), 'white')
+            # Create white background with full dimensions
+            background = Image.new('RGB', (self.width, self.height), 'white')
 
-                # Center the rendered page
-                x_offset = (self.width - img.width) // 2
-                y_offset = (self.height - img.height) // 2
-                background.paste(img, (x_offset, y_offset))
-                img = background
+            # Center the rendered page
+            x_offset = (self.width - img.width) // 2
+            y_offset = 10 + (usable_height - img.height) // 2
+            background.paste(img, (x_offset, y_offset))
+
+            # Add page number overlay if requested
+            if show_page_number:
+                from PIL import ImageDraw, ImageFont
+                draw = ImageDraw.Draw(background)
+
+                try:
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+                except:
+                    font = ImageFont.load_default()
+
+                page_text = f"Page {page_num + 1} of {self.page_count}"
+                # Draw at bottom center
+                try:
+                    bbox = draw.textbbox((0, 0), page_text, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    text_x = (self.width - text_width) // 2
+                except:
+                    text_x = self.width // 2 - 50
+
+                draw.text((text_x, self.height - 30), page_text, fill='black', font=font)
 
             # Convert to 1-bit (black and white) for e-ink display
-            img = img.convert('1')
+            img = background.convert('1')
 
-            self.logger.debug(f"Rendered page {page_num}")
+            self.logger.debug(f"Rendered page {page_num + 1}/{self.page_count}")
             return img
 
         except Exception as e:

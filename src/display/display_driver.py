@@ -33,6 +33,8 @@ class DisplayDriver:
         self.rotation = rotation
         self.epd = None
         self.logger = logging.getLogger(__name__)
+        self.partial_refresh_count = 0
+        self.full_refresh_interval = 5  # Full refresh every N page turns
 
         # Try to import Waveshare library
         try:
@@ -70,12 +72,13 @@ class DisplayDriver:
         except Exception as e:
             self.logger.error(f"Display clear failed: {e}")
 
-    def display_image(self, image: Image.Image):
+    def display_image(self, image: Image.Image, use_partial: bool = True):
         """
-        Display a PIL Image on the screen
+        Display a PIL Image on the screen with partial or full refresh
 
         Args:
             image: PIL Image object (will be resized and rotated as needed)
+            use_partial: Use partial refresh if True, full refresh if False
         """
         # Ensure image is correct size
         if image.size != (self.width, self.height):
@@ -102,11 +105,38 @@ class DisplayDriver:
             return
 
         try:
-            self.epd.display(self.epd.getbuffer(image))
-            self.logger.info("Image displayed on e-ink screen")
+            # Decide whether to use partial or full refresh
+            should_full_refresh = not use_partial or (self.partial_refresh_count >= self.full_refresh_interval)
+
+            if should_full_refresh:
+                # Full refresh - clears ghosting
+                self.epd.display(self.epd.getbuffer(image))
+                self.partial_refresh_count = 0
+                self.logger.info("Full refresh displayed")
+            else:
+                # Partial refresh - faster but may cause ghosting
+                try:
+                    self.epd.displayPartial(self.epd.getbuffer(image))
+                    self.partial_refresh_count += 1
+                    self.logger.info(f"Partial refresh displayed ({self.partial_refresh_count}/{self.full_refresh_interval})")
+                except AttributeError:
+                    # Fallback if displayPartial not available
+                    self.epd.display(self.epd.getbuffer(image))
+                    self.logger.warning("Partial refresh not supported, using full refresh")
+
         except Exception as e:
             self.logger.error(f"Display image failed: {e}")
             raise
+
+    def set_full_refresh_interval(self, interval: int):
+        """
+        Set how many partial refreshes before a full refresh
+
+        Args:
+            interval: Number of partial refreshes (e.g., 5 = full refresh every 5 page turns)
+        """
+        self.full_refresh_interval = max(1, interval)
+        self.logger.info(f"Full refresh interval set to {self.full_refresh_interval}")
 
     def sleep(self):
         """Put display into low-power sleep mode"""
