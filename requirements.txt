@@ -1,5 +1,5 @@
-PyMuPDF==1.23.8
-Pillow==10.2.0
-gpiozero==2.0.1
-spidev==3.6
-PyYAML==6.0.1
+PyMuPDF>=1.23.0
+Pillow>=10.0.0
+gpiozero>=2.0
+spidev>=3.6
+PyYAML>=6.0
