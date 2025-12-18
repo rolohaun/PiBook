@@ -1,6 +1,5 @@
 {
-  "font_size": 12,
+  "zoom": 1.0,
   "full_refresh_interval": 5,
-  "show_page_numbers": true,
-  "dpi": 150
+  "show_page_numbers": true
 }

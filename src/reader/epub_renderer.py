@@ -15,7 +15,7 @@ class EPUBRenderer:
     EPUB renderer using PyMuPDF
     """
 
-    def __init__(self, epub_path: str, width: int = 800, height: int = 480, dpi: int = 150):
+    def __init__(self, epub_path: str, width: int = 800, height: int = 480, zoom_factor: float = 1.0):
         """
         Initialize EPUB renderer
 
@@ -23,13 +23,13 @@ class EPUBRenderer:
             epub_path: Path to EPUB file
             width: Target screen width
             height: Target screen height
-            dpi: DPI for rendering
+            zoom_factor: Zoom multiplier (1.0 = fit to screen, >1.0 = zoom in, <1.0 = zoom out)
         """
         self.logger = logging.getLogger(__name__)
         self.epub_path = epub_path
         self.width = width
         self.height = height
-        self.dpi = dpi
+        self.zoom_factor = zoom_factor
         self.doc = None
         self.page_count = 0
 
@@ -61,18 +61,19 @@ class EPUBRenderer:
 
             # Calculate zoom to fit screen while maintaining aspect ratio
             # Reserve space for page number at bottom
-            usable_width = self.width - 20  # 10px margin on each side
-            usable_height = self.height - 50 if show_page_number else self.height - 20
+            usable_width = self.width - 40  # 20px margin on each side
+            usable_height = self.height - 60 if show_page_number else self.height - 40
 
             zoom_x = usable_width / page.rect.width
             zoom_y = usable_height / page.rect.height
-            zoom = min(zoom_x, zoom_y)
+            zoom = min(zoom_x, zoom_y) * self.zoom_factor  # Apply user zoom setting
 
             # Create transformation matrix
+            # Note: Don't use dpi parameter when using matrix - they conflict!
             mat = fitz.Matrix(zoom, zoom)
 
             # Render page to pixmap (RGB image)
-            pix = page.get_pixmap(matrix=mat, dpi=self.dpi)
+            pix = page.get_pixmap(matrix=mat)
 
             # Convert PyMuPDF pixmap to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)

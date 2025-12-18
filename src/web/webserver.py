@@ -134,10 +134,9 @@ class PiBookWebServer:
             """Save user settings"""
             try:
                 settings_data = {
-                    'font_size': int(request.form.get('font_size', 12)),
+                    'zoom': float(request.form.get('zoom', 1.0)),
                     'full_refresh_interval': int(request.form.get('full_refresh_interval', 5)),
-                    'show_page_numbers': request.form.get('show_page_numbers') == 'on',
-                    'dpi': int(request.form.get('dpi', 150))
+                    'show_page_numbers': request.form.get('show_page_numbers') == 'on'
                 }
 
                 self._save_settings(settings_data)
@@ -151,8 +150,9 @@ class PiBookWebServer:
                     current_page = self.app_instance.reader_screen.current_page
                     epub_path = self.app_instance.reader_screen.epub_path
                     self.app_instance.reader_screen.close()
-                    self.app_instance.reader_screen.load_epub(epub_path, dpi=settings_data['dpi'])
+                    self.app_instance.reader_screen.load_epub(epub_path, zoom_factor=settings_data['zoom'])
                     self.app_instance.reader_screen.current_page = current_page
+                    self.app_instance.reader_screen.show_page_numbers = settings_data['show_page_numbers']
                     self.app_instance._render_current_screen()
 
                 self.logger.info(f"Settings saved: {settings_data}")
@@ -180,10 +180,9 @@ class PiBookWebServer:
         """Load settings from settings.json"""
         settings_file = 'settings.json'
         default_settings = {
-            'font_size': 12,
+            'zoom': 1.0,
             'full_refresh_interval': 5,
-            'show_page_numbers': True,
-            'dpi': 150
+            'show_page_numbers': True
         }
 
         if os.path.exists(settings_file):
@@ -458,17 +457,10 @@ SETTINGS_TEMPLATE = '''
     <div class="section">
         <form action="/save_settings" method="post">
             <div class="form-group">
-                <label for="font_size">Font Size</label>
-                <input type="number" id="font_size" name="font_size"
-                       value="{{ settings.font_size }}" min="8" max="24" step="1">
-                <p class="help-text">Font size for EPUB rendering (8-24)</p>
-            </div>
-
-            <div class="form-group">
-                <label for="dpi">DPI (Resolution)</label>
-                <input type="number" id="dpi" name="dpi"
-                       value="{{ settings.dpi }}" min="72" max="300" step="1">
-                <p class="help-text">Rendering resolution (72-300). Higher = sharper but slower</p>
+                <label for="zoom">Zoom Level</label>
+                <input type="number" id="zoom" name="zoom"
+                       value="{{ settings.zoom }}" min="0.5" max="2.0" step="0.1">
+                <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, &lt;1.0 = smaller, &gt;1.0 = larger</p>
             </div>
 
             <div class="form-group">

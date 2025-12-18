@@ -52,7 +52,7 @@ class PiBookApp:
         display_width = self.config.get('display.width', 800)
         display_height = self.config.get('display.height', 480)
         display_rotation = self.config.get('display.rotation', 0)
-        display_dpi = self.settings.get('dpi', self.config.get('display.dpi', 150))
+        zoom_factor = self.settings.get('zoom', 1.0)
 
         self.display = DisplayDriver(display_width, display_height, display_rotation)
         # Set full refresh interval from settings
@@ -74,7 +74,7 @@ class PiBookApp:
         self.reader_screen = ReaderScreen(
             width=display_width,
             height=display_height,
-            dpi=display_dpi,
+            zoom_factor=zoom_factor,
             cache_size=self.config.get('reader.page_cache_size', 5),
             show_page_numbers=self.settings.get('show_page_numbers', True)
         )
@@ -92,10 +92,9 @@ class PiBookApp:
         import json
         settings_file = 'settings.json'
         default_settings = {
-            'font_size': 12,
+            'zoom': 1.0,
             'full_refresh_interval': 5,
-            'show_page_numbers': True,
-            'dpi': 150
+            'show_page_numbers': True
         }
 
         if os.path.exists(settings_file):
