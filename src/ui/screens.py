@@ -218,30 +218,22 @@ class ReaderScreen:
         self.epub_path = None
         self.renderer_type = None  # Track which renderer is in use
 
-        # Pillow text renderer (crispest text but loses EPUB formatting)
-        # DISABLED by default - use PyMuPDF which preserves formatting
-        # Set self.PillowTextRenderer = PillowTextRenderer to enable
+        # RAW renderer - ZERO processing for testing baseline
+        try:
+            from src.reader.raw_renderer import RawEPUBRenderer
+            self.RawRenderer = RawEPUBRenderer
+            self.logger.info("RAW renderer enabled (zero processing)")
+        except ImportError as e:
+            self.RawRenderer = None
+            self.logger.info(f"RAW renderer not available: {e}")
+
+        # Pillow text renderer - DISABLED
         self.PillowTextRenderer = None
-        # try:
-        #     from src.reader.pillow_text_renderer import PillowTextRenderer
-        #     self.PillowTextRenderer = PillowTextRenderer
-        #     self.logger.info("Pillow text renderer available (best for e-ink)")
-        # except ImportError as e:
-        #     self.PillowTextRenderer = None
-        #     self.logger.info(f"Pillow text renderer not available: {e}")
 
-        # WeasyPrint renderer - DISABLED (causes massive slowdown from font subsetting)
-        # Use PyMuPDF with super-sampling instead for crisp text
+        # WeasyPrint renderer - DISABLED
         self.WeasyPrintRenderer = None
-        # try:
-        #     from src.reader.weasyprint_renderer import WeasyPrintRenderer
-        #     self.WeasyPrintRenderer = WeasyPrintRenderer
-        #     self.logger.info("WeasyPrint renderer available")
-        # except ImportError as e:
-        #     self.WeasyPrintRenderer = None
-        #     self.logger.info(f"WeasyPrint renderer not available: {e}")
 
-        # Import PyMuPDF renderer as final fallback
+        # Import PyMuPDF renderer as fallback
         from src.reader.epub_renderer import EPUBRenderer
         from src.reader.page_cache import PageCache
 
@@ -269,8 +261,18 @@ class ReaderScreen:
             if dpi is not None:
                 self.dpi = dpi
 
-            # Try Pillow text renderer first (crispest text for e-ink)
-            if self.PillowTextRenderer:
+            # Try RAW renderer first (zero processing - for baseline testing)
+            if self.RawRenderer:
+                try:
+                    self.renderer = self.RawRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
+                    self.renderer_type = 'raw'
+                    self.logger.info(f"Using RAW renderer (zero processing) for: {epub_path}")
+                except Exception as e:
+                    self.logger.warning(f"RAW renderer failed: {e}")
+                    self.renderer = None
+
+            # Try Pillow text renderer
+            if self.renderer is None and self.PillowTextRenderer:
                 try:
                     self.renderer = self.PillowTextRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
                     self.renderer_type = 'pillow'
@@ -279,7 +281,7 @@ class ReaderScreen:
                     self.logger.warning(f"Pillow text renderer failed: {e}")
                     self.renderer = None
 
-            # Try WeasyPrint renderer as second option
+            # Try WeasyPrint renderer
             if self.renderer is None and self.WeasyPrintRenderer:
                 try:
                     self.renderer = self.WeasyPrintRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
