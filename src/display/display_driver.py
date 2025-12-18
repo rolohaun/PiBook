@@ -118,10 +118,16 @@ class DisplayDriver:
             if should_full_refresh:
                 # Full refresh - clears ghosting
                 self.logger.info(f"Performing FULL refresh (count reset from {self.partial_refresh_count})")
+                
+                # If we were in partial mode, reinitialize for full refresh
+                # The display needs init() to properly do a full refresh after init_part()
+                if self.partial_mode_initialized:
+                    self.logger.info("Reinitializing display for full refresh mode")
+                    self.epd.init()
+                    self.partial_mode_initialized = False
+                
                 self.epd.display(self.epd.getbuffer(image))
                 self.partial_refresh_count = 0
-                # Reset partial mode so it gets re-initialized next time
-                self.partial_mode_initialized = False
             else:
                 # Partial refresh - faster but may cause ghosting
                 buffer_data = self.epd.getbuffer(image)
