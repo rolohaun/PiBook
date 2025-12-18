@@ -187,9 +187,13 @@ class WeasyPrintRenderer:
             # Render with WeasyPrint to PNG in memory
             html = HTML(string=html_content, base_url=self.temp_dir)
             
-            # Render to PNG bytes
+            # Render to document first, then write PNG
+            # WeasyPrint API changed - need to use render() first
+            document = html.render()
+            
+            # Write first page to PNG bytes
             png_bytes = io.BytesIO()
-            html.write_png(png_bytes, resolution=self.dpi)
+            document.write_png(png_bytes, resolution=self.dpi)
             png_bytes.seek(0)
             
             # Load as PIL Image
