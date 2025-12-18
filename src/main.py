@@ -366,6 +366,70 @@ class PiBookApp:
         self.navigation.navigate_to(Screen.LIBRARY)
         self._render_current_screen()
 
+    def _open_book(self, book: dict):
+        """
+        Open and display a book
+
+        Args:
+            book: Book dict from library
+        """
+        try:
+            self.logger.info(f"Opening book: {book['title']}")
+
+            # Load EPUB with PyMuPDF
+            self.reader_screen.load_epub(book['path'])
+
+            # Navigate to reader screen
+            self.navigation.navigate_to(Screen.READER, {'book': book})
+            self._render_current_screen()
+
+            # Log page info
+            info = self.reader_screen.get_page_info()
+            self.logger.info(f"Book opened: {info['total']} pages")
+
+        except Exception as e:
+            self.logger.error(f"Failed to open book: {e}", exc_info=True)
+            # Stay on library screen
+
+    def _render_current_screen(self):
+        """Render the current screen to display"""
+        try:
+            use_partial = False  # Default to full refresh
+
+            if self.navigation.is_on_screen(Screen.LIBRARY):
+                image = self.library_screen.render()
+                use_partial = True  # Use partial refresh for library navigation too (faster)
+            elif self.navigation.is_on_screen(Screen.READER):
+                image = self.reader_screen.get_current_image()
+                use_partial = True  # Use partial refresh for page turns
+
+                # Log page info
+                info = self.reader_screen.get_page_info()
+                self.logger.info(f"Page {info['current']} of {info['total']}")
+
+                # Log cache stats periodically
+                if 'cache_stats' in info:
+                    stats = info['cache_stats']
+                    self.logger.debug(f"Cache: {stats.get('hit_rate', 0):.1f}% hit rate")
+
+            else:
+                self.logger.warning(f"Unknown screen: {self.navigation.current_screen}")
+                return
+
+            # Display image with appropriate refresh mode
+            self.display.display_image(image, use_partial=use_partial)
+
+        except Exception as e:
+            self.logger.error(f"Render error: {e}", exc_info=True)
+
+    def _trigger_gc_if_needed(self):
+        """Trigger garbage collection periodically (for Pi Zero 2 W)"""
+        self.page_turn_count += 1
+
+        if self.page_turn_count % self.gc_threshold == 0:
+            gc.collect()
+            self.logger.debug(f"Garbage collection triggered (count: {self.page_turn_count})")
+
 
 def main():
     """Main entry point"""
