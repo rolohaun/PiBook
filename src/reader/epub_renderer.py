@@ -64,45 +64,31 @@ class EPUBRenderer:
             # Import PIL tools
             from PIL import ImageOps, ImageFilter, ImageEnhance
             
-            # Calculate target size
+            # Calculate target size (screen dimensions)
             margin_v = 25 if show_page_number else 0
-            usable_width = self.width
-            usable_height = self.height - margin_v
+            screen_width = self.width
+            screen_height = self.height - margin_v
             
             # Get page dimensions
             page_rect = page.rect
             page_width = page_rect.width
-            page_height = page_rect.height
             
-            # ========== SUPER-SAMPLING FOR CRISP TEXT ==========
-            # Render at 2.5x the target resolution, then downscale with LANCZOS
-            # This acts as a high-quality anti-aliasing filter for sharp text
-            
-            # Calculate base zoom to fit screen
-            zoom_x = usable_width / page_width
-            zoom_y = usable_height / page_height
-            base_zoom = min(zoom_x, zoom_y) * self.zoom_factor
-            
-            # Super-sample: render 2x larger than needed (faster than 2.5x, still crisp)
-            super_sample_factor = 2.0
-            zoom = base_zoom * super_sample_factor
-            
+            # ========== 1. SUPER-SAMPLING (Fixes Jagged Edges) ==========
+            # Render 3x larger than screen to capture serif details
+            zoom = (screen_width / page_width) * 3.0 * self.zoom_factor
             mat = fitz.Matrix(zoom, zoom)
             
-            # IMPORTANT: Enable anti-aliasing when super-sampling
-            # The LANCZOS downscale will convert AA to crisp edges
+            # Render with anti-aliasing enabled
             fitz.TOOLS.set_aa_level(8)
             
-            # Render at high resolution
+            # alpha=False forces a white background
             pix = page.get_pixmap(matrix=mat, alpha=False)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             self.logger.debug(f"Super-sampled at {pix.width}x{pix.height} (zoom={zoom:.3f})")
             
-            # Convert to PIL Image
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            
-            # Calculate actual target dimensions (maintaining aspect ratio)
-            target_width = int(pix.width / super_sample_factor)
-            target_height = int(pix.height / super_sample_factor)
+            # ========== 2. DOWNSCALE (Smooths the edges) ==========
+            # Resize to actual screen dimensions with high-quality resampling
+            img = img.resize((screen_width, screen_height), Image.Resampling.LANCZOS)
             
             # Detect if this is an image-heavy page (like a cover) or text page
             small = img.convert('L').resize((50, 50), Image.Resampling.NEAREST)
@@ -112,28 +98,30 @@ class EPUBRenderer:
             self.logger.debug(f"Page {page_num}: unique_values={unique_values}, is_image={is_image_page}")
             
             if is_image_page:
-                # For images/covers: downscale and use dithering
-                img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                # For images/covers: use dithering to preserve gradients
                 gray = img.convert('L')
                 self.logger.debug("Using dithering for image page")
                 bw = gray.convert('1')  # Default Floyd-Steinberg dithering
             else:
-                # ========== CRISP TEXT PIPELINE ==========
-                # 1. High-quality downscale with LANCZOS (smooths edges beautifully)
-                img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
-                
-                # 2. Convert to grayscale
+                # ========== CLEAN E-INK TEXT PIPELINE ==========
+                # 3. Convert to grayscale
                 gray = img.convert('L')
                 
-                # 3. Boost contrast (makes dark grays pure black)
+                # 4. TEXT THICKENING - Enhance contrast heavily
                 enhancer = ImageEnhance.Contrast(gray)
-                gray = enhancer.enhance(1.5)
+                gray = enhancer.enhance(2.0)
                 
-                # 4. Threshold - NO DITHERING (the "Kindle" trick)
-                # This forces crisp black/white edges
-                threshold = 128
-                bw = gray.point(lambda p: 255 if p > threshold else 0, mode='1')
-                self.logger.debug(f"Crisp text: super-sampled, LANCZOS downscale, threshold={threshold}")
+                # 5. GAMMA CORRECTION - Thicken text by darkening mid-tones
+                # Values < 1.0 make gray pixels blacker (effectively "bolds" the font)
+                gamma = 0.6
+                gray = gray.point(lambda p: int(255 * ((p / 255) ** gamma)))
+                
+                # 6. HARD THRESHOLD (Fixes the "Sand/Noise")
+                # Any pixel lighter than 200 becomes WHITE (cleans the off-white background)
+                # Any pixel darker than 200 becomes BLACK
+                threshold = 200
+                bw = gray.point(lambda x: 255 if x > threshold else 0, mode='1')
+                self.logger.debug(f"Clean e-ink: 3x super-sample, contrast 2.0, gamma {gamma}, threshold {threshold}")
 
             # Create white 1-bit background
             background = Image.new('1', (self.width, self.height), 1)  # 1 = white

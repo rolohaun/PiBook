@@ -218,14 +218,8 @@ class ReaderScreen:
         self.epub_path = None
         self.renderer_type = None  # Track which renderer is in use
 
-        # RAW renderer - ZERO processing for testing baseline
-        try:
-            from src.reader.raw_renderer import RawEPUBRenderer
-            self.RawRenderer = RawEPUBRenderer
-            self.logger.info("RAW renderer enabled (zero processing)")
-        except ImportError as e:
-            self.RawRenderer = None
-            self.logger.info(f"RAW renderer not available: {e}")
+        # RAW renderer - DISABLED (was for testing only)
+        self.RawRenderer = None
 
         # Pillow text renderer - DISABLED
         self.PillowTextRenderer = None
