@@ -29,7 +29,7 @@ class LibraryScreen:
     Renders a list of available EPUB files using Pillow
     """
 
-    def __init__(self, width: int = 800, height: int = 480, items_per_page: int = 8, font_size: int = 20):
+    def __init__(self, width: int = 800, height: int = 480, items_per_page: int = 8, font_size: int = 20, web_port: int = 5000):
         """
         Initialize library screen
 
@@ -38,12 +38,14 @@ class LibraryScreen:
             height: Screen height
             items_per_page: Number of books to show per page
             font_size: Font size for menu text
+            web_port: Web server port number
         """
         self.logger = logging.getLogger(__name__)
         self.width = width
         self.height = height
         self.items_per_page = items_per_page
         self.font_size = font_size
+        self.web_port = web_port
 
         self.current_index = 0
         self.current_page = 0
@@ -126,16 +128,16 @@ class LibraryScreen:
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
 
-        # Draw IP address at top center
+        # Draw IP address and port at top center
         ip_address = get_ip_address()
-        ip_text = f"IP: {ip_address}"
+        ip_text = f"{ip_address}:{self.web_port}"
         try:
             # Get text bounding box for centering
             bbox = draw.textbbox((0, 0), ip_text, font=self.font)
             ip_width = bbox[2] - bbox[0]
             ip_x = (self.width - ip_width) // 2
         except:
-            ip_x = self.width // 2 - 60
+            ip_x = self.width // 2 - 80
         draw.text((ip_x, 5), ip_text, font=self.font, fill=0)
 
         # Draw title

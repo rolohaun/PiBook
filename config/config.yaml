@@ -2,8 +2,9 @@
 # This file works identically on Pi 3B+ and Pi Zero 2 W
 
 display:
-  width: 800
-  height: 480
+  width: 480
+  height: 800
+  rotation: 90                # Rotate 90 degrees for portrait mode
   dpi: 150                    # DPI for PyMuPDF rendering
 
 library:

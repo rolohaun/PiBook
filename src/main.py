@@ -47,18 +47,21 @@ class PiBookApp:
         # Initialize components
         display_width = self.config.get('display.width', 800)
         display_height = self.config.get('display.height', 480)
+        display_rotation = self.config.get('display.rotation', 0)
         display_dpi = self.config.get('display.dpi', 150)
 
-        self.display = DisplayDriver(display_width, display_height)
+        self.display = DisplayDriver(display_width, display_height, display_rotation)
         self.gpio = GPIOHandler(self.config.get('gpio_config', 'config/gpio_mapping.yaml'))
         self.navigation = NavigationManager(Screen.LIBRARY)
 
         # Initialize screens
+        web_port = self.config.get('web.port', 5000)
         self.library_screen = LibraryScreen(
             width=display_width,
             height=display_height,
             items_per_page=self.config.get('library.items_per_page', 8),
-            font_size=self.config.get('library.font_size', 20)
+            font_size=self.config.get('library.font_size', 20),
+            web_port=web_port
         )
 
         self.reader_screen = ReaderScreen(

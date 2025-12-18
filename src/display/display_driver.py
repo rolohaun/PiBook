@@ -19,16 +19,18 @@ class DisplayDriver:
     Hardware abstraction for Waveshare 7.5" e-Paper HAT (800x480)
     """
 
-    def __init__(self, width: int = 800, height: int = 480):
+    def __init__(self, width: int = 800, height: int = 480, rotation: int = 0):
         """
         Initialize display driver
 
         Args:
-            width: Display width in pixels
-            height: Display height in pixels
+            width: Display width in pixels (logical, after rotation)
+            height: Display height in pixels (logical, after rotation)
+            rotation: Rotation angle (0, 90, 180, 270)
         """
         self.width = width
         self.height = height
+        self.rotation = rotation
         self.epd = None
         self.logger = logging.getLogger(__name__)
 
@@ -73,7 +75,7 @@ class DisplayDriver:
         Display a PIL Image on the screen
 
         Args:
-            image: PIL Image object (will be resized to 800x480 and converted to 1-bit)
+            image: PIL Image object (will be resized and rotated as needed)
         """
         # Ensure image is correct size
         if image.size != (self.width, self.height):
@@ -84,6 +86,12 @@ class DisplayDriver:
         if image.mode != '1':
             self.logger.debug(f"Converting image from {image.mode} to 1-bit")
             image = image.convert('1')
+
+        # Apply rotation if needed (for portrait mode)
+        if self.rotation != 0:
+            # Rotate the image (negative angle for clockwise rotation in PIL)
+            image = image.rotate(-self.rotation, expand=True)
+            self.logger.debug(f"Rotated image by {self.rotation} degrees")
 
         if not self.hardware_available or not self.epd:
             # Mock mode - save image to file

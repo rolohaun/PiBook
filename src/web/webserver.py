@@ -46,22 +46,30 @@ class PiBookWebServer:
 
         @self.flask_app.route('/upload', methods=['POST'])
         def upload():
-            """Upload EPUB file"""
+            """Upload EPUB file(s)"""
             if 'file' not in request.files:
                 return jsonify({'error': 'No file uploaded'}), 400
 
-            file = request.files['file']
-            if file.filename == '':
-                return jsonify({'error': 'No file selected'}), 400
+            files = request.files.getlist('file')
+            if not files or files[0].filename == '':
+                return jsonify({'error': 'No files selected'}), 400
 
-            if not file.filename.lower().endswith('.epub'):
-                return jsonify({'error': 'Only EPUB files allowed'}), 400
+            uploaded_count = 0
+            for file in files:
+                if file and file.filename.lower().endswith('.epub'):
+                    filename = secure_filename(file.filename)
+                    filepath = os.path.join(self.books_dir, filename)
+                    file.save(filepath)
+                    self.logger.info(f"Uploaded: {filename}")
+                    uploaded_count += 1
 
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(self.books_dir, filename)
-            file.save(filepath)
+            # Reload library screen to show new books
+            self.app_instance.library_screen.load_books(self.books_dir)
+            # Refresh the display if on library screen
+            if self.app_instance.navigation.current_screen.value == 'library':
+                self.app_instance._render_current_screen()
 
-            self.logger.info(f"Uploaded: {filename}")
+            self.logger.info(f"Uploaded {uploaded_count} book(s)")
             return redirect(url_for('index'))
 
         @self.flask_app.route('/delete/<filename>')
@@ -71,6 +79,13 @@ class PiBookWebServer:
             if os.path.exists(filepath) and filepath.endswith('.epub'):
                 os.remove(filepath)
                 self.logger.info(f"Deleted: {filename}")
+
+                # Reload library screen to show updated book list
+                self.app_instance.library_screen.load_books(self.books_dir)
+                # Refresh the display if on library screen
+                if self.app_instance.navigation.current_screen.value == 'library':
+                    self.app_instance._render_current_screen()
+
             return redirect(url_for('index'))
 
         @self.flask_app.route('/rename', methods=['POST'])
@@ -232,11 +247,14 @@ HTML_TEMPLATE = '''
 
     <!-- File Upload -->
     <div class="section">
-        <h2>📤 Upload EPUB</h2>
+        <h2>📤 Upload EPUB Books</h2>
         <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
-            <input type="file" name="file" accept=".epub" required>
+            <input type="file" name="file" accept=".epub" multiple required>
             <button type="submit" class="btn">Upload</button>
         </form>
+        <p style="color: #666; font-size: 14px; margin-top: 10px;">
+            💡 Tip: Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple files
+        </p>
     </div>
 
     <!-- Book List -->
