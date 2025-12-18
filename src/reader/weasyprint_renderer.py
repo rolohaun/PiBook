@@ -184,20 +184,29 @@ class WeasyPrintRenderer:
             chapter = self.chapters[page_num]
             html_content = self._prepare_html_for_render(chapter)
             
-            # Render with WeasyPrint to PNG in memory
+            # Render with WeasyPrint to PDF in memory
+            # WeasyPrint v60+ removed PNG support, so we render to PDF
+            # and then convert to PNG using PyMuPDF
             html = HTML(string=html_content, base_url=self.temp_dir)
             
-            # Render to document first, then write PNG
-            # WeasyPrint API changed - need to use render() first
-            document = html.render()
+            # Render to PDF bytes
+            pdf_bytes = io.BytesIO()
+            html.write_pdf(pdf_bytes)
+            pdf_bytes.seek(0)
             
-            # Write first page to PNG bytes
-            png_bytes = io.BytesIO()
-            document.write_png(png_bytes, resolution=self.dpi)
-            png_bytes.seek(0)
+            # Convert PDF to PNG using PyMuPDF (fitz)
+            import fitz
+            pdf_doc = fitz.open(stream=pdf_bytes.read(), filetype="pdf")
+            page = pdf_doc[0]  # Get first page
             
-            # Load as PIL Image
-            img = Image.open(png_bytes)
+            # Render at target DPI
+            zoom = self.dpi / 72.0  # PDF is 72 DPI by default
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            
+            # Convert to PIL Image
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            pdf_doc.close()
             
             # Convert to RGB if needed
             if img.mode != 'RGB':
