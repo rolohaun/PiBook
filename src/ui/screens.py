@@ -230,14 +230,16 @@ class ReaderScreen:
         #     self.PillowTextRenderer = None
         #     self.logger.info(f"Pillow text renderer not available: {e}")
 
-        # Try WeasyPrint renderer as second option
-        try:
-            from src.reader.weasyprint_renderer import WeasyPrintRenderer
-            self.WeasyPrintRenderer = WeasyPrintRenderer
-            self.logger.info("WeasyPrint renderer available")
-        except ImportError as e:
-            self.WeasyPrintRenderer = None
-            self.logger.info(f"WeasyPrint renderer not available: {e}")
+        # WeasyPrint renderer - DISABLED (causes massive slowdown from font subsetting)
+        # Use PyMuPDF with super-sampling instead for crisp text
+        self.WeasyPrintRenderer = None
+        # try:
+        #     from src.reader.weasyprint_renderer import WeasyPrintRenderer
+        #     self.WeasyPrintRenderer = WeasyPrintRenderer
+        #     self.logger.info("WeasyPrint renderer available")
+        # except ImportError as e:
+        #     self.WeasyPrintRenderer = None
+        #     self.logger.info(f"WeasyPrint renderer not available: {e}")
 
         # Import PyMuPDF renderer as final fallback
         from src.reader.epub_renderer import EPUBRenderer

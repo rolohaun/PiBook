@@ -83,8 +83,8 @@ class EPUBRenderer:
             zoom_y = usable_height / page_height
             base_zoom = min(zoom_x, zoom_y) * self.zoom_factor
             
-            # Super-sample: render 2.5x larger than needed
-            super_sample_factor = 2.5
+            # Super-sample: render 2x larger than needed (faster than 2.5x, still crisp)
+            super_sample_factor = 2.0
             zoom = base_zoom * super_sample_factor
             
             mat = fitz.Matrix(zoom, zoom)
