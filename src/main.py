@@ -318,6 +318,7 @@ class PiBookApp:
 
             if self.navigation.is_on_screen(Screen.LIBRARY):
                 image = self.library_screen.render()
+                use_partial = True  # Use partial refresh for library navigation too (faster)
             elif self.navigation.is_on_screen(Screen.READER):
                 image = self.reader_screen.get_current_image()
                 use_partial = True  # Use partial refresh for page turns

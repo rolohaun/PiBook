@@ -173,17 +173,21 @@ class PillowTextRenderer:
 
     def _reflow_pages(self, tokens: List[TextToken]):
         """Reflow tokens into pages based on width/height"""
+        self.logger.info(f"Reflowing {len(tokens)} tokens...")
         self.pages = []
         current_page = []
         current_y = self.margin_top
         current_x = self.margin_left
         line_height = 0
         
+        # Pre-calculate font heights to avoid per-word overhead
+        font_metrics = {}
+        for style, font in self.fonts.items():
+            bbox = font.getbbox("Ay")
+            font_metrics[style] = bbox[3] - bbox[1] if bbox else self.base_font_size
+
         # Helper to finish a line
         def finish_line(line_items, y, h):
-            # line_items is list of (text, font)
-            # Add to current page
-            # Check page height
             nonlocal current_y, current_page
             if y + h > self.height - self.margin_bottom:
                 self.pages.append(current_page)
@@ -197,30 +201,33 @@ class PillowTextRenderer:
             return current_y
 
         current_line = [] # (text, font, x)
+        current_line_max_h = 0
         
+        count = 0
         for token in tokens:
+            count += 1
+            if count % 5000 == 0:
+                self.logger.debug(f"Reflow progress: {count}/{len(tokens)}")
+
             font = self.fonts.get(token.style, self.fonts['normal'])
+            font_h = font_metrics.get(token.style, self.base_font_size)
             
             # Handle headers with extra spacing
             if token.style in ['h1', 'h2'] and not current_line:
                 current_y += self.paragraph_spacing
             
-            # Measure token
+            # Measure token width only
             try:
                 width = font.getlength(token.text)
-                bbox = font.getbbox(token.text)
-                height = bbox[3] - bbox[1] if bbox else self.base_font_size
             except:
                 width = len(token.text) * self.base_font_size * 0.6
-                height = self.base_font_size
 
             # Check if fits on line
             if current_x + width > self.width - self.margin_right:
                 # Wrap
-                # Calculate max height of current line (font is at index 1)
-                max_h = max([i[1].getbbox("Ay")[3] for i in current_line]) if current_line else height
-                current_y = finish_line(current_line, current_y, max_h)
+                current_y = finish_line(current_line, current_y, current_line_max_h or font_h)
                 current_line = []
+                current_line_max_h = 0
                 current_x = self.margin_left
                 # If whitespace caused wrap, skip it at start of new line
                 if token.text.isspace():
@@ -228,20 +235,19 @@ class PillowTextRenderer:
 
             current_line.append((token.text, font, current_x))
             current_x += width
-            line_height = max(line_height, height)
+            current_line_max_h = max(current_line_max_h, font_h)
             
             if token.new_paragraph:
                 # Force new line
-                max_h = max([i[1].getbbox("Ay")[3] for i in current_line]) if current_line else height
-                current_y = finish_line(current_line, current_y, max_h)
+                current_y = finish_line(current_line, current_y, current_line_max_h or font_h)
                 current_line = []
+                current_line_max_h = 0
                 current_x = self.margin_left
                 current_y += self.paragraph_spacing
-                line_height = 0
                 
         # Finish last page
         if current_line:
-             finish_line(current_line, current_y, line_height)
+             finish_line(current_line, current_y, current_line_max_h)
         if current_page:
             self.pages.append(current_page)
         
@@ -250,6 +256,7 @@ class PillowTextRenderer:
             self.page_count = 1
         else:
             self.page_count = len(self.pages)
+        self.logger.info(f"Reflow complete: {self.page_count} pages")
 
     def render_page(self, page_num: int, show_page_number: bool = True) -> Image.Image:
         image = Image.new('1', (self.width, self.height), 1)
