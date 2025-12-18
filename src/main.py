@@ -96,15 +96,57 @@ class PiBookApp:
         # Web server
         self.web_server = None
 
+    def _load_settings(self):
+        """Load user settings from settings.json"""
+        import json
+        settings_file = 'settings.json'
+        default_settings = {
+            'zoom': 1.0,
+            'dpi': 150,
+            'full_refresh_interval': 5,
+            'show_page_numbers': True
+        }
+
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.warning(f"Failed to load settings: {e}. Using defaults.")
+                return default_settings
+        else:
+            # Create default settings file
+            try:
+                with open(settings_file, 'w') as f:
+                    json.dump(default_settings, f, indent=2)
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.warning(f"Failed to create settings file: {e}")
+            return default_settings
+
     def _setup_logging(self):
         """Configure logging"""
-        # ... (keep existing logging setup) ...
-        # Since replace_file_content requires context matching, I will supply the full surrounding context
-        # But this method is very long. I will edit the file in chunks or carefully match context.
-        # Let's try to match the State section and imports first.
-        pass
+        log_level = getattr(logging, self.config.get('logging.level', 'INFO'))
+        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-    # ... (skipping to implemented methods) ...
+        handlers = []
+
+        # Console handler
+        if self.config.get('logging.console', True):
+            handlers.append(logging.StreamHandler())
+
+        # File handler
+        log_file = self.config.get('logging.file')
+        if log_file:
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            handlers.append(logging.FileHandler(log_file))
+
+        logging.basicConfig(
+            level=log_level,
+            format=log_format,
+            handlers=handlers
+        )
 
     def start(self):
         """Start the application"""
