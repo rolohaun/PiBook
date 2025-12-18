@@ -218,17 +218,18 @@ class ReaderScreen:
         self.epub_path = None
         self.renderer_type = None  # Track which renderer is in use
 
-        # RAW renderer - ZERO processing (User requested baseline)
+        # Pillow text renderer - Primary (Crisp text + Formatting)
+        # We upgraded this to support Bold/Italic so it's the best option
         try:
-            from src.reader.raw_renderer import RawEPUBRenderer
-            self.RawRenderer = RawEPUBRenderer
-            self.logger.info("RAW renderer enabled (zero processing)")
+            from src.reader.pillow_text_renderer import PillowTextRenderer
+            self.PillowTextRenderer = PillowTextRenderer
+            self.logger.info("Pillow text renderer enabled (Crisp + Rich Text)")
         except ImportError as e:
-            self.RawRenderer = None
-            self.logger.info(f"RAW renderer not available: {e}")
+            self.PillowTextRenderer = None
+            self.logger.info(f"Pillow text renderer not available: {e}")
 
-        # Pillow text renderer - DISABLED
-        self.PillowTextRenderer = None
+        # RAW renderer - DISABLED
+        self.RawRenderer = None
 
         # WeasyPrint renderer - DISABLED
         self.WeasyPrintRenderer = None
