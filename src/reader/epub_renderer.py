@@ -61,25 +61,21 @@ class EPUBRenderer:
             # Get page from PyMuPDF
             page = self.doc[page_num]
 
-            # Render at high DPI for quality
-            # Use higher DPI (300) for crisp text on e-ink
+            # Render at high DPI for quality - higher = sharper source
             render_dpi = max(self.dpi, 300)
             pix = page.get_pixmap(dpi=render_dpi)
 
             # Convert PyMuPDF pixmap to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             
+            # Import PIL filters
+            from PIL import ImageOps, ImageFilter, ImageEnhance
+            
             # AUTO-CROP: Remove whitespace margins from the EPUB's internal styling
-            # This crops out the empty borders that the EPUB CSS creates
-            # Convert to grayscale for better edge detection
             gray_for_crop = img.convert('L')
-            # Invert so white becomes black (background) - getbbox finds non-zero pixels
-            from PIL import ImageOps, ImageFilter
             inverted = ImageOps.invert(gray_for_crop)
-            # Get bounding box of content (non-white areas)
             bbox = inverted.getbbox()
             if bbox:
-                # Add small padding (10px) around content
                 padding = 10
                 left = max(0, bbox[0] - padding)
                 top = max(0, bbox[1] - padding)
@@ -88,31 +84,40 @@ class EPUBRenderer:
                 img = img.crop((left, top, right, bottom))
                 self.logger.debug(f"Auto-cropped from {pix.width}x{pix.height} to {img.width}x{img.height}")
 
-            # Calculate target size - use FULL screen, minimal margin for page number
+            # Convert to grayscale for processing
+            gray = img.convert('L')
+            
+            # Boost contrast BEFORE thresholding - makes text darker and background lighter
+            enhancer = ImageEnhance.Contrast(gray)
+            gray = enhancer.enhance(2.0)  # Double the contrast
+            
+            # Convert to 1-bit BEFORE resizing to avoid antialiasing creating gray pixels
+            # Use a threshold that makes text solid black
+            threshold = 180
+            bw = gray.point(lambda x: 0 if x < threshold else 255, '1')
+            
+            # Now resize the 1-bit image - no antialiasing possible
             margin_v = 25 if show_page_number else 0
             usable_width = self.width
             usable_height = self.height - margin_v
 
-            # Calculate zoom to fill screen while maintaining aspect ratio
-            zoom_x = usable_width / img.width
-            zoom_y = usable_height / img.height
+            zoom_x = usable_width / bw.width
+            zoom_y = usable_height / bw.height
             zoom = min(zoom_x, zoom_y) * self.zoom_factor
 
-            # Resize image to fit screen
-            target_width = int(img.width * zoom)
-            target_height = int(img.height * zoom)
-            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            target_width = int(bw.width * zoom)
+            target_height = int(bw.height * zoom)
             
-            # Apply sharpening filter for crisper text on e-ink
-            img = img.filter(ImageFilter.SHARPEN)
+            # Use NEAREST for 1-bit to avoid creating gray edges
+            bw = bw.resize((target_width, target_height), Image.Resampling.NEAREST)
 
-            # Create white background with full dimensions
-            background = Image.new('RGB', (self.width, self.height), 'white')
+            # Create white 1-bit background
+            background = Image.new('1', (self.width, self.height), 1)  # 1 = white
 
             # Center the content
-            x_offset = (self.width - img.width) // 2
-            y_offset = (usable_height - img.height) // 2
-            background.paste(img, (x_offset, y_offset))
+            x_offset = (self.width - bw.width) // 2
+            y_offset = (usable_height - bw.height) // 2
+            background.paste(bw, (x_offset, y_offset))
 
             # Add page number overlay if requested
             if show_page_number:
@@ -125,27 +130,18 @@ class EPUBRenderer:
                     font = ImageFont.load_default()
 
                 page_text = f"Page {page_num + 1} of {self.page_count}"
-                # Draw at bottom center
                 try:
-                    bbox = draw.textbbox((0, 0), page_text, font=font)
-                    text_width = bbox[2] - bbox[0]
+                    bbox_text = draw.textbbox((0, 0), page_text, font=font)
+                    text_width = bbox_text[2] - bbox_text[0]
                     text_x = (self.width - text_width) // 2
                 except:
                     text_x = self.width // 2 - 50
 
-                draw.text((text_x, self.height - 25), page_text, fill='black', font=font)
-
-            # Convert to 1-bit (black and white) for e-ink display
-            # Use threshold conversion instead of dithering to avoid "holes" in text
-            # Dithering (default) creates patterns that look bad on e-ink
-            grayscale = background.convert('L')  # Convert to grayscale first
-            # Apply threshold: pixels darker than threshold become black, lighter become white
-            # Lower threshold = more aggressive black (catches lighter gray text too)
-            threshold = 180  # Lowered to catch lighter decorative text
-            img = grayscale.point(lambda x: 0 if x < threshold else 255, '1')
+                # For 1-bit images, fill=0 is black
+                draw.text((text_x, self.height - 22), page_text, fill=0, font=font)
 
             self.logger.debug(f"Rendered page {page_num + 1}/{self.page_count}")
-            return img
+            return background
 
         except Exception as e:
             self.logger.error(f"Failed to render page {page_num}: {e}")
