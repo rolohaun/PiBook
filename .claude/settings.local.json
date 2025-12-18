@@ -9,7 +9,11 @@
       "Bash(git remote set-url:*)",
       "Bash(git branch:*)",
       "Bash(git push:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python:*)",
+      "Bash(git restore:*)",
+      "WebFetch(domain:www.waveshare.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }
