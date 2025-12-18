@@ -217,8 +217,8 @@ class PillowTextRenderer:
             # Check if fits on line
             if current_x + width > self.width - self.margin_right:
                 # Wrap
-                # Calculate max height of current line
-                max_h = max([i[3].getbbox("Ay")[3] for i in current_line]) if current_line else height
+                # Calculate max height of current line (font is at index 1)
+                max_h = max([i[1].getbbox("Ay")[3] for i in current_line]) if current_line else height
                 current_y = finish_line(current_line, current_y, max_h)
                 current_line = []
                 current_x = self.margin_left
@@ -232,7 +232,7 @@ class PillowTextRenderer:
             
             if token.new_paragraph:
                 # Force new line
-                max_h = max([i[3].getbbox("Ay")[3] for i in current_line]) if current_line else height
+                max_h = max([i[1].getbbox("Ay")[3] for i in current_line]) if current_line else height
                 current_y = finish_line(current_line, current_y, max_h)
                 current_line = []
                 current_x = self.margin_left
