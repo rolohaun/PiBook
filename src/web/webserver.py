@@ -135,6 +135,7 @@ class PiBookWebServer:
             try:
                 settings_data = {
                     'zoom': float(request.form.get('zoom', 1.0)),
+                    'dpi': int(request.form.get('dpi', 150)),
                     'full_refresh_interval': int(request.form.get('full_refresh_interval', 5)),
                     'show_page_numbers': request.form.get('show_page_numbers') == 'on'
                 }
@@ -150,7 +151,7 @@ class PiBookWebServer:
                     current_page = self.app_instance.reader_screen.current_page
                     epub_path = self.app_instance.reader_screen.epub_path
                     self.app_instance.reader_screen.close()
-                    self.app_instance.reader_screen.load_epub(epub_path, zoom_factor=settings_data['zoom'])
+                    self.app_instance.reader_screen.load_epub(epub_path, zoom_factor=settings_data['zoom'], dpi=settings_data['dpi'])
                     self.app_instance.reader_screen.current_page = current_page
                     self.app_instance.reader_screen.show_page_numbers = settings_data['show_page_numbers']
                     self.app_instance._render_current_screen()
@@ -181,6 +182,7 @@ class PiBookWebServer:
         settings_file = 'settings.json'
         default_settings = {
             'zoom': 1.0,
+            'dpi': 150,
             'full_refresh_interval': 5,
             'show_page_numbers': True
         }
@@ -461,6 +463,13 @@ SETTINGS_TEMPLATE = '''
                 <input type="number" id="zoom" name="zoom"
                        value="{{ settings.zoom }}" min="0.5" max="2.0" step="0.1">
                 <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, &lt;1.0 = smaller, &gt;1.0 = larger</p>
+            </div>
+
+            <div class="form-group">
+                <label for="dpi">DPI (Rendering Quality)</label>
+                <input type="number" id="dpi" name="dpi"
+                       value="{{ settings.dpi }}" min="72" max="300" step="1">
+                <p class="help-text">Rendering resolution (72-300). Higher = sharper text but slower. Default: 150</p>
             </div>
 
             <div class="form-group">

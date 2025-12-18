@@ -15,7 +15,7 @@ class EPUBRenderer:
     EPUB renderer using PyMuPDF
     """
 
-    def __init__(self, epub_path: str, width: int = 800, height: int = 480, zoom_factor: float = 1.0):
+    def __init__(self, epub_path: str, width: int = 800, height: int = 480, zoom_factor: float = 1.0, dpi: int = 150):
         """
         Initialize EPUB renderer
 
@@ -24,12 +24,14 @@ class EPUBRenderer:
             width: Target screen width
             height: Target screen height
             zoom_factor: Zoom multiplier (1.0 = fit to screen, >1.0 = zoom in, <1.0 = zoom out)
+            dpi: Rendering DPI for quality (higher = sharper)
         """
         self.logger = logging.getLogger(__name__)
         self.epub_path = epub_path
         self.width = width
         self.height = height
         self.zoom_factor = zoom_factor
+        self.dpi = dpi
         self.doc = None
         self.page_count = 0
 
@@ -59,24 +61,26 @@ class EPUBRenderer:
             # Get page from PyMuPDF
             page = self.doc[page_num]
 
-            # Calculate zoom to fit screen while maintaining aspect ratio
-            # Reserve space for page number at bottom
-            usable_width = self.width - 40  # 20px margin on each side
-            usable_height = self.height - 60 if show_page_number else self.height - 40
-
-            zoom_x = usable_width / page.rect.width
-            zoom_y = usable_height / page.rect.height
-            zoom = min(zoom_x, zoom_y) * self.zoom_factor  # Apply user zoom setting
-
-            # Create transformation matrix
-            # Note: Don't use dpi parameter when using matrix - they conflict!
-            mat = fitz.Matrix(zoom, zoom)
-
-            # Render page to pixmap (RGB image)
-            pix = page.get_pixmap(matrix=mat)
+            # Render at high DPI for quality (don't use matrix here)
+            # This ensures crisp text rendering
+            pix = page.get_pixmap(dpi=self.dpi)
 
             # Convert PyMuPDF pixmap to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+            # Calculate target size with margins
+            usable_width = self.width - 40  # 20px margin on each side
+            usable_height = self.height - 60 if show_page_number else self.height - 40
+
+            # Calculate zoom to fit within usable area
+            zoom_x = usable_width / img.width
+            zoom_y = usable_height / img.height
+            zoom = min(zoom_x, zoom_y) * self.zoom_factor  # Apply user zoom setting
+
+            # Resize image to fit screen with zoom applied
+            target_width = int(img.width * zoom)
+            target_height = int(img.height * zoom)
+            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
             # Create white background with full dimensions
             background = Image.new('RGB', (self.width, self.height), 'white')

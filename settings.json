@@ -1,5 +1,6 @@
 {
   "zoom": 1.0,
+  "dpi": 150,
   "full_refresh_interval": 5,
   "show_page_numbers": true
 }

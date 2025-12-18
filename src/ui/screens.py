@@ -193,7 +193,7 @@ class ReaderScreen:
     Uses EPUBRenderer (PyMuPDF) to display pages
     """
 
-    def __init__(self, width: int = 800, height: int = 480, zoom_factor: float = 1.0, cache_size: int = 5, show_page_numbers: bool = True):
+    def __init__(self, width: int = 800, height: int = 480, zoom_factor: float = 1.0, dpi: int = 150, cache_size: int = 5, show_page_numbers: bool = True):
         """
         Initialize reader screen
 
@@ -201,6 +201,7 @@ class ReaderScreen:
             width: Screen width
             height: Screen height
             zoom_factor: Zoom multiplier for content
+            dpi: Rendering DPI for quality
             cache_size: Number of pages to cache
             show_page_numbers: Whether to show page numbers
         """
@@ -208,6 +209,7 @@ class ReaderScreen:
         self.width = width
         self.height = height
         self.zoom_factor = zoom_factor
+        self.dpi = dpi
         self.show_page_numbers = show_page_numbers
 
         self.current_page = 0
@@ -223,30 +225,33 @@ class ReaderScreen:
         self.PageCache = PageCache
         self.cache_size = cache_size
 
-    def load_epub(self, epub_path: str, zoom_factor: float = None):
+    def load_epub(self, epub_path: str, zoom_factor: float = None, dpi: int = None):
         """
         Load an EPUB file
 
         Args:
             epub_path: Path to EPUB file
             zoom_factor: Optional zoom override (uses self.zoom_factor if not provided)
+            dpi: Optional DPI override (uses self.dpi if not provided)
         """
         try:
             # Close previous book if open
             if self.renderer:
                 self.renderer.close()
 
-            # Use provided zoom or default
+            # Use provided settings or defaults
             if zoom_factor is not None:
                 self.zoom_factor = zoom_factor
+            if dpi is not None:
+                self.dpi = dpi
 
             # Create new renderer and cache
-            self.renderer = self.EPUBRenderer(epub_path, self.width, self.height, self.zoom_factor)
+            self.renderer = self.EPUBRenderer(epub_path, self.width, self.height, self.zoom_factor, self.dpi)
             self.page_cache = self.PageCache(self.cache_size)
             self.current_page = 0
             self.epub_path = epub_path
 
-            self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages, zoom={self.zoom_factor})")
+            self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages, zoom={self.zoom_factor}, dpi={self.dpi})")
 
         except Exception as e:
             self.logger.error(f"Failed to load EPUB: {e}")
