@@ -66,43 +66,62 @@ class PillowTextRenderer:
 
     def _load_fonts(self):
         """Load specific TrueType fonts for styles"""
-        font_families = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif",
-            "/usr/share/fonts/truetype/liberation/LiberationSerif",
-            "C:/Windows/Fonts/times"
+        # Font search paths with proper file names
+        font_candidates = [
+            # DejaVu Serif (common on Raspberry Pi)
+            {
+                'normal': '/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf',
+                'bold': '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf',
+                'italic': '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf',
+                'bold_italic': '/usr/share/fonts/truetype/dejavu/DejaVuSerif-BoldItalic.ttf',
+            },
+            # Liberation Serif
+            {
+                'normal': '/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf',
+                'bold': '/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf',
+                'italic': '/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf',
+                'bold_italic': '/usr/share/fonts/truetype/liberation/LiberationSerif-BoldItalic.ttf',
+            },
+            # Windows fonts
+            {
+                'normal': 'C:/Windows/Fonts/times.ttf',
+                'bold': 'C:/Windows/Fonts/timesbd.ttf',
+                'italic': 'C:/Windows/Fonts/timesi.ttf',
+                'bold_italic': 'C:/Windows/Fonts/timesbi.ttf',
+            },
         ]
-        
-        base_path = None
-        for path in font_families:
-            # Check if Regular exists (handling extensions)
-            for ext in ['.ttf', '-Regular.ttf']:
-                if os.path.exists(path + ext) or os.path.exists(path + '.ttf'):
-                    base_path = path
-                    break
-            if base_path: break
-            
-        if not base_path:
-            self.logger.warning("No fonts found, using default")
+
+        # Find first available font family
+        font_paths = None
+        for candidate in font_candidates:
+            if os.path.exists(candidate['normal']):
+                font_paths = candidate
+                self.logger.info(f"Using font: {candidate['normal']}")
+                break
+
+        if not font_paths:
+            self.logger.warning("No TrueType fonts found, using default bitmap font")
             default = ImageFont.load_default()
             self.fonts = {k: default for k in ['normal', 'bold', 'italic', 'bold_italic', 'h1', 'h2']}
             return
 
-        def load(suffix, size):
+        # Load fonts with fallback to normal if variants don't exist
+        def load_font(style, size):
+            path = font_paths.get(style, font_paths['normal'])
+            if not os.path.exists(path):
+                path = font_paths['normal']  # Fallback to normal
             try:
-                # Try common naming patterns
-                p = f"{base_path}{suffix}.ttf"
-                if not os.path.exists(p):
-                    p = f"{base_path}{suffix.replace('-','')}.ttf"
-                return ImageFont.truetype(p, size)
-            except:
-                return ImageFont.truetype(f"{base_path}.ttf", size)
+                return ImageFont.truetype(path, size)
+            except Exception as e:
+                self.logger.warning(f"Failed to load {path}: {e}")
+                return ImageFont.load_default()
 
-        self.fonts['normal'] = load("", self.base_font_size)
-        self.fonts['bold'] = load("-Bold", self.base_font_size)
-        self.fonts['italic'] = load("-Italic", self.base_font_size)
-        self.fonts['bold_italic'] = load("-BoldItalic", self.base_font_size)
-        self.fonts['h1'] = load("-Bold", self.header_font_size)
-        self.fonts['h2'] = load("-Bold", int(self.header_font_size * 0.9))
+        self.fonts['normal'] = load_font('normal', self.base_font_size)
+        self.fonts['bold'] = load_font('bold', self.base_font_size)
+        self.fonts['italic'] = load_font('italic', self.base_font_size)
+        self.fonts['bold_italic'] = load_font('bold_italic', self.base_font_size)
+        self.fonts['h1'] = load_font('bold', self.header_font_size)
+        self.fonts['h2'] = load_font('bold', int(self.header_font_size * 0.9))
 
     def _get_cache_path(self) -> str:
         """Get path to cache file"""
