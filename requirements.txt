@@ -5,3 +5,4 @@ PyYAML>=6.0
 Flask>=3.0.0
 EbookLib>=0.18
 beautifulsoup4>=4.12.0
+cairosvg>=2.7.0
