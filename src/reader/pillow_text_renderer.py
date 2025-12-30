@@ -169,7 +169,54 @@ class PillowTextRenderer:
         self._save_cache()
         self.logger.info(f"Loaded EPUB: {self.page_count} pages")
 
-    # ... (keep _parse_html) ...
+    def _parse_html(self, html: str) -> List[TextToken]:
+        """Parse HTML into flat list of tokens with styles"""
+        soup = BeautifulSoup(html, 'html.parser')
+        tokens = []
+
+        # Remove metadata
+        for tag in soup(['head', 'script', 'style', 'title', 'meta']):
+            tag.decompose()
+
+        def process_node(node, current_style='normal'):
+            if isinstance(node, NavigableString):
+                text = str(node).replace('\n', ' ').strip()
+                if not text: return
+
+                words = re.split(r'(\s+)', str(node).replace('\n', ' '))
+                for w in words:
+                    if w:
+                        tokens.append(TextToken(w, current_style))
+                return
+
+            if isinstance(node, Tag):
+                style = current_style
+                is_block = node.name in ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'br', 'li']
+
+                # Determine style
+                if node.name in ['b', 'strong']:
+                    style = 'bold_italic' if 'italic' in style else 'bold'
+                elif node.name in ['i', 'em']:
+                    style = 'bold_italic' if 'bold' in style else 'italic'
+                elif node.name == 'h1':
+                    style = 'h1'
+                elif node.name == 'h2':
+                    style = 'h2'
+                elif node.name in ['h3', 'h4']:
+                    style = 'bold'
+
+                if is_block and tokens and not tokens[-1].new_paragraph:
+                    # Mark last token to end paragraph
+                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
+
+                for child in node.children:
+                    process_node(child, style)
+
+                if is_block and tokens and not tokens[-1].new_paragraph:
+                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
+
+        process_node(soup.body if soup.body else soup)
+        return tokens
 
     def _reflow_pages(self, tokens: List[TextToken]):
         """Reflow tokens into pages based on width/height"""
