@@ -9,6 +9,7 @@ from typing import List, Optional, Dict
 import os
 import logging
 import socket
+import subprocess
 
 
 def get_ip_address():
@@ -21,6 +22,38 @@ def get_ip_address():
         return ip
     except Exception:
         return "No Network"
+
+
+def get_wifi_status():
+    """Check if WiFi is enabled and connected"""
+    try:
+        # Check if wlan0 interface exists and is up
+        result = subprocess.run(['ip', 'link', 'show', 'wlan0'],
+                              capture_output=True, text=True, timeout=2)
+        if result.returncode == 0:
+            # Check if interface is UP
+            if 'state UP' in result.stdout or 'UP' in result.stdout:
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def get_bluetooth_status():
+    """Check if Bluetooth is enabled"""
+    try:
+        # Check if bluetooth service is active
+        result = subprocess.run(['systemctl', 'is-active', 'bluetooth'],
+                              capture_output=True, text=True, timeout=2)
+        if result.returncode == 0 and result.stdout.strip() == 'active':
+            # Also check if hci0 is up
+            hci_result = subprocess.run(['hciconfig', 'hci0'],
+                                      capture_output=True, text=True, timeout=2)
+            if hci_result.returncode == 0 and 'UP RUNNING' in hci_result.stdout:
+                return True
+        return False
+    except Exception:
+        return False
 
 
 class LibraryScreen:
@@ -127,6 +160,37 @@ class LibraryScreen:
         # Create white background
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
+
+        # Draw WiFi status indicator (top left)
+        wifi_on = get_wifi_status()
+        wifi_icon_x = 10
+        wifi_icon_y = 8
+        if wifi_on:
+            # Draw WiFi icon (three curved lines)
+            draw.arc([wifi_icon_x, wifi_icon_y+8, wifi_icon_x+16, wifi_icon_y+16], 180, 360, fill=0, width=2)
+            draw.arc([wifi_icon_x+3, wifi_icon_y+11, wifi_icon_x+13, wifi_icon_y+16], 180, 360, fill=0, width=2)
+            draw.arc([wifi_icon_x+6, wifi_icon_y+14, wifi_icon_x+10, wifi_icon_y+16], 180, 360, fill=0, width=2)
+            draw.text((wifi_icon_x + 20, wifi_icon_y), "WiFi", font=self.font, fill=0)
+        else:
+            # Draw WiFi off icon (X through WiFi)
+            draw.text((wifi_icon_x, wifi_icon_y), "WiFi OFF", font=self.font, fill=0)
+
+        # Draw Bluetooth status indicator (top right)
+        bt_on = get_bluetooth_status()
+        bt_text = "BT" if bt_on else "BT OFF"
+        try:
+            bbox = draw.textbbox((0, 0), bt_text, font=self.font)
+            bt_width = bbox[2] - bbox[0]
+        except:
+            bt_width = len(bt_text) * 10
+        bt_x = self.width - bt_width - 10
+        bt_y = 8
+
+        if bt_on:
+            # Draw simple Bluetooth icon (B symbol)
+            draw.text((bt_x, bt_y), "BT", font=self.font, fill=0)
+        else:
+            draw.text((bt_x, bt_y), "BT OFF", font=self.font, fill=0)
 
         # Draw IP address and port at top center
         ip_address = get_ip_address()
