@@ -11,7 +11,8 @@ import logging
 import os
 import re
 import textwrap
-from typing import Dict, List, Optional, Tuple, NamedTuple
+from io import BytesIO
+from typing import Dict, List, Optional, Tuple, NamedTuple, Union
 from bs4 import BeautifulSoup, NavigableString, Tag
 
 # Define a token structure for rich text
@@ -19,6 +20,13 @@ class TextToken(NamedTuple):
     text: str
     style: str  # 'normal', 'bold', 'italic', 'bold_italic', 'h1', 'h2'
     new_paragraph: bool = False
+
+# Define an image token for embedded images
+class ImageToken(NamedTuple):
+    image: Image.Image
+    max_width: int  # Maximum width in pixels
+    max_height: int  # Maximum height in pixels
+    new_paragraph: bool = True
 
 class PillowTextRenderer:
     """
@@ -55,8 +63,9 @@ class PillowTextRenderer:
         
         # Book content
         self.book = None
-        self.pages = []  # List of pages, each page is a list of (x, y, text, font) tuples
+        self.pages = []  # List of pages, each page is a list of render items (text or image)
         self.page_count = 0
+        self.images = {}  # Cache for EPUB images: {src_path: PIL.Image}
         
         try:
             self._load_epub()
@@ -167,8 +176,12 @@ class PillowTextRenderer:
             return
 
         self.book = epub.read_epub(self.epub_path)
+
+        # First pass: Extract and cache all images from EPUB
+        self._extract_images()
+
         all_tokens = []
-        
+
         for item in self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
             try:
                 content = item.get_content()
@@ -176,19 +189,45 @@ class PillowTextRenderer:
                     html = content.decode('utf-8')
                 except UnicodeDecodeError:
                     html = content.decode('latin-1', errors='ignore')
-                    
+
                 tokens = self._parse_html(html)
                 if tokens:
                     all_tokens.extend(tokens)
-                    all_tokens.append(TextToken("", "normal", new_paragraph=True)) 
+                    all_tokens.append(TextToken("", "normal", new_paragraph=True))
             except Exception as e:
                 self.logger.warning(f"Chapter error: {e}")
-                
+
         self._reflow_pages(all_tokens)
         self._save_cache()
         self.logger.info(f"Loaded EPUB: {self.page_count} pages")
 
-    def _parse_html(self, html: str) -> List[TextToken]:
+    def _extract_images(self):
+        """Extract all images from EPUB and cache them"""
+        for item in self.book.get_items_of_type(ebooklib.ITEM_IMAGE):
+            try:
+                # Get image data
+                img_data = item.get_content()
+                img = Image.open(BytesIO(img_data))
+
+                # Convert to appropriate mode for e-ink
+                if img.mode == 'RGBA':
+                    # Create white background for transparency
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    background.paste(img, mask=img.split()[3])  # Use alpha channel as mask
+                    img = background
+                elif img.mode not in ['RGB', 'L', '1']:
+                    img = img.convert('RGB')
+
+                # Store with filename as key
+                img_name = item.get_name()
+                self.images[img_name] = img
+                self.logger.debug(f"Extracted image: {img_name} ({img.size[0]}x{img.size[1]})")
+            except Exception as e:
+                self.logger.warning(f"Failed to extract image {item.get_name()}: {e}")
+
+        self.logger.info(f"Extracted {len(self.images)} images from EPUB")
+
+    def _parse_html(self, html: str) -> List[Union[TextToken, ImageToken]]:
         """Parse HTML into flat list of tokens with styles"""
         soup = BeautifulSoup(html, 'html.parser')
         tokens = []
@@ -209,6 +248,30 @@ class PillowTextRenderer:
                 return
 
             if isinstance(node, Tag):
+                # Handle image tags
+                if node.name == 'img':
+                    src = node.get('src', '')
+                    if src:
+                        # Normalize path (remove ../ and leading /)
+                        img_path = src.split('/')[-1]  # Get just the filename
+
+                        # Try to find image in cache
+                        img = None
+                        for key in self.images.keys():
+                            if key.endswith(img_path) or img_path in key:
+                                img = self.images[key]
+                                break
+
+                        if img:
+                            # Add image token with max dimensions
+                            max_img_width = self.text_width
+                            max_img_height = int(self.text_height * 0.6)  # Max 60% of page height
+                            tokens.append(ImageToken(img, max_img_width, max_img_height))
+                            self.logger.debug(f"Added image token: {img_path}")
+                        else:
+                            self.logger.warning(f"Image not found in EPUB: {src}")
+                    return  # Don't process children of img tag
+
                 style = current_style
                 is_block = node.name in ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'br', 'li']
 
@@ -226,13 +289,16 @@ class PillowTextRenderer:
 
                 if is_block and tokens and not tokens[-1].new_paragraph:
                     # Mark last token to end paragraph
-                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
+                    if isinstance(tokens[-1], TextToken):
+                        tokens[-1] = tokens[-1]._replace(new_paragraph=True)
 
                 for child in node.children:
                     process_node(child, style)
 
                 if is_block and tokens and not tokens[-1].new_paragraph:
-                    tokens[-1] = tokens[-1]._replace(new_paragraph=True)
+                    # Mark last token to end paragraph
+                    if isinstance(tokens[-1], TextToken):
+                        tokens[-1] = tokens[-1]._replace(new_paragraph=True)
 
         process_node(soup.body if soup.body else soup)
         return tokens
@@ -274,9 +340,43 @@ class PillowTextRenderer:
             if count % 10000 == 0:
                 self.logger.debug(f"Reflow progress: {count}/{len(tokens)}")
 
+            # Handle image tokens
+            if isinstance(token, ImageToken):
+                # Finish current line first
+                if current_line:
+                    current_y = finish_line(current_line, current_y, current_line_max_h or self.base_font_size)
+                    current_line = []
+                    current_line_max_h = 0
+
+                # Scale image to fit
+                img = token.image
+                img_w, img_h = img.size
+
+                # Calculate scaled dimensions
+                scale = min(token.max_width / img_w, token.max_height / img_h, 1.0)
+                new_w = int(img_w * scale)
+                new_h = int(img_h * scale)
+
+                # Check if image fits on current page
+                if current_y + new_h > self.height - self.margin_bottom:
+                    # Start new page
+                    self.pages.append(current_page)
+                    current_page = []
+                    current_y = self.margin_top
+
+                # Add image to page (special marker: 'IMAGE' style with image object)
+                img_x = self.margin_left + (self.text_width - new_w) // 2  # Center image
+                current_page.append((img_x, current_y, img, 'IMAGE', new_w, new_h))
+                current_y += new_h + self.paragraph_spacing * 2
+
+                # Reset text position
+                current_x = self.margin_left + self.paragraph_indent
+                continue
+
+            # Handle text tokens
             font = self.fonts.get(token.style, self.fonts['normal'])
             font_h = font_metrics.get(token.style, self.base_font_size)
-            
+
             # Handle headers (no indent, extra space)
             if token.style in ['h1', 'h2']:
                 if current_line:
@@ -285,7 +385,7 @@ class PillowTextRenderer:
                      current_line_max_h = 0
                 current_x = self.margin_left # Headers not indented
                 current_y += self.paragraph_spacing * 2
-            
+
             # Measure token width only
             try:
                 width = font.getlength(token.text)
@@ -306,7 +406,7 @@ class PillowTextRenderer:
             current_line.append((token.text, token.style, current_x))
             current_x += width
             current_line_max_h = max(current_line_max_h, font_h)
-            
+
             if token.new_paragraph:
                 # Force new line
                 current_y = finish_line(current_line, current_y, current_line_max_h or font_h)
@@ -331,12 +431,31 @@ class PillowTextRenderer:
     def render_page(self, page_num: int, show_page_number: bool = True) -> Image.Image:
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
-        
+
         if 0 <= page_num < len(self.pages):
-            for x, y, text, style in self.pages[page_num]:
-                font = self.fonts.get(style, self.fonts['normal'])
-                draw.text((x, y), text, font=font, fill=0)
-                
+            for item in self.pages[page_num]:
+                # Check if this is an image item (has 6 elements)
+                if len(item) == 6:
+                    x, y, img, style_marker, img_w, img_h = item
+                    if style_marker == 'IMAGE':
+                        # Resize and convert image to 1-bit for e-ink
+                        resized_img = img.resize((img_w, img_h), Image.Resampling.LANCZOS)
+
+                        # Convert to grayscale first, then to 1-bit with dithering for better quality
+                        if resized_img.mode != 'L':
+                            resized_img = resized_img.convert('L')
+
+                        # Convert to 1-bit with Floyd-Steinberg dithering for better image quality
+                        bw_img = resized_img.convert('1', dither=Image.Dither.FLOYDSTEINBERG)
+
+                        # Paste the image onto the page
+                        image.paste(bw_img, (x, y))
+                else:
+                    # Text item (4 elements)
+                    x, y, text, style = item
+                    font = self.fonts.get(style, self.fonts['normal'])
+                    draw.text((x, y), text, font=font, fill=0)
+
         if show_page_number:
             page_text = f"Page {page_num + 1} of {self.page_count}"
             font = self.fonts['normal']
@@ -346,7 +465,7 @@ class PillowTextRenderer:
                 draw.text(((self.width - w)//2, self.height - 25), page_text, font=font, fill=0)
             except:
                 pass
-                
+
         return image
 
     def get_page_count(self): return self.page_count
