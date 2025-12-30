@@ -35,11 +35,12 @@ class DisplayDriver:
         self.logger = logging.getLogger(__name__)
         self.partial_refresh_count = 0
         self.full_refresh_interval = 5  # Full refresh every N page turns
-        
+        self.first_display = True  # Force full refresh on first display
+
         # Physical hardware dimensions (always 800x480 for this display)
         self.hw_width = 800
         self.hw_height = 480
-        
+
         # Track if partial refresh mode has been initialized
         self.partial_mode_initialized = False
         
@@ -157,20 +158,25 @@ class DisplayDriver:
                     image = image.convert('1', dither=Image.Dither.NONE)
                 
                 # Decide whether to use partial or full refresh
-                should_full_refresh = not use_partial or (self.partial_refresh_count >= self.full_refresh_interval)
+                # Always do full refresh on first display to clear any ghosting from previous session
+                should_full_refresh = self.first_display or not use_partial or (self.partial_refresh_count >= self.full_refresh_interval)
 
                 if should_full_refresh:
                     # Full refresh - clears ghosting
-                    self.logger.info(f"Performing FULL refresh (count reset from {self.partial_refresh_count})")
-                    
+                    if self.first_display:
+                        self.logger.info(f"Performing FIRST FULL refresh (clearing any previous ghosting)")
+                    else:
+                        self.logger.info(f"Performing FULL refresh (count reset from {self.partial_refresh_count})")
+
                     # Reinitialize for full refresh if we were in partial mode
                     if self.partial_mode_initialized:
                         self.logger.info("Reinitializing display for full refresh mode")
                         self.epd.init()
                         self.partial_mode_initialized = False
-                    
+
                     self.epd.display(self.epd.getbuffer(image))
                     self.partial_refresh_count = 0
+                    self.first_display = False  # Clear first display flag after full refresh
                 else:
                     # Partial refresh - faster but may cause ghosting
                     buffer_data = self.epd.getbuffer(image)
