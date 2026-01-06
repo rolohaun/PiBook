@@ -268,7 +268,7 @@ class PiBookApp:
             self.pisugar_button.register_callback('prev_page', self._handle_prev)
             self.pisugar_button.register_callback('select', self._handle_select)
             self.pisugar_button.register_callback('back', self._handle_back)
-            self.pisugar_button.register_callback('menu', self._handle_menu)
+            self.pisugar_button.register_callback('toggle', self._handle_toggle)  # Long press toggles
             self.pisugar_button.start()
             self.logger.info("PiSugar button callbacks registered")
 
@@ -412,6 +412,28 @@ class PiBookApp:
 
         self.navigation.navigate_to(Screen.LIBRARY)
         self._render_current_screen()
+
+    def _handle_toggle(self):
+        """Handle toggle button press (PiSugar long press)"""
+        if not self.running: return
+        
+        self._reset_activity()
+        if self.is_sleeping:
+            self._wake_from_sleep()
+            return
+
+        self.logger.info("Button: Toggle")
+
+        if self.navigation.is_on_screen(Screen.LIBRARY):
+            # On library - open selected book (same as select)
+            book = self.library_screen.get_selected_book()
+            if book:
+                self._open_book(book)
+        elif self.navigation.is_on_screen(Screen.READER):
+            # On reader - return to library
+            self.reader_screen.close()
+            self.navigation.navigate_to(Screen.LIBRARY)
+            self._render_current_screen()
 
     def _open_book(self, book: dict):
         """
