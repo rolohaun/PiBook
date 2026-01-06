@@ -127,11 +127,11 @@ class PiBookApp:
         self.running = False
         self.page_turn_count = 0
         self.gc_threshold = self.config.get('performance.gc_threshold', 100)
-        
-        # Sleep Mode
+        # Inactivity tracking for sleep mode (battery optimization)
+        self.sleep_timeout = self.config.get('power.sleep_timeout', 120)  # 2 minutes default
         self.last_activity_time = time.time()
         self.is_sleeping = False
-        self.sleep_timeout = 300 # 5 minutes
+        self.logger.info(f"Sleep timeout set to {self.sleep_timeout}s for battery optimization")
 
         # Web server
         self.web_server = None
@@ -303,6 +303,14 @@ class PiBookApp:
         
         self.is_sleeping = True
         
+        # Stop web server during sleep (battery optimization)
+        if self.web_server and not self.config.get('web.always_on', False):
+            try:
+                self.web_server.stop()
+                self.logger.info("🔌 Web server stopped for battery savings")
+            except:
+                pass
+        
         # Create sleep image
         from PIL import Image, ImageDraw, ImageFont
         image = Image.new('1', (self.display.width, self.display.height), 1)
@@ -327,10 +335,25 @@ class PiBookApp:
         self.display.display_image(image, use_partial=False)
 
     def _wake_from_sleep(self):
-        """Wake from sleep"""
-        self.logger.info("Waking up!")
+        """Wake from sleep mode"""
+        self.logger.info("Waking from sleep")
         self.is_sleeping = False
-        self._reset_activity()
+        
+        # Restart web server if it was stopped (battery optimization)
+        if not self.web_server and self.config.get('web.enabled', True):
+            try:
+                web_port = self.config.get('web.port', 5000)
+                self.web_server = PiBookWebServer(
+                    self.library_screen,
+                    port=web_port,
+                    books_dir=self.config.get('library.books_directory')
+                )
+                self.web_server.start()
+                self.logger.info("🔌 Web server restarted")
+            except:
+                pass
+        
+        self._render_current_screen()
         self._render_current_screen()
 
     def _reset_activity(self):
@@ -365,6 +388,11 @@ class PiBookApp:
                 )
 
         self._render_current_screen()
+        
+        # Force garbage collection on page turn (battery optimization)
+        if self.config.get('performance.gc_on_page_turn', True):
+            gc.collect()
+        
         self._trigger_gc_if_needed()
 
     def _handle_prev(self):

@@ -6,6 +6,8 @@ display:
   height: 800
   rotation: 90                # Rotate 90 degrees for portrait mode
   dpi: 150                    # DPI for PyMuPDF rendering
+  partial_refresh: true       # Use partial refresh for page turns
+  full_refresh_interval: 10   # Full refresh every N page turns (higher = more battery savings)
 
 library:
   books_directory: "/home/pi/PiBook/books"
@@ -13,20 +15,25 @@ library:
   font_size: 20               # For library menu rendering only
 
 reader:
-  page_cache_size: 5          # Rendered page cache (reduce to 3 for Pi Zero 2 W)
+  page_cache_size: 3          # Reduced from 5 for better battery life
   zoom: 1.0                   # Page zoom factor (1.0 = fit to screen)
 
 performance:
-  gc_threshold: 100           # Reduce to 50 for Pi Zero 2 W
-  preload_next_page: false    # Preload next page in background (experimental)
+  gc_threshold: 50            # Aggressive GC for battery savings
+  gc_on_page_turn: true       # Force GC after page turn
+  preload_next_page: false    # Disabled for battery savings
 
 logging:
-  level: "INFO"               # DEBUG, INFO, WARNING, ERROR
-  file: "/home/pi/PiBook/logs/app.log"
-  console: true
+  level: "WARNING"            # Reduced logging for battery savings
+  file: "/tmp/pibook.log"     # RAM disk instead of SD card
+  console: false              # Disabled for battery savings
+  max_size: "1MB"             # Rotate logs
 
 web:
   port: 5000                  # Web interface port
+  enabled: true               # Enable web server
+  always_on: false            # Disable during sleep for battery savings
+  start_on_boot: true         # Start when app starts
 
 battery:
   enabled: true               # Enable/disable battery monitoring
@@ -44,3 +51,16 @@ pisugar:
   socket_path: "/tmp/pisugar-server.sock"  # PiSugar2 server socket
   button_enabled: true        # Enable PiSugar2 button integration
   button_socket_path: "/tmp/pibook-button.sock"  # IPC socket for button events
+
+# Power Management (Battery Optimization)
+power:
+  mode: "balanced"            # Options: maximum_battery, balanced, performance
+  sleep_timeout: 120          # Seconds of inactivity before sleep (2 minutes)
+  cpu_scaling: true           # Enable CPU frequency scaling
+  wifi_power_save: true       # Enable WiFi power management
+
+reading_progress:
+  enabled: true               # Enable reading position tracking
+  save_on_page_turn: true     # Save after each page turn
+  save_on_sleep: true         # Save when entering sleep
+  progress_file: "data/reading_progress.json"
