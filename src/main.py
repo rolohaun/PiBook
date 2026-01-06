@@ -254,10 +254,13 @@ class PiBookApp:
 
     def _register_gpio_callbacks(self):
         """Register button callbacks"""
-        # Single GPIO button with toggle functionality
-        self.gpio.register_callback('toggle', self._handle_toggle)
+        # Single GPIO button with short and long press functionality
+        # Short press: Next page (in reader) or move down (in library)
+        # Long press: Toggle between library and reader
+        self.gpio.register_callback('toggle', self._handle_next, long_press=False)
+        self.gpio.register_callback('toggle', self._handle_toggle, long_press=True)
 
-        self.logger.info("GPIO callbacks registered")
+        self.logger.info("GPIO callbacks registered (short press: next, long press: toggle)")
 
         # Register PiSugar button callbacks (if available)
         if self.pisugar_button:
@@ -332,8 +335,10 @@ class PiBookApp:
         self.logger.info("Button: Next")
 
         if self.navigation.is_on_screen(Screen.LIBRARY):
+            self.logger.info("📖 Action: NEXT (Library - Move down)")
             self.library_screen.next_item()
         elif self.navigation.is_on_screen(Screen.READER):
+            self.logger.info("📄 Action: NEXT PAGE (Reader)")
             self.reader_screen.next_page()
 
         self._render_current_screen()
@@ -351,8 +356,10 @@ class PiBookApp:
         self.logger.info("Button: Previous")
 
         if self.navigation.is_on_screen(Screen.LIBRARY):
+            self.logger.info("📖 Action: PREVIOUS (Library - Move up)")
             self.library_screen.prev_item()
         elif self.navigation.is_on_screen(Screen.READER):
+            self.logger.info("📄 Action: PREVIOUS PAGE (Reader)")
             self.reader_screen.prev_page()
 
         self._render_current_screen()
@@ -367,13 +374,13 @@ class PiBookApp:
             self._wake_from_sleep()
             return
 
-        self.logger.info("Button: Select")
-
         if self.navigation.is_on_screen(Screen.LIBRARY):
-            # Open selected book
             book = self.library_screen.get_selected_book()
             if book:
+                self.logger.info(f"📚 Action: SELECT - Opening book '{book['title']}'")
                 self._open_book(book)
+            else:
+                self.logger.warning("No book selected")
 
     def _handle_back(self):
         """Handle back button press"""
@@ -419,15 +426,17 @@ class PiBookApp:
             self._wake_from_sleep()
             return
 
-        self.logger.info("Button: Toggle")
-
         if self.navigation.is_on_screen(Screen.LIBRARY):
             # On library - open selected book (same as select)
             book = self.library_screen.get_selected_book()
             if book:
+                self.logger.info(f"🔄 Action: TOGGLE - Opening book '{book['title']}' from library")
                 self._open_book(book)
+            else:
+                self.logger.warning("No book selected to open")
         elif self.navigation.is_on_screen(Screen.READER):
             # On reader - return to library
+            self.logger.info("🔄 Action: TOGGLE - Returning to library from reader")
             self.reader_screen.close()
             self.navigation.navigate_to(Screen.LIBRARY)
             self._render_current_screen()
