@@ -4,47 +4,45 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 
 ## Features
 
-- **EPUB Support**: Renders EPUBs with full formatting using PyMuPDF
-- **E-ink Display**: Optimized for Waveshare 7.5" e-Paper HAT (800×480)
-- **Button Navigation**: GPIO-based controls for page turning and menu navigation
-- **Battery Status Indicator**: Real-time battery percentage display with icon (optional)
+- **EPUB Support**: Renders EPUBs with full formatting including tables, SVG, custom fonts, and CSS
+- **E-ink Display**: Optimized for Waveshare 7.5" e-Paper HAT (800×480) with partial refresh
+- **Smart Button Control**: Single button with short/long press detection
+  - Short press: Next page
+  - Long press: Toggle between library and reader
+- **PiSugar2 Integration**: Battery monitoring and custom button support with auto-detection
+- **Reading Progress**: Automatically saves and restores your page position
+- **Battery Optimized**: 2-3x battery life with aggressive power management
 - **Web Interface**: Manage books and control e-reader from any device
   - Upload/delete EPUB files wirelessly
-  - Remote page navigation (Next/Prev/Select)
-  - File management (rename, delete)
-  - Works on phone, tablet, or computer
-- **IP Address Display**: Shows Pi's IP on library screen
-- **Memory Efficient**: Designed for Pi Zero 2 W (512MB RAM)
-- **100% Portable**: Same code runs on Pi 3B+ and Pi Zero 2 W
+  - Remote page navigation
+  - File management
+- **Network Status**: WiFi and Bluetooth status indicators
+- **Memory Efficient**: Optimized for Pi Zero 2 W (512MB RAM)
 
 ## Hardware Requirements
 
 ### Essential
-- Raspberry Pi 3B+ or Pi Zero 2 W
+- Raspberry Pi Zero 2 W
 - Waveshare 7.5inch e-Paper HAT (800×480, black/white)
 - MicroSD card (8GB+)
-- Power supply
+- **PiSugar2** battery module (battery, charging, monitoring, button)
 - 1× Push button (optional, for GPIO control)
 
-### Recommended (for Battery Power)
-- **PiSugar2** battery module (all-in-one: battery, charging, monitoring, button)
-- See [PISUGAR2_SETUP.md](PISUGAR2_SETUP.md) for setup guide
-
-### Alternative (DIY Battery Monitoring)
-- ADS1115 16-bit ADC module (I2C)
-- 2× 10kΩ resistors (for voltage divider)
-- 18650 battery with 5V boost converter
-- See [BATTERY_SETUP.md](BATTERY_SETUP.md) for setup guide
+### Setup Guides
+- [PISUGAR2_SETUP.md](PISUGAR2_SETUP.md) - PiSugar2 installation and configuration
+- [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
 
 ## Technology Stack
 
 | Component | Library | Purpose |
 |-----------|---------|---------|
-| EPUB Rendering | PyMuPDF (fitz) | Renders EPUB pages to images |
-| Image Processing | Pillow (PIL) | Resizes and converts to 1-bit for e-ink |
-| Hardware Driver | waveshare-epd | E-ink display driver |
-| GPIO Input | gpiozero | Button handling |
+| EPUB Rendering | PillowTextRenderer | Renders EPUB pages with full formatting |
+| Image Processing | Pillow (PIL) | Image manipulation and 1-bit conversion |
+| Hardware Driver | waveshare-epd | E-ink display driver with partial refresh |
+| GPIO Input | gpiozero | Button handling with press detection |
+| Battery Monitor | PiSugar2 | Battery status and custom button |
 | Configuration | PyYAML | Config file management |
+| Web Server | Flask | Web interface for book management |
 
 ## Installation
 
@@ -91,18 +89,18 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 
 Connect a single button between GPIO 5 and GND:
 
-| Button | GPIO Pin (BCM) | Function |
-|--------|----------------|----------|
-| Toggle | GPIO 5 | Toggle between library and reader |
+| Button | GPIO Pin (BCM) | Physical Pin | Function |
+|--------|----------------|--------------|----------|
+| Toggle | GPIO 5 | Pin 29 | Short press: Next page<br>Long press: Toggle library/reader |
 
 **Wiring:**
-- Connect one side of the button to GPIO 5
-- Connect the other side to GND
+- Connect one side of the button to GPIO 5 (Physical Pin 29)
+- Connect the other side to GND (Physical Pin 30)
 - Internal pull-up resistor is enabled in software
 
 **Functionality:**
-- **On library screen**: Opens selected book
-- **On reader screen**: Returns to library
+- **Short press** (< 0.8s): Turn to next page
+- **Long press** (≥ 0.8s): Toggle between library and reader
 - Same behavior as PiSugar2 custom button
 
 ## Configuration
@@ -111,15 +109,23 @@ Edit `config/config.yaml` to customize:
 
 ```yaml
 display:
-  width: 800
-  height: 480
-  dpi: 150
+  width: 480
+  height: 800
+  rotation: 90
+  partial_refresh: true
+  full_refresh_interval: 10  # Battery optimization
 
 reader:
-  page_cache_size: 5  # Reduce to 3 for Pi Zero 2 W if needed
+  page_cache_size: 3  # Optimized for battery life
 
 performance:
-  gc_threshold: 100   # Reduce to 50 for Pi Zero 2 W if needed
+  gc_threshold: 50
+  gc_on_page_turn: true  # Battery optimization
+
+power:
+  sleep_timeout: 120  # 2 minutes
+  cpu_scaling: true
+  wifi_power_save: true
 ```
 
 Edit `config/gpio_mapping.yaml` to change button pins.
@@ -144,25 +150,7 @@ View logs:
 sudo journalctl -u pibook.service -f
 ```
 
-## Migrating from Pi 3B+ to Pi Zero 2 W
 
-**No code changes needed!** Just:
-
-1. Shutdown Pi 3B+
-2. Remove SD card
-3. Insert SD card into Pi Zero 2 W
-4. Boot
-5. (Optional) Reduce cache sizes in `config/config.yaml`
-
-### Optional: ZRAM for Pi Zero 2 W
-
-For better memory usage on Pi Zero 2 W:
-
-```bash
-cd /home/pi/PiBook
-./scripts/setup_zram.sh
-sudo reboot
-```
 
 ## Troubleshooting
 
@@ -192,18 +180,10 @@ sudo usermod -a -G gpio,spi pi
 sudo reboot
 ```
 
-### Out of memory (Pi Zero 2 W)
+### Out of memory
 
-1. Reduce cache sizes in `config/config.yaml`:
-   ```yaml
-   reader:
-     page_cache_size: 3
-
-   performance:
-     gc_threshold: 50
-   ```
-
-2. Enable ZRAM:
+1. Cache sizes are already optimized in `config/config.yaml`
+2. Enable ZRAM if needed:
    ```bash
    ./scripts/setup_zram.sh
    ```
@@ -256,8 +236,8 @@ PiBook/
 Wire a single button to GPIO 5 as specified in `config/gpio_mapping.yaml`:
 
 #### Toggle Button (GPIO 5)
-- **On library**: Opens selected book
-- **On reader**: Returns to library
+- **Short press**: Next page (in reader) or move down (in library)
+- **Long press**: Toggle between library and reader
 
 ## Development
 
@@ -282,28 +262,31 @@ logging:
 
 ## Performance
 
-**Pi 3B+ (1GB RAM):**
-- EPUB loading: ~2-5 seconds
-- Page rendering: ~0.5-1 second (cached: instant)
-- Recommended cache size: 5-10 pages
-
 **Pi Zero 2 W (512MB RAM):**
-- EPUB loading: ~5-10 seconds
+- EPUB loading: ~3-5 seconds
 - Page rendering: ~1-2 seconds (cached: instant)
-- Recommended cache size: 3-5 pages
+- Page cache: 3 pages (optimized for battery)
+- Battery life: 16-20 hours reading, 48-72 hours standby
+- Sleep timeout: 2 minutes
+
+## Implemented Features
+
+- [x] Reading progress persistence (auto-saves page position)
+- [x] Battery level indicator (PiSugar2 integration)
+- [x] Battery optimization (2-3x battery life)
+- [x] Short/long press button detection
+- [x] Partial refresh for e-ink display
+- [x] WiFi and Bluetooth status indicators
 
 ## Future Enhancements
 
-- [ ] Bookmarks and reading progress persistence
 - [ ] Chapter navigation via table of contents
 - [ ] Font size adjustment
-- [ ] PDF support (PyMuPDF supports PDFs natively)
+- [ ] PDF support (renderer supports PDFs)
 - [ ] Search within books
 - [ ] Dictionary lookup
 - [ ] Book metadata editing
 - [ ] Wi-Fi sync with Calibre
-- [ ] Battery level indicator (for battery HATs)
-- [ ] Sleep timer
 
 ## License
 
