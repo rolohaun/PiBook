@@ -297,7 +297,7 @@ class PiBookApp:
             self.progress_manager.save_progress(
                 self.reader_screen.current_book_path,
                 self.reader_screen.current_page,
-                self.reader_screen.renderer.get_total_pages()
+                self.reader_screen.renderer.get_page_count()
             )
             self.logger.info("💾 Saved reading progress before sleep")
         
@@ -361,7 +361,7 @@ class PiBookApp:
                 self.progress_manager.save_progress(
                     self.reader_screen.current_book_path,
                     self.reader_screen.current_page,
-                    self.reader_screen.renderer.get_total_pages()
+                    self.reader_screen.renderer.get_page_count()
                 )
 
         self._render_current_screen()
