@@ -339,6 +339,7 @@ class ReaderScreen:
         self.renderer = None
         self.page_cache = None
         self.epub_path = None
+        self.current_book_path = None  # Track current book for progress saving
         self.renderer_type = None
         self.battery_monitor = battery_monitor
 
@@ -356,47 +357,41 @@ class ReaderScreen:
             zoom_factor: Optional zoom override (uses self.zoom_factor if not provided)
             dpi: Optional DPI override (uses self.dpi if not provided)
         """
+        self.logger.info(f"Loading EPUB: {epub_path}")
+        self.epub_path = epub_path
+        self.current_book_path = os.path.abspath(epub_path)  # Store absolute path
+        self.current_page = 0
+
+        # Use provided zoom/dpi or fall back to instance defaults
+        zoom = zoom_factor if zoom_factor is not None else self.zoom_factor
+        dpi_val = dpi if dpi is not None else self.dpi
+
+        # Determine renderer type
         try:
-            # Close previous book if open
-            if self.renderer:
-                self.renderer.close()
-
-            # Use provided settings or defaults
-            if zoom_factor is not None:
-                self.zoom_factor = zoom_factor
-            if dpi is not None:
-                self.dpi = dpi
-
-            # Initialize PillowTextRenderer
-            from src.reader.pillow_text_renderer import PillowTextRenderer
-            self.renderer = PillowTextRenderer(
-                epub_path, 
-                width=self.width, 
-                height=self.height, 
-                zoom_factor=self.zoom_factor, 
-                dpi=self.dpi
+            from src.reader.epub_renderer import EPUBRenderer
+            self.renderer = EPUBRenderer(
+                epub_path,
+                width=self.width,
+                height=self.height,
+                zoom_factor=zoom,
+                dpi=dpi_val
             )
-            self.renderer_type = 'pillow'
-            self.logger.info(f"Using PillowTextRenderer for: {epub_path}")
+            self.renderer_type = 'pymupdf'
+            self.logger.info("Using PyMuPDF renderer")
+        except ImportError:
+            from src.reader.epub_renderer_fallback import EPUBRendererFallback
+            self.renderer = EPUBRendererFallback(
+                epub_path,
+                width=self.width,
+                height=self.height
+            )
+            self.renderer_type = 'fallback'
+            self.logger.info("Using fallback renderer (Pillow)")
 
-            self.epub_path = epub_path
+        # Initialize page cache
+        self.page_cache = self.PageCache(self.cache_size)
 
-            self.page_cache = self.PageCache(self.cache_size)
-            self.current_page = 0
-            
-            # Pre-fill cache for first few pages
-            if self.page_cache:
-                self.page_cache.reset()
-                self._update_cache(0) # Cache surrounding pages
-
-        except Exception as e:
-            self.epub_path = epub_path
-
-            self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages, renderer={self.renderer_type}, zoom={self.zoom_factor}, dpi={self.dpi})")
-
-        except Exception as e:
-            self.logger.error(f"Failed to load EPUB: {e}")
-            raise
+        self.logger.info(f"EPUB loaded: {self.renderer.get_total_pages()} pages")
 
     def next_page(self) -> bool:
         """
@@ -428,12 +423,103 @@ class ReaderScreen:
 
         if self.current_page > 0:
             self.current_page -= 1
-            self.logger.debug(f"Previous page: {self.current_page}")
+            self.logger.debug(f"Previous page: {self.current_page + 1}/{self.renderer.get_total_pages()}")
             return True
-
-        self.logger.debug("Already on first page")
         return False
 
+    def go_to_page(self, page_number: int):
+        """
+        Jump to specific page number
+
+        Args:
+            page_number: Page number to jump to (0-indexed)
+        """
+        if not self.renderer:
+            return
+
+        total_pages = self.renderer.get_total_pages()
+        if 0 <= page_number < total_pages:
+            self.current_page = page_number
+            self.logger.info(f"Jumped to page {page_number + 1}/{total_pages}")
+
+    def cache_page(self, page_number: int):
+        """
+        Pre-cache a specific page
+
+        Args:
+            page_number: Page number to cache (0-indexed)
+        """
+        if not self.renderer:
+            return
+
+        total_pages = self.renderer.get_total_pages()
+        if 0 <= page_number < total_pages:
+            # Render and cache the page
+            img = self.renderer.render_page(page_number, show_page_number=self.show_page_numbers)
+            self.page_cache.put(page_number, img)
+            self.logger.debug(f"Cached page {page_number + 1}/{total_pages}")
+
+    def show_loading_progress(self, percentage: int, message: str = "Loading..."):
+        """
+        Display loading progress bar on screen
+
+        Args:
+            percentage: Progress percentage (0-100)
+            message: Loading message to display
+
+        Returns:
+            PIL Image with progress bar
+        """
+        image = Image.new('1', (self.width, self.height), 255)
+        draw = ImageDraw.Draw(image)
+
+        # Load font
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
+            small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+        except:
+            font = ImageFont.load_default()
+            small_font = ImageFont.load_default()
+
+        # Draw title
+        try:
+            bbox = draw.textbbox((0, 0), message, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_x = (self.width - text_width) // 2
+        except:
+            text_x = self.width // 2 - 50
+
+        draw.text((text_x, self.height // 2 - 60), message, font=font, fill=0)
+
+        # Draw progress bar
+        bar_width = 400
+        bar_height = 30
+        bar_x = (self.width - bar_width) // 2
+        bar_y = self.height // 2
+
+        # Outline
+        draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height],
+                       outline=0, width=2)
+
+        # Fill based on percentage
+        fill_width = int((bar_width - 4) * (percentage / 100))
+        if fill_width > 0:
+            draw.rectangle([bar_x + 2, bar_y + 2,
+                           bar_x + 2 + fill_width, bar_y + bar_height - 2],
+                           fill=0)
+
+        # Percentage text
+        pct_text = f"{percentage}%"
+        try:
+            bbox = draw.textbbox((0, 0), pct_text, font=small_font)
+            pct_width = bbox[2] - bbox[0]
+            pct_x = (self.width - pct_width) // 2
+        except:
+            pct_x = self.width // 2 - 20
+
+        draw.text((pct_x, bar_y + bar_height + 20), pct_text, font=small_font, fill=0)
+
+        return image
     def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int):
         """
         Draw battery icon with percentage

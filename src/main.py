@@ -23,6 +23,7 @@ from src.hardware.battery_monitor import BatteryMonitor
 from src.ui.navigation import NavigationManager, Screen
 from src.ui.screens import LibraryScreen, ReaderScreen
 from src.web.webserver import PiBookWebServer
+from src.utils.progress_manager import ProgressManager
 
 
 class PiBookApp:
@@ -95,6 +96,11 @@ class PiBookApp:
             except Exception as e:
                 self.logger.warning(f"Failed to initialize PiSugar button handler: {e}")
                 self.pisugar_button = None
+
+        # Initialize reading progress manager
+        progress_file = self.config.get('reading_progress.progress_file', 'data/reading_progress.json')
+        self.progress_manager = ProgressManager(progress_file)
+        self.logger.info("Reading progress manager initialized")
 
         # Initialize screens
         web_port = self.config.get('web.port', 5000)
@@ -285,6 +291,16 @@ class PiBookApp:
     def _enter_sleep(self):
         """Enter sleep mode"""
         self.logger.info("Entering sleep mode (inactive)")
+        
+        # Save reading progress before sleeping
+        if self.navigation.is_on_screen(Screen.READER) and self.reader_screen.current_book_path:
+            self.progress_manager.save_progress(
+                self.reader_screen.current_book_path,
+                self.reader_screen.current_page,
+                self.reader_screen.renderer.get_total_pages()
+            )
+            self.logger.info("💾 Saved reading progress before sleep")
+        
         self.is_sleeping = True
         
         # Create sleep image
@@ -340,6 +356,13 @@ class PiBookApp:
         elif self.navigation.is_on_screen(Screen.READER):
             self.logger.info("📄 Action: NEXT PAGE (Reader)")
             self.reader_screen.next_page()
+            # Save progress after page turn
+            if self.reader_screen.current_book_path:
+                self.progress_manager.save_progress(
+                    self.reader_screen.current_book_path,
+                    self.reader_screen.current_page,
+                    self.reader_screen.renderer.get_total_pages()
+                )
 
         self._render_current_screen()
         self._trigger_gc_if_needed()
@@ -361,6 +384,13 @@ class PiBookApp:
         elif self.navigation.is_on_screen(Screen.READER):
             self.logger.info("📄 Action: PREVIOUS PAGE (Reader)")
             self.reader_screen.prev_page()
+            # Save progress after page turn
+            if self.reader_screen.current_book_path:
+                self.progress_manager.save_progress(
+                    self.reader_screen.current_book_path,
+                    self.reader_screen.current_page,
+                    self.reader_screen.renderer.get_total_pages()
+                )
 
         self._render_current_screen()
         self._trigger_gc_if_needed()
@@ -435,11 +465,20 @@ class PiBookApp:
             else:
                 self.logger.warning("No book selected to open")
         elif self.navigation.is_on_screen(Screen.READER):
-            # On reader - return to library
-            self.logger.info("🔄 Action: TOGGLE - Returning to library from reader")
-            self.reader_screen.close()
-            self.navigation.navigate_to(Screen.LIBRARY)
-            self._render_current_screen()
+        # On reader - return to library
+        self.logger.info("🔄 Action: TOGGLE - Returning to library from reader")
+        
+        # Save progress before leaving reader
+        if self.reader_screen.current_book_path:
+            self.progress_manager.save_progress(
+                self.reader_screen.current_book_path,
+                self.reader_screen.current_page,
+                self.reader_screen.renderer.get_total_pages()
+            )
+        
+        self.reader_screen.close()
+        self.navigation.navigate_to(Screen.LIBRARY)
+        self._render_current_screen()
 
     def _open_book(self, book: dict):
         """
@@ -451,11 +490,30 @@ class PiBookApp:
         try:
             self.logger.info(f"Opening book: {book['title']}")
 
-            # Load EPUB with PyMuPDF
+            # Show initial loading screen (0%)
+            loading_img = self.reader_screen.show_loading_progress(0, "Loading book...")
+            self.display.display_image(loading_img)
+
+            # Load EPUB
             self.reader_screen.load_epub(book['path'])
+
+            # Check for saved progress and restore position
+            saved_page = self.progress_manager.load_progress(book['path'])
+            if saved_page is not None and saved_page > 0:
+                self.reader_screen.go_to_page(saved_page)
+                self.logger.info(f"📖 Restored to page {saved_page + 1}")
 
             # Navigate to reader screen
             self.navigation.navigate_to(Screen.READER, {'book': book})
+            
+            # Show final loading (100%)
+            loading_img = self.reader_screen.show_loading_progress(100, "Ready!")
+            self.display.display_image(loading_img)
+            
+            # Small delay to show completion
+            time.sleep(0.3)
+            
+            # Render first page
             self._render_current_screen()
 
             # Log page info
