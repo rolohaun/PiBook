@@ -27,3 +27,20 @@ logging:
 
 web:
   port: 5000                  # Web interface port
+
+battery:
+  enabled: true               # Enable/disable battery monitoring
+  # Backend auto-detected: pisugar2 → ads1115 → mock
+  # ADS1115 settings (only used if PiSugar2 not detected)
+  adc_channel: 0              # ADC channel (0-3 for ADS1115)
+  voltage_divider_ratio: 2.0  # Voltage divider ratio (2:1)
+  min_voltage: 3.0            # Battery empty voltage (V)
+  max_voltage: 4.2            # Battery full voltage (V)
+  update_interval: 30         # Seconds between readings
+  show_percentage: true       # Show percentage number
+  low_battery_threshold: 20   # Warning threshold (%)
+
+pisugar:
+  socket_path: "/tmp/pisugar-server.sock"  # PiSugar2 server socket
+  button_enabled: true        # Enable PiSugar2 button integration
+  button_socket_path: "/tmp/pibook-button.sock"  # IPC socket for button events

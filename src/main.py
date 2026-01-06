@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.config import Config
 from src.display.display_driver import DisplayDriver
 from src.hardware.gpio_handler import GPIOHandler
+from src.hardware.battery_monitor import BatteryMonitor
 from src.ui.navigation import NavigationManager, Screen
 from src.ui.screens import LibraryScreen, ReaderScreen
 from src.web.webserver import PiBookWebServer
@@ -64,6 +65,37 @@ class PiBookApp:
         self.gpio = GPIOHandler(self.config.get('gpio_config', 'config/gpio_mapping.yaml'))
         self.navigation = NavigationManager(Screen.LIBRARY)
 
+        # Initialize battery monitor (if enabled)
+        self.battery_monitor = None
+        if self.config.get('battery.enabled', False):
+            try:
+                self.battery_monitor = BatteryMonitor(
+                    adc_channel=self.config.get('battery.adc_channel', 0),
+                    voltage_divider_ratio=self.config.get('battery.voltage_divider_ratio', 2.0),
+                    min_voltage=self.config.get('battery.min_voltage', 3.0),
+                    max_voltage=self.config.get('battery.max_voltage', 4.2),
+                    update_interval=self.config.get('battery.update_interval', 30),
+                    pisugar_socket=self.config.get('pisugar.socket_path', '/tmp/pisugar-server.sock')
+                )
+                self.logger.info("Battery monitor initialized")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize battery monitor: {e}")
+                self.battery_monitor = None
+
+        # Initialize PiSugar button handler (if enabled)
+        self.pisugar_button = None
+        if self.config.get('pisugar.button_enabled', False):
+            try:
+                from src.hardware.pisugar_button_handler import PiSugarButtonHandler
+                self.pisugar_button = PiSugarButtonHandler(
+                    socket_path=self.config.get('pisugar.button_socket_path', '/tmp/pibook-button.sock')
+                )
+                # Register callbacks (will be set up after GPIO callbacks)
+                self.logger.info("PiSugar button handler initialized")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize PiSugar button handler: {e}")
+                self.pisugar_button = None
+
         # Initialize screens
         web_port = self.config.get('web.port', 5000)
         self.library_screen = LibraryScreen(
@@ -71,7 +103,8 @@ class PiBookApp:
             height=display_height,
             items_per_page=self.config.get('library.items_per_page', 8),
             font_size=self.config.get('library.font_size', 20),
-            web_port=web_port
+            web_port=web_port,
+            battery_monitor=self.battery_monitor
         )
 
         self.reader_screen = ReaderScreen(
@@ -80,7 +113,8 @@ class PiBookApp:
             zoom_factor=zoom_factor,
             dpi=dpi,
             cache_size=self.config.get('reader.page_cache_size', 5),
-            show_page_numbers=self.settings.get('show_page_numbers', True)
+            show_page_numbers=self.settings.get('show_page_numbers', True),
+            battery_monitor=self.battery_monitor
         )
 
         # State
@@ -213,6 +247,9 @@ class PiBookApp:
         if self.gpio:
             self.gpio.cleanup()
 
+        if self.pisugar_button:
+            self.pisugar_button.stop()
+
         self.logger.info("PiBook stopped")
 
     def _register_gpio_callbacks(self):
@@ -224,6 +261,16 @@ class PiBookApp:
         self.gpio.register_callback('menu', self._handle_menu)
 
         self.logger.info("GPIO callbacks registered")
+
+        # Register PiSugar button callbacks (if available)
+        if self.pisugar_button:
+            self.pisugar_button.register_callback('next_page', self._handle_next)
+            self.pisugar_button.register_callback('prev_page', self._handle_prev)
+            self.pisugar_button.register_callback('select', self._handle_select)
+            self.pisugar_button.register_callback('back', self._handle_back)
+            self.pisugar_button.register_callback('menu', self._handle_menu)
+            self.pisugar_button.start()
+            self.logger.info("PiSugar button callbacks registered")
 
     def _monitor_inactivity(self):
         """Background thread to check for inactivity"""

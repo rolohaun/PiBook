@@ -7,6 +7,7 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 - **EPUB Support**: Renders EPUBs with full formatting using PyMuPDF
 - **E-ink Display**: Optimized for Waveshare 7.5" e-Paper HAT (800×480)
 - **Button Navigation**: GPIO-based controls for page turning and menu navigation
+- **Battery Status Indicator**: Real-time battery percentage display with icon (optional)
 - **Web Interface**: Manage books and control e-reader from any device
   - Upload/delete EPUB files wirelessly
   - Remote page navigation (Next/Prev/Select)
@@ -18,11 +19,22 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 
 ## Hardware Requirements
 
+### Essential
 - Raspberry Pi 3B+ or Pi Zero 2 W
 - Waveshare 7.5inch e-Paper HAT (800×480, black/white)
 - MicroSD card (8GB+)
 - Power supply
 - 5× Push buttons (for GPIO control)
+
+### Recommended (for Battery Power)
+- **PiSugar2** battery module (all-in-one: battery, charging, monitoring, button)
+- See [PISUGAR2_SETUP.md](PISUGAR2_SETUP.md) for setup guide
+
+### Alternative (DIY Battery Monitoring)
+- ADS1115 16-bit ADC module (I2C)
+- 2× 10kΩ resistors (for voltage divider)
+- 18650 battery with 5V boost converter
+- See [BATTERY_SETUP.md](BATTERY_SETUP.md) for setup guide
 
 ## Technology Stack
 

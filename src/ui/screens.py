@@ -62,7 +62,7 @@ class LibraryScreen:
     Renders a list of available EPUB files using Pillow
     """
 
-    def __init__(self, width: int = 800, height: int = 480, items_per_page: int = 8, font_size: int = 20, web_port: int = 5000):
+    def __init__(self, width: int = 800, height: int = 480, items_per_page: int = 8, font_size: int = 20, web_port: int = 5000, battery_monitor=None):
         """
         Initialize library screen
 
@@ -72,6 +72,7 @@ class LibraryScreen:
             items_per_page: Number of books to show per page
             font_size: Font size for menu text
             web_port: Web server port number
+            battery_monitor: Optional BatteryMonitor instance
         """
         self.logger = logging.getLogger(__name__)
         self.width = width
@@ -83,6 +84,7 @@ class LibraryScreen:
         self.current_index = 0
         self.current_page = 0
         self.books: List[Dict[str, str]] = []
+        self.battery_monitor = battery_monitor
 
         # Try to load fonts
         try:
@@ -150,6 +152,57 @@ class LibraryScreen:
             return self.books[self.current_index]
         return None
 
+    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int):
+        """
+        Draw battery icon with percentage
+
+        Args:
+            draw: ImageDraw object
+            x: X position (top-right corner)
+            y: Y position
+            percentage: Battery percentage (0-100)
+        """
+        # Battery dimensions
+        battery_width = 30
+        battery_height = 14
+        terminal_width = 2
+        terminal_height = 6
+
+        # Draw battery outline
+        battery_x = x - battery_width
+        draw.rectangle(
+            [(battery_x, y), (battery_x + battery_width, y + battery_height)],
+            outline=0,
+            width=1
+        )
+
+        # Draw battery terminal (positive end)
+        terminal_x = battery_x + battery_width
+        terminal_y = y + (battery_height - terminal_height) // 2
+        draw.rectangle(
+            [(terminal_x, terminal_y), (terminal_x + terminal_width, terminal_y + terminal_height)],
+            fill=0
+        )
+
+        # Draw battery fill based on percentage
+        fill_width = int((battery_width - 4) * (percentage / 100))
+        if fill_width > 0:
+            draw.rectangle(
+                [(battery_x + 2, y + 2), (battery_x + 2 + fill_width, y + battery_height - 2)],
+                fill=0
+            )
+
+        # Draw percentage text
+        percentage_text = f"{percentage}%"
+        try:
+            bbox = draw.textbbox((0, 0), percentage_text, font=self.font)
+            text_width = bbox[2] - bbox[0]
+        except:
+            text_width = len(percentage_text) * 8
+
+        text_x = battery_x - text_width - 5
+        draw.text((text_x, y), percentage_text, font=self.font, fill=0)
+
     def render(self) -> Image.Image:
         """
         Render library screen to PIL Image
@@ -204,6 +257,11 @@ class LibraryScreen:
             ip_x = self.width // 2 - 80
         draw.text((ip_x, 5), ip_text, font=self.font, fill=0)
 
+        # Draw battery status in top-right corner
+        if self.battery_monitor:
+            battery_percentage = self.battery_monitor.get_percentage()
+            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage)
+
         # Draw title
         draw.text((40, 30), "Library", font=self.title_font, fill=0)
         draw.line([(40, 65), (self.width - 40, 65)], fill=0, width=2)
@@ -257,7 +315,7 @@ class ReaderScreen:
     Uses EPUBRenderer (PyMuPDF) to display pages
     """
 
-    def __init__(self, width: int = 800, height: int = 480, zoom_factor: float = 1.0, dpi: int = 150, cache_size: int = 5, show_page_numbers: bool = True):
+    def __init__(self, width: int = 800, height: int = 480, zoom_factor: float = 1.0, dpi: int = 150, cache_size: int = 5, show_page_numbers: bool = True, battery_monitor=None):
         """
         Initialize reader screen
 
@@ -268,6 +326,7 @@ class ReaderScreen:
             dpi: Rendering DPI for quality
             cache_size: Number of pages to cache
             show_page_numbers: Whether to show page numbers
+            battery_monitor: Optional BatteryMonitor instance
         """
         self.logger = logging.getLogger(__name__)
         self.width = width
@@ -281,6 +340,7 @@ class ReaderScreen:
         self.page_cache = None
         self.epub_path = None
         self.renderer_type = None
+        self.battery_monitor = battery_monitor
 
         # Helper for page caching
         from src.reader.page_cache import PageCache
@@ -374,6 +434,59 @@ class ReaderScreen:
         self.logger.debug("Already on first page")
         return False
 
+    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int):
+        """
+        Draw battery icon with percentage
+
+        Args:
+            draw: ImageDraw object
+            x: X position (top-right corner)
+            y: Y position
+            percentage: Battery percentage (0-100)
+        """
+        # Battery dimensions
+        battery_width = 30
+        battery_height = 14
+        terminal_width = 2
+        terminal_height = 6
+
+        # Draw battery outline
+        battery_x = x - battery_width
+        draw.rectangle(
+            [(battery_x, y), (battery_x + battery_width, y + battery_height)],
+            outline=0,
+            width=1
+        )
+
+        # Draw battery terminal (positive end)
+        terminal_x = battery_x + battery_width
+        terminal_y = y + (battery_height - terminal_height) // 2
+        draw.rectangle(
+            [(terminal_x, terminal_y), (terminal_x + terminal_width, terminal_y + terminal_height)],
+            fill=0
+        )
+
+        # Draw battery fill based on percentage
+        fill_width = int((battery_width - 4) * (percentage / 100))
+        if fill_width > 0:
+            draw.rectangle(
+                [(battery_x + 2, y + 2), (battery_x + 2 + fill_width, y + battery_height - 2)],
+                fill=0
+            )
+
+        # Draw percentage text
+        percentage_text = f"{percentage}%"
+        # Use default font for battery percentage
+        font = ImageFont.load_default()
+        try:
+            bbox = draw.textbbox((0, 0), percentage_text, font=font)
+            text_width = bbox[2] - bbox[0]
+        except:
+            text_width = len(percentage_text) * 8
+
+        text_x = battery_x - text_width - 5
+        draw.text((text_x, y), percentage_text, font=font, fill=0)
+
     def get_current_image(self) -> Image.Image:
         """
         Get current page as PIL Image (with caching)
@@ -393,6 +506,14 @@ class ReaderScreen:
         # Render and cache
         img = self.renderer.render_page(self.current_page, show_page_number=self.show_page_numbers)
         self.page_cache.put(self.current_page, img)
+
+        # Add battery overlay if monitor available
+        if self.battery_monitor:
+            # Create a copy to avoid modifying cached image
+            img = img.copy()
+            draw = ImageDraw.Draw(img)
+            battery_percentage = self.battery_monitor.get_percentage()
+            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage)
 
         return img
 
