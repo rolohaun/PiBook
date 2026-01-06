@@ -354,7 +354,6 @@ class PiBookApp:
                 pass
         
         self._render_current_screen()
-        self._render_current_screen()
 
     def _reset_activity(self):
         self.last_activity_time = time.time()
@@ -506,6 +505,21 @@ class PiBookApp:
             
             self.reader_screen.close()
             self.navigation.navigate_to(Screen.LIBRARY)
+            
+            # Restart web server when returning to library (battery optimization)
+            if not self.web_server and self.config.get('web.enabled', True):
+                try:
+                    web_port = self.config.get('web.port', 5000)
+                    self.web_server = PiBookWebServer(
+                        self.library_screen,
+                        port=web_port,
+                        books_dir=self.config.get('library.books_directory')
+                    )
+                    self.web_server.start()
+                    self.logger.info("🔌 Web server restarted (returning to library)")
+                except:
+                    pass
+            
             self._render_current_screen()
 
     def _open_book(self, book: dict):
@@ -530,6 +544,14 @@ class PiBookApp:
             if saved_page is not None and saved_page > 0:
                 self.reader_screen.go_to_page(saved_page)
                 self.logger.info(f"📖 Restored to page {saved_page + 1}")
+
+            # Stop web server when entering reader (battery optimization)
+            if self.web_server and not self.config.get('web.always_on', False):
+                try:
+                    self.web_server.stop()
+                    self.logger.info("🔌 Web server stopped (entering reader)")
+                except:
+                    pass
 
             # Navigate to reader screen
             self.navigation.navigate_to(Screen.READER, {'book': book})
