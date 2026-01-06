@@ -465,20 +465,20 @@ class PiBookApp:
             else:
                 self.logger.warning("No book selected to open")
         elif self.navigation.is_on_screen(Screen.READER):
-        # On reader - return to library
-        self.logger.info("🔄 Action: TOGGLE - Returning to library from reader")
-        
-        # Save progress before leaving reader
-        if self.reader_screen.current_book_path:
-            self.progress_manager.save_progress(
-                self.reader_screen.current_book_path,
-                self.reader_screen.current_page,
-                self.reader_screen.renderer.get_total_pages()
-            )
-        
-        self.reader_screen.close()
-        self.navigation.navigate_to(Screen.LIBRARY)
-        self._render_current_screen()
+            # On reader - return to library
+            self.logger.info("🔄 Action: TOGGLE - Returning to library from reader")
+            
+            # Save progress before leaving reader
+            if self.reader_screen.current_book_path:
+                self.progress_manager.save_progress(
+                    self.reader_screen.current_book_path,
+                    self.reader_screen.current_page,
+                    self.reader_screen.renderer.get_total_pages()
+                )
+            
+            self.reader_screen.close()
+            self.navigation.navigate_to(Screen.LIBRARY)
+            self._render_current_screen()
 
     def _open_book(self, book: dict):
         """
