@@ -254,11 +254,8 @@ class PiBookApp:
 
     def _register_gpio_callbacks(self):
         """Register button callbacks"""
-        self.gpio.register_callback('next_page', self._handle_next)
-        self.gpio.register_callback('prev_page', self._handle_prev)
-        self.gpio.register_callback('select', self._handle_select)
-        self.gpio.register_callback('back', self._handle_back)
-        self.gpio.register_callback('menu', self._handle_menu)
+        # Single GPIO button with toggle functionality
+        self.gpio.register_callback('toggle', self._handle_toggle)
 
         self.logger.info("GPIO callbacks registered")
 

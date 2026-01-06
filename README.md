@@ -24,7 +24,7 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 - Waveshare 7.5inch e-Paper HAT (800×480, black/white)
 - MicroSD card (8GB+)
 - Power supply
-- 5× Push buttons (for GPIO control)
+- 1× Push button (optional, for GPIO control)
 
 ### Recommended (for Battery Power)
 - **PiSugar2** battery module (all-in-one: battery, charging, monitoring, button)
@@ -89,20 +89,21 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 
 ## Button Wiring (GPIO)
 
-Connect buttons between GPIO pins and GND:
+Connect a single button between GPIO 5 and GND:
 
 | Button | GPIO Pin (BCM) | Function |
-|--------|---------------|----------|
-| Next | GPIO 5 | Next page/item |
-| Previous | GPIO 6 | Previous page/item |
-| Select | GPIO 13 | Open book |
-| Back | GPIO 19 | Return to library |
-| Menu | GPIO 26 | Go to main menu |
+|--------|----------------|----------|
+| Toggle | GPIO 5 | Toggle between library and reader |
 
 **Wiring:**
-- Connect one side of each button to the GPIO pin
+- Connect one side of the button to GPIO 5
 - Connect the other side to GND
-- Internal pull-up resistors are enabled in software
+- Internal pull-up resistor is enabled in software
+
+**Functionality:**
+- **On library screen**: Opens selected book
+- **On reader screen**: Returns to library
+- Same behavior as PiSugar2 custom button
 
 ## Configuration
 
@@ -250,18 +251,13 @@ PiBook/
    - **Menu**: Always return to library
    - **Refresh**: Reload the page to see updated book list
 
-### Physical Buttons (Optional)
+### Physical Button (Optional)
 
-Wire buttons to GPIO pins as specified in `config/gpio_mapping.yaml`:
+Wire a single button to GPIO 5 as specified in `config/gpio_mapping.yaml`:
 
-#### Library Screen
-- **Next/Prev buttons** (GPIO 5/6): Navigate book list
-- **Select button** (GPIO 13): Open selected book
-
-#### Reader Screen
-- **Next/Prev buttons**: Turn pages
-- **Back button** (GPIO 19): Return to library
-- **Menu button** (GPIO 26): Return to library
+#### Toggle Button (GPIO 5)
+- **On library**: Opens selected book
+- **On reader**: Returns to library
 
 ## Development
 

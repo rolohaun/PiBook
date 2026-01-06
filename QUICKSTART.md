@@ -47,15 +47,13 @@ cp /path/to/your/books/*.epub books/
 python3 src/main.py
 ```
 
-## Connect Buttons
+## Connect Button (Optional)
 
-Wire 5 push buttons between these GPIO pins and GND:
+Wire a single push button between GPIO 5 and GND:
 
-- **GPIO 5** → Next Page
-- **GPIO 6** → Previous Page
-- **GPIO 13** → Select/Open
-- **GPIO 19** → Back
-- **GPIO 26** → Menu
+- **GPIO 5** → Toggle (Library↔Reader)
+  - On library: Opens selected book
+  - On reader: Returns to library
 
 ## Auto-Start on Boot
 
