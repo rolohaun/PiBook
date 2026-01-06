@@ -137,7 +137,8 @@ class PiBookWebServer:
                     'zoom': float(request.form.get('zoom', 1.0)),
                     'dpi': int(request.form.get('dpi', 150)),
                     'full_refresh_interval': int(request.form.get('full_refresh_interval', 5)),
-                    'show_page_numbers': request.form.get('show_page_numbers') == 'on'
+                    'show_page_numbers': request.form.get('show_page_numbers') == 'on',
+                    'wifi_while_reading': request.form.get('wifi_while_reading') == 'on'
                 }
 
                 self._save_settings(settings_data)
@@ -155,6 +156,9 @@ class PiBookWebServer:
                     self.app_instance.reader_screen.current_page = current_page
                     self.app_instance.reader_screen.show_page_numbers = settings_data['show_page_numbers']
                     self.app_instance._render_current_screen()
+                
+                # Update config with WiFi setting
+                self.app_instance.config.set('web.always_on', settings_data['wifi_while_reading'])
 
                 self.logger.info(f"Settings saved: {settings_data}")
                 return redirect(url_for('settings'))
@@ -184,7 +188,8 @@ class PiBookWebServer:
             'zoom': 1.0,
             'dpi': 150,
             'full_refresh_interval': 5,
-            'show_page_numbers': True
+            'show_page_numbers': True,
+            'wifi_while_reading': False  # Default: WiFi off while reading
         }
 
         if os.path.exists(settings_file):
