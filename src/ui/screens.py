@@ -357,41 +357,45 @@ class ReaderScreen:
             zoom_factor: Optional zoom override (uses self.zoom_factor if not provided)
             dpi: Optional DPI override (uses self.dpi if not provided)
         """
-        self.logger.info(f"Loading EPUB: {epub_path}")
-        self.epub_path = epub_path
-        self.current_book_path = os.path.abspath(epub_path)  # Store absolute path
-        self.current_page = 0
-
-        # Use provided zoom/dpi or fall back to instance defaults
-        zoom = zoom_factor if zoom_factor is not None else self.zoom_factor
-        dpi_val = dpi if dpi is not None else self.dpi
-
-        # Determine renderer type
         try:
-            from src.reader.epub_renderer import EPUBRenderer
-            self.renderer = EPUBRenderer(
+            # Close previous book if open
+            if self.renderer:
+                self.renderer.close()
+
+            # Use provided settings or defaults
+            if zoom_factor is not None:
+                self.zoom_factor = zoom_factor
+            if dpi is not None:
+                self.dpi = dpi
+
+            # Initialize PillowTextRenderer
+            from src.reader.pillow_text_renderer import PillowTextRenderer
+            self.renderer = PillowTextRenderer(
                 epub_path,
                 width=self.width,
                 height=self.height,
-                zoom_factor=zoom,
-                dpi=dpi_val
+                zoom_factor=self.zoom_factor,
+                dpi=self.dpi
             )
-            self.renderer_type = 'pymupdf'
-            self.logger.info("Using PyMuPDF renderer")
-        except ImportError:
-            from src.reader.epub_renderer_fallback import EPUBRendererFallback
-            self.renderer = EPUBRendererFallback(
-                epub_path,
-                width=self.width,
-                height=self.height
-            )
-            self.renderer_type = 'fallback'
-            self.logger.info("Using fallback renderer (Pillow)")
+            self.renderer_type = 'pillow'
+            self.logger.info(f"Using PillowTextRenderer for: {epub_path}")
 
-        # Initialize page cache
-        self.page_cache = self.PageCache(self.cache_size)
+            self.epub_path = epub_path
+            self.current_book_path = os.path.abspath(epub_path)  # Store absolute path for progress tracking
 
-        self.logger.info(f"EPUB loaded: {self.renderer.get_total_pages()} pages")
+            self.page_cache = self.PageCache(self.cache_size)
+            self.current_page = 0
+
+            # Pre-fill cache for first few pages
+            if self.page_cache:
+                self.page_cache.reset()
+                self._update_cache(0)  # Cache surrounding pages
+
+            self.logger.info(f"Loaded EPUB: {epub_path} ({self.renderer.get_page_count()} pages, renderer={self.renderer_type}, zoom={self.zoom_factor}, dpi={self.dpi})")
+
+        except Exception as e:
+            self.logger.error(f"Failed to load EPUB: {e}")
+            raise
 
     def next_page(self) -> bool:
         """
@@ -437,7 +441,7 @@ class ReaderScreen:
         if not self.renderer:
             return
 
-        total_pages = self.renderer.get_total_pages()
+        total_pages = self.renderer.get_page_count()
         if 0 <= page_number < total_pages:
             self.current_page = page_number
             self.logger.info(f"Jumped to page {page_number + 1}/{total_pages}")
@@ -452,7 +456,7 @@ class ReaderScreen:
         if not self.renderer:
             return
 
-        total_pages = self.renderer.get_total_pages()
+        total_pages = self.renderer.get_page_count()
         if 0 <= page_number < total_pages:
             # Render and cache the page
             img = self.renderer.render_page(page_number, show_page_number=self.show_page_numbers)
