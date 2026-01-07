@@ -170,26 +170,20 @@ class LibraryScreen:
         return lines if lines else [text]
 
     def next_item(self):
-        """Move selection to next book"""
-        if self.current_index < len(self.books) - 1:
-            self.current_index += 1
-
-            # Page down if needed
-            if self.current_index >= (self.current_page + 1) * self.items_per_page:
-                self.current_page += 1
-
-            self.logger.debug(f"Selected book {self.current_index}")
+        """Move selection to next book (with wrap-around)"""
+        if len(self.books) == 0:
+            return
+        
+        self.current_index = (self.current_index + 1) % len(self.books)
+        self.current_page = self.current_index // self.items_per_page
 
     def prev_item(self):
-        """Move selection to previous book"""
-        if self.current_index > 0:
-            self.current_index -= 1
-
-            # Page up if needed
-            if self.current_index < self.current_page * self.items_per_page:
-                self.current_page -= 1
-
-            self.logger.debug(f"Selected book {self.current_index}")
+        """Move selection to previous book (with wrap-around)"""
+        if len(self.books) == 0:
+            return
+        
+        self.current_index = (self.current_index - 1 + len(self.books)) % len(self.books)
+        self.current_page = self.current_index // self.items_per_page
 
     def get_selected_book(self) -> Optional[Dict[str, str]]:
         """

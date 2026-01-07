@@ -11,7 +11,7 @@ display:
 
 library:
   books_directory: "/home/pi/PiBook/books"
-  items_per_page: 5               # Reduced from 8 for book covers
+  items_per_page: 4               # Reduced to 4 for larger covers (100x150)
   font_size: 20               # For library menu rendering only
 
 reader:
