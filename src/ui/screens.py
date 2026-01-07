@@ -98,7 +98,7 @@ class LibraryScreen:
         # Initialize cover extractor
         from src.utils.cover_extractor import CoverExtractor
         self.cover_extractor = CoverExtractor()
-        self.cover_size = (80, 120)  # Increased from 60x90 for better detail
+        self.cover_size = (100, 150)  # Larger for better detail on e-ink
 
     def load_books(self, books_dir: str):
         """
@@ -124,13 +124,14 @@ class LibraryScreen:
         self.books.sort(key=lambda x: x['title'].lower())
         self.logger.info(f"Loaded {len(self.books)} books")
     
-    def _wrap_text(self, text: str, max_width: int, font: ImageFont.ImageFont) -> list:
+    def _wrap_text(self, text: str, max_width: int, draw: ImageDraw.ImageDraw, font: ImageFont.ImageFont) -> list:
         """
         Wrap text to fit within max_width pixels
         
         Args:
             text: Text to wrap
             max_width: Maximum width in pixels
+            draw: ImageDraw object for measuring
             font: Font to use for measuring
             
         Returns:
@@ -143,11 +144,11 @@ class LibraryScreen:
         for word in words:
             test_line = ' '.join(current_line + [word])
             try:
-                # Use getbbox to measure text width
-                bbox = font.getbbox(test_line)
+                # Use draw.textbbox for accurate measurement
+                bbox = draw.textbbox((0, 0), test_line, font=font)
                 width = bbox[2] - bbox[0]
             except:
-                # Fallback to character count estimation
+                # Fallback
                 width = len(test_line) * 10
             
             if width <= max_width:
@@ -157,14 +158,14 @@ class LibraryScreen:
                     lines.append(' '.join(current_line))
                     current_line = [word]
                 else:
-                    # Single word is too long, add it anyway
+                    # Single word too long, add anyway
                     lines.append(word)
                     current_line = []
         
         if current_line:
             lines.append(' '.join(current_line))
         
-        return lines if lines else [text]  # Return original if empty
+        return lines if lines else [text]
 
     def next_item(self):
         """Move selection to next book"""
@@ -346,8 +347,8 @@ class LibraryScreen:
             text_y = y + 5
             max_text_width = self.width - text_x - 40
             
-            # Wrap text to max 2 lines
-            lines = self._wrap_text(title, max_text_width, self.font)
+            # Wrap text to max 2 lines using draw object
+            lines = self._wrap_text(title, max_text_width, draw, self.font)
             if len(lines) > 2:
                 # Truncate to 2 lines with ellipsis
                 lines = lines[:2]

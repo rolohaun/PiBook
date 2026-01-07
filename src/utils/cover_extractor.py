@@ -124,9 +124,15 @@ class CoverExtractor:
         Returns:
             Thumbnail PIL Image (1-bit for e-ink)
         """
+        from PIL import ImageEnhance
+        
         # Convert to grayscale
         if image.mode != 'L':
             image = image.convert('L')
+        
+        # Enhance contrast for better e-ink rendering
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(1.5)  # Increase contrast
         
         # Resize maintaining aspect ratio
         image.thumbnail(size, Image.Resampling.LANCZOS)
@@ -138,7 +144,7 @@ class CoverExtractor:
         offset = ((size[0] - image.size[0]) // 2, (size[1] - image.size[1]) // 2)
         thumbnail.paste(image, offset)
         
-        # Convert to 1-bit (black and white) with dithering for e-ink
+        # Convert to 1-bit with better dithering for e-ink
         thumbnail = thumbnail.convert('1', dither=Image.Dither.FLOYDSTEINBERG)
         
         return thumbnail
