@@ -126,7 +126,7 @@ class PiBookWebServer:
         @self.flask_app.route('/settings')
         def settings():
             """Settings page"""
-            settings_data = self._load_settings()
+            settings_data = self._load_settings('settings.json')
             return render_template_string(SETTINGS_TEMPLATE, settings=settings_data)
 
         @self.flask_app.route('/save_settings', methods=['POST'])
