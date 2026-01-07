@@ -94,6 +94,11 @@ class LibraryScreen:
             self.logger.warning("TrueType fonts not found, using default")
             self.font = ImageFont.load_default()
             self.title_font = ImageFont.load_default()
+        
+        # Initialize cover extractor
+        from src.utils.cover_extractor import CoverExtractor
+        self.cover_extractor = CoverExtractor()
+        self.cover_size = (60, 90)  # width, height for thumbnails
 
     def load_books(self, books_dir: str):
         """
@@ -118,6 +123,42 @@ class LibraryScreen:
 
         self.books.sort(key=lambda x: x['title'].lower())
         self.logger.info(f"Loaded {len(self.books)} books")
+    
+    def _wrap_text(self, text: str, max_width: int, font: ImageFont.ImageFont) -> list:
+        """
+        Wrap text to fit within max_width pixels
+        
+        Args:
+            text: Text to wrap
+            max_width: Maximum width in pixels
+            font: Font to use for measuring
+            
+        Returns:
+            List of text lines
+        """
+        words = text.split()
+        lines = []
+        current_line = []
+        
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            try:
+                bbox = font.getbbox(test_line)
+                width = bbox[2] - bbox[0]
+            except:
+                width = len(test_line) * 8  # Fallback
+            
+            if width <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+        
+        if current_line:
+            lines.append(' '.join(current_line))
+        
+        return lines
 
     def next_item(self):
         """Move selection to next book"""
@@ -260,28 +301,58 @@ class LibraryScreen:
         start_idx = self.current_page * self.items_per_page
         end_idx = min(start_idx + self.items_per_page, len(self.books))
 
-        # Draw book list
+        # Draw book list with covers
         y = 85
-        line_height = 38
+        line_height = 105  # Increased for cover height
 
         for i in range(start_idx, end_idx):
             book = self.books[i]
             is_selected = (i == self.current_index)
 
+            # Get or create cover
+            cover = self.cover_extractor.get_cover(book['path'], self.cover_size)
+            if not cover:
+                cover = self.cover_extractor.create_fallback_cover(self.cover_size)
+            
+            # Draw cover
+            cover_x = 40
+            cover_y = y
+            image.paste(cover, (cover_x, cover_y))
+            
+            # Draw border around cover
+            draw.rectangle(
+                [(cover_x, cover_y), (cover_x + self.cover_size[0], cover_y + self.cover_size[1])],
+                outline=0,
+                width=1
+            )
+
+            # Draw selection box around entire item
             if is_selected:
-                # Draw selection box
                 draw.rectangle(
                     [(30, y - 5), (self.width - 30, y + line_height - 10)],
                     outline=0,
                     width=2
                 )
 
-            # Draw book title (truncate if too long)
+            # Draw book title with wrapping
             title = book['title']
-            if len(title) > 50:
-                title = title[:47] + "..."
-
-            draw.text((40, y), title, font=self.font, fill=0)
+            text_x = cover_x + self.cover_size[0] + 15
+            text_y = y + 5
+            max_text_width = self.width - text_x - 40
+            
+            # Wrap text to max 2 lines
+            lines = self._wrap_text(title, max_text_width, self.font)
+            if len(lines) > 2:
+                # Truncate to 2 lines with ellipsis
+                lines = lines[:2]
+                if len(lines[1]) > 3:
+                    lines[1] = lines[1][:-3] + "..."
+            
+            # Draw wrapped lines
+            for line in lines:
+                draw.text((text_x, text_y), line, font=self.font, fill=0)
+                text_y += 22  # Line spacing
+            
             y += line_height
 
         # Draw footer with page info
