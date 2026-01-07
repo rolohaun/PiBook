@@ -98,7 +98,7 @@ class LibraryScreen:
         # Initialize cover extractor
         from src.utils.cover_extractor import CoverExtractor
         self.cover_extractor = CoverExtractor()
-        self.cover_size = (60, 90)  # width, height for thumbnails
+        self.cover_size = (80, 120)  # Increased from 60x90 for better detail
 
     def load_books(self, books_dir: str):
         """
@@ -143,22 +143,28 @@ class LibraryScreen:
         for word in words:
             test_line = ' '.join(current_line + [word])
             try:
+                # Use getbbox to measure text width
                 bbox = font.getbbox(test_line)
                 width = bbox[2] - bbox[0]
             except:
-                width = len(test_line) * 8  # Fallback
+                # Fallback to character count estimation
+                width = len(test_line) * 10
             
             if width <= max_width:
                 current_line.append(word)
             else:
                 if current_line:
                     lines.append(' '.join(current_line))
-                current_line = [word]
+                    current_line = [word]
+                else:
+                    # Single word is too long, add it anyway
+                    lines.append(word)
+                    current_line = []
         
         if current_line:
             lines.append(' '.join(current_line))
         
-        return lines
+        return lines if lines else [text]  # Return original if empty
 
     def next_item(self):
         """Move selection to next book"""
