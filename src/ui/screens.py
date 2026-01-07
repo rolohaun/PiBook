@@ -258,19 +258,16 @@ class LibraryScreen:
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
 
-        # Draw WiFi status indicator (top left)
+        # Draw WiFi status indicator (top left) - only show when ON
         wifi_on = get_wifi_status()
-        wifi_icon_x = 10
-        wifi_icon_y = 8
         if wifi_on:
+            wifi_icon_x = 10
+            wifi_icon_y = 8
             # Draw simple WiFi icon (arcs)
             draw.arc([wifi_icon_x, wifi_icon_y, wifi_icon_x+16, wifi_icon_y+16], 180, 360, fill=0, width=2)
             draw.arc([wifi_icon_x+3, wifi_icon_y+8, wifi_icon_x+13, wifi_icon_y+16], 180, 360, fill=0, width=2)
             draw.arc([wifi_icon_x+6, wifi_icon_y+14, wifi_icon_x+10, wifi_icon_y+16], 180, 360, fill=0, width=2)
             draw.text((wifi_icon_x + 20, wifi_icon_y), "WiFi", font=self.font, fill=0)
-        else:
-            # Draw WiFi off icon (X through WiFi)
-            draw.text((wifi_icon_x, wifi_icon_y), "WiFi OFF", font=self.font, fill=0)
 
         # Draw IP address and port at top center
         ip_address = get_ip_address()
