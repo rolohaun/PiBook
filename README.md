@@ -152,8 +152,6 @@ View logs:
 sudo journalctl -u pibook.service -f
 ```
 
-
-
 ## Troubleshooting
 
 ### Display not working
@@ -217,25 +215,9 @@ PiBook/
 ├── books/                          # Place EPUB files here
 ├── logs/                           # Application logs
 └── requirements.txt
-```
 
 ## Usage
 
-### Web Interface (Recommended for Easy Management)
-
-1. **Find the IP address**: Displayed at the top of the library screen
-2. **Open in browser**: Navigate to `http://<pi-ip>:5000` on any device
-3. **Upload books**: Click "Choose File" and upload EPUB files
-4. **Remote control**: Use on-screen buttons to navigate:
-   - **Previous/Next**: Navigate through book list or pages
-   - **Select**: Open selected book
-   - **Back**: Return to library from book
-   - **Menu**: Always return to library
-   - **Refresh**: Reload the page to see updated book list
-
-### Physical Button (Optional)
-
-Wire a single button to GPIO 5 as specified in `config/gpio_mapping.yaml`:
 
 #### Toggle Button (GPIO 5)
 - **Short press**: Next page (in reader) or move down (in library)
