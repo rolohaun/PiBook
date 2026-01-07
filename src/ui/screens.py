@@ -115,10 +115,12 @@ class LibraryScreen:
 
         for filename in os.listdir(books_dir):
             if filename.lower().endswith('.epub'):
+                # Remove .epub extension and replace underscores with spaces
+                title = filename[:-5].replace('_', ' ')
                 self.books.append({
                     'filename': filename,
                     'path': os.path.join(books_dir, filename),
-                    'title': filename[:-5]  # Remove .epub extension
+                    'title': title
                 })
 
         self.books.sort(key=lambda x: x['title'].lower())
