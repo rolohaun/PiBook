@@ -24,10 +24,10 @@ performance:
   preload_next_page: false    # Disabled for battery savings
 
 logging:
-  level: "WARNING"            # Reduced logging for battery savings
-  file: "/tmp/pibook.log"     # RAM disk instead of SD card
-  console: false              # Disabled for battery savings
-  max_size: "1MB"             # Rotate logs
+  level: "DEBUG"              # Changed from WARNING for troubleshooting
+  file: "/home/pi/PiBook/logs/pibook.log"  # Persistent log file (not /tmp)
+  console: true               # Enable console output for debugging
+  max_size: "10MB"            # Increased from 1MB for more history
 
 web:
   port: 5000                  # Web interface port
