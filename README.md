@@ -48,44 +48,34 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 
 ## Installation
 
-### On Your Raspberry Pi
+### Quick Install
 
-1. **Copy this directory to your Pi:**
-   ```bash
-   # On your computer, transfer files to Pi
-   scp -r PiBook pi@raspberrypi.local:/home/pi/
+```bash
+# Clone the repository
+git clone https://github.com/rolohaun/PiBook.git
+cd PiBook
 
-   # Or use a USB drive
-   ```
+# Run the installation script
+chmod +x scripts/install_dependencies.sh
+./scripts/install_dependencies.sh
 
-2. **SSH into your Pi:**
-   ```bash
-   ssh pi@raspberrypi.local
-   cd /home/pi/PiBook
-   ```
+# Reboot to enable SPI
+sudo reboot
+```
 
-3. **Run installation script:**
-   ```bash
-   chmod +x scripts/install_dependencies.sh
-   ./scripts/install_dependencies.sh
-   ```
+### Add Books
 
-4. **Reboot to enable SPI:**
-   ```bash
-   sudo reboot
-   ```
+```bash
+# Copy your EPUB files to the books directory
+cp /path/to/your/*.epub /home/pi/PiBook/books/
+```
 
-5. **Add EPUB books:**
-   ```bash
-   # Copy your EPUB files to the books directory
-   cp /path/to/your/*.epub /home/pi/PiBook/books/
-   ```
+### Run PiBook
 
-6. **Run PiBook:**
-   ```bash
-   cd /home/pi/PiBook
-   python3 src/main.py
-   ```
+```bash
+cd /home/pi/PiBook
+python3 src/main.py
+```
 
 ## Button Wiring (GPIO)
 
