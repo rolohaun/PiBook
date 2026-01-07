@@ -5,10 +5,12 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 ## Features
 
 - **EPUB Support**: Renders EPUBs with full formatting including tables, SVG, custom fonts, and CSS
-- **E-ink Display**: Optimized for Waveshare 7.5" e-Paper HAT (800×480) with partial refresh
-- **Smart Button Control**: Single button with short/long press detection
-  - Short press: Next page
-  - Long press: Toggle between library and reader
+- **Hardware**: Raspberry Pi Zero 2 W, Waveshare 7.5" e-Paper HAT
+- **Battery**: PiSugar2 (1200mAh) with UPS functionality
+- **Display**: 800x480 e-ink display with partial refresh support
+- **Storage**: MicroSD card for books and OS
+- **Connectivity**: WiFi for web interface and book uploads
+- **Expected Battery Life**: 18-24 hours reading time
 - **PiSugar2 Integration**: Battery monitoring and custom button support with auto-detection
 - **Reading Progress**: Automatically saves and restores your page position
 - **Battery Optimized**: 2-3x battery life with aggressive power management
@@ -260,14 +262,16 @@ logging:
   level: "DEBUG"  # DEBUG, INFO, WARNING, ERROR
 ```
 
-## Performance
+### Performance Specifications
 
-**Pi Zero 2 W (512MB RAM):**
-- EPUB loading: ~3-5 seconds
-- Page rendering: ~1-2 seconds (cached: instant)
-- Page cache: 3 pages (optimized for battery)
-- Battery life: 16-20 hours reading, 48-72 hours standby
-- Sleep timeout: 2 minutes
+**With All Optimizations Enabled:**
+- **Battery**: PiSugar2 1200mAh
+- **Reading Time**: 18-24 hours continuous reading
+- **Standby Time**: 60-80 hours
+- **Page Turn Speed**: ~1-2 seconds (partial refresh)
+- **Full Refresh**: Every 10 pages (configurable)
+- **WiFi**: Off during reading, on in library
+- **Sleep Mode**: 2 minutes inactivity (configurable)
 
 ## Implemented Features
 
