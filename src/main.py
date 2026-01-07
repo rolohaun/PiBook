@@ -311,6 +311,14 @@ class PiBookApp:
             except:
                 pass
         
+        # Disable WiFi during sleep (battery optimization)
+        if not self.config.get('web.always_on', False):
+            try:
+                os.system("sudo ifconfig wlan0 down")
+                self.logger.info("📶 WiFi disabled for battery savings")
+            except Exception as e:
+                self.logger.warning(f"Failed to disable WiFi: {e}")
+        
         # Create sleep image
         from PIL import Image, ImageDraw, ImageFont
         image = Image.new('1', (self.display.width, self.display.height), 1)
@@ -338,6 +346,16 @@ class PiBookApp:
         """Wake from sleep mode"""
         self.logger.info("Waking from sleep")
         self.is_sleeping = False
+        
+        # Re-enable WiFi (battery optimization)
+        if not self.config.get('web.always_on', False):
+            try:
+                os.system("sudo ifconfig wlan0 up")
+                self.logger.info("📶 WiFi re-enabled")
+                # Wait a moment for WiFi to come up
+                time.sleep(2)
+            except Exception as e:
+                self.logger.warning(f"Failed to enable WiFi: {e}")
         
         # Restart web server if it was stopped (battery optimization)
         if not self.web_server and self.config.get('web.enabled', True):
@@ -506,6 +524,16 @@ class PiBookApp:
             self.reader_screen.close()
             self.navigation.navigate_to(Screen.LIBRARY)
             
+            # Re-enable WiFi when returning to library (battery optimization)
+            if not self.config.get('web.always_on', False):
+                try:
+                    os.system("sudo ifconfig wlan0 up")
+                    self.logger.info("📶 WiFi re-enabled (returning to library)")
+                    # Wait a moment for WiFi to come up
+                    time.sleep(2)
+                except Exception as e:
+                    self.logger.warning(f"Failed to enable WiFi: {e}")
+            
             # Restart web server when returning to library (battery optimization)
             if not self.web_server and self.config.get('web.enabled', True):
                 try:
@@ -552,6 +580,14 @@ class PiBookApp:
                     self.logger.info("🔌 Web server stopped (entering reader)")
                 except:
                     pass
+            
+            # Disable WiFi when entering reader (battery optimization)
+            if not self.config.get('web.always_on', False):
+                try:
+                    os.system("sudo ifconfig wlan0 down")
+                    self.logger.info("📶 WiFi disabled (entering reader)")
+                except Exception as e:
+                    self.logger.warning(f"Failed to disable WiFi: {e}")
 
             # Navigate to reader screen
             self.navigation.navigate_to(Screen.READER, {'book': book})
