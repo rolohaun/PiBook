@@ -27,7 +27,7 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 - Raspberry Pi Zero 2 W
 - Waveshare 7.5inch e-Paper HAT (800×480, black/white)
 - MicroSD card (8GB+)
-- **PiSugar2** battery module (battery, charging, monitoring, button)
+- **1 Push button** (GPIO control - recommended for daily use)
 - 1× Push button (optional, for GPIO control)
 
 ### Setup Guides
