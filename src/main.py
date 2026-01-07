@@ -336,8 +336,15 @@ class PiBookApp:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 48)
         except:
             font = ImageFont.load_default()
-            
-        text = "Shh I'm sleeping"
+        
+        # Load sleep message from settings or use default
+        try:
+            import json
+            with open('settings.json', 'r') as f:
+                settings = json.load(f)
+                text = settings.get('sleep_message', 'Shh I\'m sleeping')
+        except:
+            text = 'Shh I\'m sleeping'
         try:
             bbox = draw.textbbox((0, 0), text, font=font)
             w = bbox[2] - bbox[0]

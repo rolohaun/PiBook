@@ -136,9 +136,12 @@ class PiBookWebServer:
                 settings_data = {
                     'zoom': float(request.form.get('zoom', 1.0)),
                     'dpi': int(request.form.get('dpi', 150)),
-                    'full_refresh_interval': int(request.form.get('full_refresh_interval', 5)),
+                    'full_refresh_interval': int(request.form.get('full_refresh_interval', 10)),
                     'show_page_numbers': request.form.get('show_page_numbers') == 'on',
-                    'wifi_while_reading': request.form.get('wifi_while_reading') == 'on'
+                    'wifi_while_reading': request.form.get('wifi_while_reading') == 'on',
+                    'sleep_message': request.form.get('sleep_message', 'Shh I\'m sleeping'),
+                    'sleep_timeout': int(request.form.get('sleep_timeout', 120)),
+                    'items_per_page': int(request.form.get('items_per_page', 4))
                 }
 
                 self._save_settings(settings_data)
@@ -159,6 +162,14 @@ class PiBookWebServer:
                 
                 # Update config with WiFi setting
                 self.app_instance.config.set('web.always_on', settings_data['wifi_while_reading'])
+                
+                # Update config with sleep settings
+                self.app_instance.config.set('power.sleep_timeout', settings_data['sleep_timeout'])
+                self.app_instance.sleep_timeout = settings_data['sleep_timeout']
+                
+                # Update config with library settings
+                self.app_instance.config.set('library.items_per_page', settings_data['items_per_page'])
+                self.app_instance.library_screen.items_per_page = settings_data['items_per_page']
 
                 self.logger.info(f"Settings saved: {settings_data}")
                 return redirect(url_for('settings'))
@@ -187,9 +198,12 @@ class PiBookWebServer:
         default_settings = {
             'zoom': 1.0,
             'dpi': 150,
-            'full_refresh_interval': 5,
+            'full_refresh_interval': 10,  # Updated default
             'show_page_numbers': True,
-            'wifi_while_reading': False  # Default: WiFi off while reading
+            'wifi_while_reading': False,  # Default: WiFi off while reading
+            'sleep_message': 'Shh I\'m sleeping',
+            'sleep_timeout': 120,  # 2 minutes
+            'items_per_page': 4
         }
 
         if os.path.exists(settings_file):
@@ -500,6 +514,28 @@ SETTINGS_TEMPLATE = '''
                     <label for="wifi_while_reading" style="margin: 0;">Keep WiFi On While Reading</label>
                 </div>
                 <p class="help-text">🔋 Uncheck to save battery (WiFi turns off when reading, on when in library)</p>
+            </div>
+
+            <div class="form-group">
+                <label for="sleep_message">Sleep Screen Message</label>
+                <input type="text" id="sleep_message" name="sleep_message"
+                       value="{{ settings.sleep_message }}" maxlength="50"
+                       style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ddd; border-radius: 5px;">
+                <p class="help-text">Message displayed when device goes to sleep (max 50 characters)</p>
+            </div>
+
+            <div class="form-group">
+                <label for="sleep_timeout">Sleep Timeout (seconds)</label>
+                <input type="number" id="sleep_timeout" name="sleep_timeout"
+                       value="{{ settings.sleep_timeout }}" min="30" max="600" step="30">
+                <p class="help-text">Time of inactivity before sleep (30-600 seconds). Lower = better battery</p>
+            </div>
+
+            <div class="form-group">
+                <label for="items_per_page">Books Per Page</label>
+                <input type="number" id="items_per_page" name="items_per_page"
+                       value="{{ settings.items_per_page }}" min="3" max="6" step="1">
+                <p class="help-text">Number of books shown on library screen (3-6)</p>
             </div>
 
             <button type="submit" class="btn">Save Settings</button>
