@@ -103,7 +103,6 @@ class PiBookApp:
         self.logger.info("Reading progress manager initialized")
         
         # Disable HDMI for battery savings (never needed for e-ink display)
-        try:
         self.library_screen = LibraryScreen(
             width=display_width,
             height=display_height,
