@@ -192,29 +192,31 @@ class PiBookWebServer:
                     })
         return books
 
-    def _load_settings(self):
-        """Load settings from settings.json"""
-        settings_file = 'settings.json'
+    def _load_settings(self, settings_file: str) -> dict:
+        """Load settings from file, with defaults from config.yaml"""
+        # Start with defaults from config.yaml
         default_settings = {
             'zoom': 1.0,
             'dpi': 150,
-            'full_refresh_interval': 10,  # Updated default
+            'full_refresh_interval': self.app_instance.config.get('display.full_refresh_interval', 10),
             'show_page_numbers': True,
-            'wifi_while_reading': False,  # Default: WiFi off while reading
+            'wifi_while_reading': self.app_instance.config.get('web.always_on', False),
             'sleep_message': 'Shh I\'m sleeping',
-            'sleep_timeout': 120,  # 2 minutes
-            'items_per_page': 4
+            'sleep_timeout': self.app_instance.config.get('power.sleep_timeout', 120),
+            'items_per_page': self.app_instance.config.get('library.items_per_page', 4)
         }
 
+        # Override with saved settings if they exist
         if os.path.exists(settings_file):
             try:
                 with open(settings_file, 'r') as f:
-                    return json.load(f)
+                    saved_settings = json.load(f)
+                    default_settings.update(saved_settings)
+                    self.logger.info(f"Loaded settings from {settings_file}")
             except Exception as e:
-                self.logger.error(f"Failed to load settings: {e}")
-                return default_settings
-        else:
-            return default_settings
+                self.logger.error(f"Error loading settings: {e}")
+
+        return default_settings
 
     def _save_settings(self, settings_data):
         """Save settings to settings.json"""
