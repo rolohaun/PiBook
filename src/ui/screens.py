@@ -94,11 +94,15 @@ class LibraryScreen:
             self.logger.warning("TrueType fonts not found, using default")
             self.font = ImageFont.load_default()
             self.title_font = ImageFont.load_default()
-        
         # Initialize cover extractor
         from src.utils.cover_extractor import CoverExtractor
         self.cover_extractor = CoverExtractor()
         self.cover_size = (100, 150)  # Larger for better detail on e-ink
+        
+        # Cache for WiFi/BT status (avoid expensive subprocess calls)
+        self._wifi_status = None
+        self._wifi_check_time = 0
+        self._status_cache_duration = 5  # seconds
 
     def load_books(self, books_dir: str):
         """
@@ -125,6 +129,15 @@ class LibraryScreen:
 
         self.books.sort(key=lambda x: x['title'].lower())
         self.logger.info(f"Loaded {len(self.books)} books")
+    
+    def _get_cached_wifi_status(self) -> bool:
+        """Get WiFi status with caching to avoid expensive subprocess calls"""
+        import time
+        now = time.time()
+        if now - self._wifi_check_time > self._status_cache_duration:
+            self._wifi_status = get_wifi_status()
+            self._wifi_check_time = now
+        return self._wifi_status if self._wifi_status is not None else False
     
     def _wrap_text(self, text: str, max_width: int, draw: ImageDraw.ImageDraw, font: ImageFont.ImageFont) -> list:
         """
