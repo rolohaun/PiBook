@@ -28,7 +28,7 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 - Waveshare 7.5inch e-Paper HAT (800×480, black/white)
 - MicroSD card (8GB+)
 - **1 Push button** (GPIO control - recommended for daily use)
-- 1× Push button (optional, for GPIO control)
+- **PiSugar2** battery module (optional - adds battery, charging, monitoring)
 
 ### Setup Guides
 - [PISUGAR2_SETUP.md](PISUGAR2_SETUP.md) - PiSugar2 installation and configuration
