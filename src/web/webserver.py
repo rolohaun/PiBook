@@ -493,6 +493,15 @@ SETTINGS_TEMPLATE = '''
                 <p class="help-text">Display "Page X of Y" at bottom of screen when reading</p>
             </div>
 
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="wifi_while_reading" name="wifi_while_reading"
+                           {% if settings.wifi_while_reading %}checked{% endif %}>
+                    <label for="wifi_while_reading" style="margin: 0;">Keep WiFi On While Reading</label>
+                </div>
+                <p class="help-text">🔋 Uncheck to save battery (WiFi turns off when reading, on when in library)</p>
+            </div>
+
             <button type="submit" class="btn">Save Settings</button>
         </form>
 
