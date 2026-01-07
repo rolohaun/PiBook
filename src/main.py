@@ -101,6 +101,13 @@ class PiBookApp:
         progress_file = self.config.get('reading_progress.progress_file', 'data/reading_progress.json')
         self.progress_manager = ProgressManager(progress_file)
         self.logger.info("Reading progress manager initialized")
+        
+        # Disable HDMI for battery savings (never needed for e-ink display)
+        try:
+            os.system("sudo /usr/bin/tvservice -o")
+            self.logger.info("📺 HDMI disabled for battery savings")
+        except Exception as e:
+            self.logger.warning(f"Failed to disable HDMI: {e}")
 
         # Initialize screens
         web_port = self.config.get('web.port', 5000)
