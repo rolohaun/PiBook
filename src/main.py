@@ -104,12 +104,8 @@ class PiBookApp:
         
         # Disable HDMI for battery savings (never needed for e-ink display)
         try:
-            os.system("sudo /usr/bin/tvservice -o")
-            self.logger.info("📺 HDMI disabled for battery savings")
-        except Exception as e:
-            self.logger.warning(f"Failed to disable HDMI: {e}")
-
-        # Initialize screens
+        # HDMI is disabled via /boot/config.txt (dtoverlay=vc4-kms-v3d,nohdmi)
+        self.logger.info("HDMI disabled via boot config")
         web_port = self.config.get('web.port', 5000)
         self.library_screen = LibraryScreen(
             width=display_width,
