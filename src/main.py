@@ -103,6 +103,12 @@ class PiBookApp:
         self.logger.info("Reading progress manager initialized")
         
         # Disable HDMI for battery savings (never needed for e-ink display)
+
+        # HDMI is disabled via /boot/config.txt (dtoverlay=vc4-kms-v3d,nohdmi)
+        self.logger.info("HDMI disabled via boot config")
+
+        # Initialize screens
+        web_port = self.config.get('web.port', 5000)
         self.library_screen = LibraryScreen(
             width=display_width,
             height=display_height,
