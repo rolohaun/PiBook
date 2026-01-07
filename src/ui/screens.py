@@ -312,7 +312,7 @@ class LibraryScreen:
 
         # Draw book list with covers
         y = 85
-        line_height = 105  # Increased for cover height
+        line_height = 160  # Increased for larger covers (100x150) + 4 lines of text
 
         for i in range(start_idx, end_idx):
             book = self.books[i]
@@ -349,13 +349,13 @@ class LibraryScreen:
             text_y = y + 5
             max_text_width = self.width - text_x - 40
             
-            # Wrap text to max 2 lines using draw object
+            # Wrap text to max 4 lines using draw object
             lines = self._wrap_text(title, max_text_width, draw, self.font)
-            if len(lines) > 2:
-                # Truncate to 2 lines with ellipsis
-                lines = lines[:2]
-                if len(lines[1]) > 3:
-                    lines[1] = lines[1][:-3] + "..."
+            if len(lines) > 4:
+                # Truncate to 4 lines with ellipsis
+                lines = lines[:4]
+                if len(lines[3]) > 3:
+                    lines[3] = lines[3][:-3] + "..."
             
             # Draw wrapped lines
             for line in lines:
