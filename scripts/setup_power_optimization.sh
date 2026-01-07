@@ -77,6 +77,9 @@ force_turbo=0
 arm_boost=0
 arm_freq_min=600
 
+# ---- Minimize GPU Memory (more RAM for CPU) ----
+gpu_mem=16
+
 EOF
 
 echo "✅ Power optimizations added to config.txt"
