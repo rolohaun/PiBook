@@ -148,6 +148,18 @@ class PiBookWebServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
+        @self.flask_app.route('/api/battery_status')
+        def battery_status():
+            """Get current battery status including charging state"""
+            try:
+                if self.app_instance.battery_monitor:
+                    status = self.app_instance.battery_monitor.get_status()
+                    return jsonify(status)
+                else:
+                    return jsonify({'error': 'Battery monitor not available'}), 503
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
         @self.flask_app.route('/reboot')
         def reboot():
             """Reboot the Raspberry Pi"""
