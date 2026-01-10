@@ -117,8 +117,6 @@ class PiBookApp:
             web_port=web_port,
             battery_monitor=self.battery_monitor
         )
-        # Sync sleep status to library screen (will be loaded later from settings)
-        self.library_screen.sleep_enabled = self.sleep_enabled
 
         self.reader_screen = ReaderScreen(
             width=display_width,
@@ -141,6 +139,9 @@ class PiBookApp:
         self.is_sleeping = False
         sleep_status = "enabled" if self.sleep_enabled else "disabled"
         self.logger.info(f"Sleep mode {sleep_status}, timeout set to {self.sleep_timeout}s for battery optimization")
+
+        # Sync sleep status to library screen now that it's defined
+        self.library_screen.sleep_enabled = self.sleep_enabled
 
         # Web server
         self.web_server = None
