@@ -253,21 +253,21 @@ class LibraryScreen:
 
         # Draw charging indicator (lightning bolt) if charging
         if is_charging:
-            # Lightning bolt coordinates (centered in battery)
+            # Lightning bolt as a filled polygon (more visible)
             bolt_center_x = battery_x + battery_width // 2
             bolt_center_y = y + battery_height // 2
-            # Simple lightning bolt shape
+            # Larger, more visible lightning bolt shape
             bolt_points = [
-                (bolt_center_x, bolt_center_y - 4),      # Top
-                (bolt_center_x - 2, bolt_center_y),       # Middle left
-                (bolt_center_x + 1, bolt_center_y),       # Middle right (offset)
-                (bolt_center_x - 1, bolt_center_y + 4)    # Bottom
+                (bolt_center_x + 1, bolt_center_y - 5),    # Top tip
+                (bolt_center_x - 1, bolt_center_y - 1),     # Upper left
+                (bolt_center_x + 2, bolt_center_y - 1),     # Upper right
+                (bolt_center_x - 1, bolt_center_y + 5),     # Bottom tip
+                (bolt_center_x + 1, bolt_center_y + 1),     # Lower right
+                (bolt_center_x - 2, bolt_center_y + 1),     # Lower left
             ]
-            # Draw as white (inverted) if battery is full, black otherwise
-            bolt_color = 1 if fill_width > battery_width - 8 else 0
-            draw.line([bolt_points[0], bolt_points[1]], fill=bolt_color, width=2)
-            draw.line([bolt_points[1], bolt_points[2]], fill=bolt_color, width=2)
-            draw.line([bolt_points[2], bolt_points[3]], fill=bolt_color, width=2)
+            # Draw as white (inverted) if battery is very full, black otherwise
+            bolt_color = 1 if fill_width > battery_width - 6 else 0
+            draw.polygon(bolt_points, fill=bolt_color)
 
         # Draw percentage text
         percentage_text = f"{percentage}%"
@@ -665,21 +665,21 @@ class ReaderScreen:
 
         # Draw charging indicator (lightning bolt) if charging
         if is_charging:
-            # Lightning bolt coordinates (centered in battery)
+            # Lightning bolt as a filled polygon (more visible)
             bolt_center_x = battery_x + battery_width // 2
             bolt_center_y = y + battery_height // 2
-            # Simple lightning bolt shape
+            # Larger, more visible lightning bolt shape
             bolt_points = [
-                (bolt_center_x, bolt_center_y - 4),      # Top
-                (bolt_center_x - 2, bolt_center_y),       # Middle left
-                (bolt_center_x + 1, bolt_center_y),       # Middle right (offset)
-                (bolt_center_x - 1, bolt_center_y + 4)    # Bottom
+                (bolt_center_x + 1, bolt_center_y - 5),    # Top tip
+                (bolt_center_x - 1, bolt_center_y - 1),     # Upper left
+                (bolt_center_x + 2, bolt_center_y - 1),     # Upper right
+                (bolt_center_x - 1, bolt_center_y + 5),     # Bottom tip
+                (bolt_center_x + 1, bolt_center_y + 1),     # Lower right
+                (bolt_center_x - 2, bolt_center_y + 1),     # Lower left
             ]
-            # Draw as white (inverted) if battery is full, black otherwise
-            bolt_color = 1 if fill_width > battery_width - 8 else 0
-            draw.line([bolt_points[0], bolt_points[1]], fill=bolt_color, width=2)
-            draw.line([bolt_points[1], bolt_points[2]], fill=bolt_color, width=2)
-            draw.line([bolt_points[2], bolt_points[3]], fill=bolt_color, width=2)
+            # Draw as white (inverted) if battery is very full, black otherwise
+            bolt_color = 1 if fill_width > battery_width - 6 else 0
+            draw.polygon(bolt_points, fill=bolt_color)
 
         # Draw percentage text
         percentage_text = f"{percentage}%"
