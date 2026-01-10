@@ -123,6 +123,43 @@ class PiBookWebServer:
 
             return jsonify({'status': 'ok', 'action': action})
 
+        @self.flask_app.route('/api/cpu_voltage')
+        def cpu_voltage():
+            """Get current CPU voltage"""
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ['vcgencmd', 'measure_volts', 'core'],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                if result.returncode == 0:
+                    voltage = result.stdout.strip()
+                    undervolt_setting = self.app_instance.config.get('power.undervolt', 0)
+                    return jsonify({
+                        'voltage': voltage,
+                        'undervolt_setting': undervolt_setting,
+                        'voltage_reduction_mv': abs(undervolt_setting) * 25
+                    })
+                else:
+                    return jsonify({'error': 'Could not read voltage'}), 500
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/reboot')
+        def reboot():
+            """Reboot the Raspberry Pi"""
+            try:
+                import subprocess
+                self.logger.info("Reboot requested via web interface")
+                # Shutdown in 5 seconds to allow response to be sent
+                subprocess.Popen(['sudo', 'shutdown', '-r', '+0'])
+                return jsonify({'status': 'rebooting'})
+            except Exception as e:
+                self.logger.error(f"Reboot failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
         @self.flask_app.route('/settings')
         def settings():
             """Settings page"""
@@ -139,9 +176,11 @@ class PiBookWebServer:
                     'full_refresh_interval': int(request.form.get('full_refresh_interval', 10)),
                     'show_page_numbers': request.form.get('show_page_numbers') == 'on',
                     'wifi_while_reading': request.form.get('wifi_while_reading') == 'on',
+                    'sleep_enabled': request.form.get('sleep_enabled') == 'on',
                     'sleep_message': request.form.get('sleep_message', 'Shh I\'m sleeping'),
                     'sleep_timeout': int(request.form.get('sleep_timeout', 120)),
-                    'items_per_page': int(request.form.get('items_per_page', 4))
+                    'items_per_page': int(request.form.get('items_per_page', 4)),
+                    'undervolt': int(request.form.get('undervolt', -2))
                 }
 
                 self._save_settings(settings_data)
@@ -166,10 +205,24 @@ class PiBookWebServer:
                 # Update config with sleep settings
                 self.app_instance.config.set('power.sleep_timeout', settings_data['sleep_timeout'])
                 self.app_instance.sleep_timeout = settings_data['sleep_timeout']
-                
+                self.app_instance.sleep_enabled = settings_data['sleep_enabled']
+
                 # Update config with library settings
                 self.app_instance.config.set('library.items_per_page', settings_data['items_per_page'])
                 self.app_instance.library_screen.items_per_page = settings_data['items_per_page']
+
+                # Update undervolt setting in config (requires reboot to take effect)
+                old_undervolt = self.app_instance.config.get('power.undervolt', 0)
+                new_undervolt = settings_data['undervolt']
+                self.app_instance.config.set('power.undervolt', new_undervolt)
+
+                # Update /boot/firmware/config.txt if undervolt changed
+                if old_undervolt != new_undervolt:
+                    try:
+                        self._apply_undervolt(new_undervolt)
+                        self.logger.info(f"Undervolt changed from {old_undervolt} to {new_undervolt} - reboot required")
+                    except Exception as e:
+                        self.logger.error(f"Failed to apply undervolt to boot config: {e}")
 
                 self.logger.info(f"Settings saved: {settings_data}")
                 return redirect(url_for('settings'))
@@ -201,9 +254,11 @@ class PiBookWebServer:
             'full_refresh_interval': self.app_instance.config.get('display.full_refresh_interval', 10),
             'show_page_numbers': True,
             'wifi_while_reading': self.app_instance.config.get('web.always_on', False),
+            'sleep_enabled': True,
             'sleep_message': 'Shh I\'m sleeping',
             'sleep_timeout': self.app_instance.config.get('power.sleep_timeout', 120),
-            'items_per_page': self.app_instance.config.get('library.items_per_page', 4)
+            'items_per_page': self.app_instance.config.get('library.items_per_page', 4),
+            'undervolt': self.app_instance.config.get('power.undervolt', -2)
         }
 
         # Override with saved settings if they exist
@@ -226,6 +281,56 @@ class PiBookWebServer:
                 json.dump(settings_data, indent=2, fp=f)
         except Exception as e:
             self.logger.error(f"Failed to save settings: {e}")
+            raise
+
+    def _apply_undervolt(self, undervolt_value):
+        """Apply undervolt setting to /boot/firmware/config.txt"""
+        config_file = '/boot/firmware/config.txt'
+
+        try:
+            # Read current config
+            with open(config_file, 'r') as f:
+                lines = f.readlines()
+
+            # Find and update over_voltage line
+            updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith('over_voltage='):
+                    lines[i] = f'over_voltage={undervolt_value}\n'
+                    updated = True
+                    break
+                elif line.strip().startswith('# over_voltage='):
+                    lines[i] = f'over_voltage={undervolt_value}\n'
+                    updated = True
+                    break
+
+            # If not found, add it after CPU Power Management section
+            if not updated:
+                for i, line in enumerate(lines):
+                    if '# ---- CPU Power Management ----' in line or '# ---- CPU Undervolting' in line:
+                        # Find next blank line or section header to insert after
+                        insert_pos = i + 1
+                        while insert_pos < len(lines) and lines[insert_pos].strip() and not lines[insert_pos].startswith('#'):
+                            insert_pos += 1
+                        lines.insert(insert_pos, f'over_voltage={undervolt_value}\n')
+                        updated = True
+                        break
+
+            # If still not found, append to end
+            if not updated:
+                lines.append(f'\n# Undervolt setting\nover_voltage={undervolt_value}\n')
+
+            # Write back to config file
+            with open(config_file, 'w') as f:
+                f.writelines(lines)
+
+            self.logger.info(f"Updated {config_file} with over_voltage={undervolt_value}")
+
+        except PermissionError:
+            self.logger.error(f"Permission denied writing to {config_file}. Run PiBook with sudo or fix permissions.")
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to update boot config: {e}")
             raise
 
     def run(self):
@@ -518,6 +623,24 @@ SETTINGS_TEMPLATE = '''
                 <p class="help-text">🔋 Uncheck to save battery (WiFi turns off when reading, on when in library)</p>
             </div>
 
+            <h3 style="margin-top: 30px; color: #555; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">🔋 Power Management</h3>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="sleep_enabled" name="sleep_enabled"
+                           {% if settings.sleep_enabled %}checked{% endif %}>
+                    <label for="sleep_enabled" style="margin: 0;">Enable Sleep Mode</label>
+                </div>
+                <p class="help-text">🔋 When enabled, device sleeps after inactivity to save battery</p>
+            </div>
+
+            <div class="form-group">
+                <label for="sleep_timeout">Sleep Timeout (seconds)</label>
+                <input type="number" id="sleep_timeout" name="sleep_timeout"
+                       value="{{ settings.sleep_timeout }}" min="30" max="600" step="30">
+                <p class="help-text">Time of inactivity before sleep (30-600 seconds). Lower = better battery</p>
+            </div>
+
             <div class="form-group">
                 <label for="sleep_message">Sleep Screen Message</label>
                 <input type="text" id="sleep_message" name="sleep_message"
@@ -526,11 +649,15 @@ SETTINGS_TEMPLATE = '''
                 <p class="help-text">Message displayed when device goes to sleep (max 50 characters)</p>
             </div>
 
+            <h3 style="margin-top: 30px; color: #555; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">⚡ CPU Undervolting (Experimental)</h3>
+
             <div class="form-group">
-                <label for="sleep_timeout">Sleep Timeout (seconds)</label>
-                <input type="number" id="sleep_timeout" name="sleep_timeout"
-                       value="{{ settings.sleep_timeout }}" min="30" max="600" step="30">
-                <p class="help-text">Time of inactivity before sleep (30-600 seconds). Lower = better battery</p>
+                <label for="undervolt">Undervolt Level</label>
+                <input type="number" id="undervolt" name="undervolt"
+                       value="{{ settings.undervolt }}" min="-8" max="0" step="1">
+                <p class="help-text">CPU voltage reduction: 0 = none, -2 = 50mV (safe), -4 = 100mV, -6 = 150mV, -8 = 200mV (max)</p>
+                <p class="help-text" style="color: #d32f2f; font-weight: bold;">⚠️ WARNING: Values below -4 may cause instability. Requires reboot to apply.</p>
+                <p class="help-text" id="voltage-status" style="color: #1976d2; font-weight: bold;">Current CPU Voltage: Loading...</p>
             </div>
 
             <div class="form-group">
@@ -544,7 +671,29 @@ SETTINGS_TEMPLATE = '''
         </form>
 
         <button class="btn btn-secondary" onclick="window.location.href='/'">Back to Library</button>
+
+        <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ff9800;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">💡 Undervolt changes require reboot</p>
+            <button class="btn" style="background: #ff9800; margin-top: 0;" onclick="if(confirm('Reboot PiBook now? This will close all connections.')) { fetch('/reboot').then(() => alert('Rebooting... Wait 30 seconds then reconnect.')); }">Reboot PiBook</button>
+        </div>
     </div>
+
+    <script>
+        // Load current CPU voltage
+        fetch('/api/cpu_voltage')
+            .then(response => response.json())
+            .then(data => {
+                const statusEl = document.getElementById('voltage-status');
+                if (data.voltage) {
+                    statusEl.textContent = 'Current CPU Voltage: ' + data.voltage + ' (Undervolt: ' + data.undervolt_setting + ')';
+                } else {
+                    statusEl.textContent = 'Current CPU Voltage: Unable to read';
+                }
+            })
+            .catch(err => {
+                document.getElementById('voltage-status').textContent = 'Current CPU Voltage: Error loading';
+            });
+    </script>
 </body>
 </html>
 '''

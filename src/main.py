@@ -133,10 +133,12 @@ class PiBookApp:
         self.page_turn_count = 0
         self.gc_threshold = self.config.get('performance.gc_threshold', 100)
         # Inactivity tracking for sleep mode (battery optimization)
+        self.sleep_enabled = self.settings.get('sleep_enabled', True)  # Load from settings
         self.sleep_timeout = self.config.get('power.sleep_timeout', 120)  # 2 minutes default
         self.last_activity_time = time.time()
         self.is_sleeping = False
-        self.logger.info(f"Sleep timeout set to {self.sleep_timeout}s for battery optimization")
+        sleep_status = "enabled" if self.sleep_enabled else "disabled"
+        self.logger.info(f"Sleep mode {sleep_status}, timeout set to {self.sleep_timeout}s for battery optimization")
 
         # Web server
         self.web_server = None
@@ -318,7 +320,8 @@ class PiBookApp:
         """Background thread to check for inactivity"""
         while self.running:
             try:
-                if not self.is_sleeping and (time.time() - self.last_activity_time > self.sleep_timeout):
+                # Only enter sleep if sleep mode is enabled
+                if self.sleep_enabled and not self.is_sleeping and (time.time() - self.last_activity_time > self.sleep_timeout):
                     self._enter_sleep()
                 time.sleep(10)
             except Exception as e:
