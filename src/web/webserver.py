@@ -220,15 +220,25 @@ class PiBookWebServer:
                 self.app_instance.config.set('power.undervolt', new_undervolt)
 
                 # Update /boot/firmware/config.txt if undervolt changed
+                undervolt_error = None
                 if old_undervolt != new_undervolt:
                     try:
                         self._apply_undervolt(new_undervolt)
                         self.logger.info(f"Undervolt changed from {old_undervolt} to {new_undervolt} - reboot required")
                     except Exception as e:
                         self.logger.error(f"Failed to apply undervolt to boot config: {e}")
+                        undervolt_error = str(e)
 
                 self.logger.info(f"Settings saved: {settings_data}")
-                return redirect(url_for('settings'))
+
+                # Return JSON for AJAX requests, redirect for normal form submission
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
+                    result = {'status': 'success', 'message': 'Settings saved successfully'}
+                    if undervolt_error:
+                        result['undervolt_warning'] = f'Settings saved but undervolt update failed: {undervolt_error}'
+                    return jsonify(result)
+                else:
+                    return redirect(url_for('settings'))
 
             except Exception as e:
                 self.logger.error(f"Failed to save settings: {e}")
@@ -638,6 +648,10 @@ HTML_TEMPLATE = '''
                     <button type="submit" class="btn">Save Settings</button>
                 </form>
 
+                <div id="settings-message" style="margin-top: 15px; padding: 15px; border-radius: 8px; display: none;">
+                    <!-- Success/error messages will appear here -->
+                </div>
+
                 <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ff9800;">
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">💡 Undervolt changes require reboot</p>
                     <button class="btn" style="background: #ff9800; margin-top: 0;" onclick="if(confirm('Reboot PiBook now? This will close all connections.')) { fetch('/reboot').then(() => alert('Rebooting... Wait 30 seconds then reconnect.')); }">Reboot PiBook</button>
@@ -692,6 +706,60 @@ HTML_TEMPLATE = '''
                 })
                 .catch(error => console.error('Error:', error));
         }
+
+        // Handle settings form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const settingsForm = document.querySelector('form[action="/save_settings"]');
+            if (settingsForm) {
+                settingsForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    const formData = new FormData(settingsForm);
+                    const messageDiv = document.getElementById('settings-message');
+
+                    fetch('/save_settings', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.redirected || response.ok) {
+                            // Show success message
+                            messageDiv.style.display = 'block';
+                            messageDiv.style.background = '#d4edda';
+                            messageDiv.style.borderLeft = '4px solid #28a745';
+                            messageDiv.style.color = '#155724';
+                            messageDiv.innerHTML = '<strong>✅ Settings saved successfully!</strong><br>Changes have been applied. If you changed the undervolt setting, click "Reboot PiBook" below to apply.';
+
+                            // Scroll to message
+                            messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                            // Reload voltage status
+                            setTimeout(() => {
+                                fetch('/api/cpu_voltage')
+                                    .then(r => r.json())
+                                    .then(data => {
+                                        const statusEl = document.getElementById('voltage-status');
+                                        if (statusEl && data.voltage) {
+                                            statusEl.textContent = 'Current CPU Voltage: ' + data.voltage + ' (Undervolt: ' + data.undervolt_setting + ')';
+                                        }
+                                    });
+                            }, 500);
+                        } else {
+                            throw new Error('Save failed');
+                        }
+                    })
+                    .catch(error => {
+                        // Show error message
+                        messageDiv.style.display = 'block';
+                        messageDiv.style.background = '#f8d7da';
+                        messageDiv.style.borderLeft = '4px solid #dc3545';
+                        messageDiv.style.color = '#721c24';
+                        messageDiv.innerHTML = '<strong>❌ Error saving settings!</strong><br>' + error.message;
+                        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    });
+                });
+            }
+        });
 
         // Load current CPU voltage when page loads
         fetch('/api/cpu_voltage')
