@@ -287,53 +287,31 @@ class PiBookWebServer:
             raise
 
     def _apply_undervolt(self, undervolt_value):
-        """Apply undervolt setting to /boot/firmware/config.txt"""
-        config_file = '/boot/firmware/config.txt'
-
+        """Apply undervolt setting to /boot/firmware/config.txt using sudo helper script"""
         try:
-            # Read current config
-            with open(config_file, 'r') as f:
-                lines = f.readlines()
+            import subprocess
+            script_path = '/home/pi/PiBook/scripts/apply_undervolt.sh'
 
-            # Find and update over_voltage line
-            updated = False
-            for i, line in enumerate(lines):
-                if line.strip().startswith('over_voltage='):
-                    lines[i] = f'over_voltage={undervolt_value}\n'
-                    updated = True
-                    break
-                elif line.strip().startswith('# over_voltage='):
-                    lines[i] = f'over_voltage={undervolt_value}\n'
-                    updated = True
-                    break
+            # Use sudo to run the helper script
+            result = subprocess.run(
+                ['sudo', script_path, str(undervolt_value)],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
 
-            # If not found, add it after CPU Power Management section
-            if not updated:
-                for i, line in enumerate(lines):
-                    if '# ---- CPU Power Management ----' in line or '# ---- CPU Undervolting' in line:
-                        # Find next blank line or section header to insert after
-                        insert_pos = i + 1
-                        while insert_pos < len(lines) and lines[insert_pos].strip() and not lines[insert_pos].startswith('#'):
-                            insert_pos += 1
-                        lines.insert(insert_pos, f'over_voltage={undervolt_value}\n')
-                        updated = True
-                        break
+            if result.returncode == 0:
+                self.logger.info(f"Successfully applied undervolt={undervolt_value} via helper script")
+                self.logger.info(result.stdout.strip())
+            else:
+                self.logger.error(f"Failed to apply undervolt: {result.stderr}")
+                raise Exception(f"Helper script failed: {result.stderr}")
 
-            # If still not found, append to end
-            if not updated:
-                lines.append(f'\n# Undervolt setting\nover_voltage={undervolt_value}\n')
-
-            # Write back to config file
-            with open(config_file, 'w') as f:
-                f.writelines(lines)
-
-            self.logger.info(f"Updated {config_file} with over_voltage={undervolt_value}")
-
-        except PermissionError:
-            self.logger.error(f"Permission denied writing to {config_file}. Run PiBook with sudo or fix permissions.")
+        except subprocess.TimeoutExpired:
+            self.logger.error("Timeout applying undervolt setting")
             raise
         except Exception as e:
-            self.logger.error(f"Failed to update boot config: {e}")
+            self.logger.error(f"Failed to apply undervolt: {e}")
             raise
 
     def run(self):
