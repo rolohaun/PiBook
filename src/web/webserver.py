@@ -535,11 +535,14 @@ HTML_TEMPLATE = '''
         <!-- Settings Tab -->
         <div id="settings" class="tab-content">
             <div class="section">
-                <p>Loading settings...</p>
-                <script>
-                    // Redirect to settings page
-                    setTimeout(() => window.location.href='/settings', 100);
-                </script>
+                <h2>⚙️ PiBook Settings</h2>
+                <p style="margin: 20px 0; color: #666;">Configure display, power management, and e-reader preferences.</p>
+                <button class="btn" style="font-size: 18px; padding: 20px;" onclick="window.location.href='/settings'">
+                    Open Settings Page →
+                </button>
+                <p style="margin-top: 15px; font-size: 14px; color: #999;">
+                    Settings will open in a new view with all configuration options
+                </p>
             </div>
         </div>
 
