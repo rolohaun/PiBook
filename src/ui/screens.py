@@ -85,6 +85,7 @@ class LibraryScreen:
         self.current_page = 0
         self.books: List[Dict[str, str]] = []
         self.battery_monitor = battery_monitor
+        self.sleep_enabled = True  # Will be updated from main app
 
         # Try to load fonts
         try:
@@ -372,7 +373,17 @@ class LibraryScreen:
         if len(self.books) > 0:
             footer_text = f"Book {self.current_index + 1} of {len(self.books)}"
             draw.text((40, self.height - 40), footer_text, font=self.font, fill=0)
-        
+
+        # Draw sleep status in bottom-right corner
+        sleep_text = "Sleep: ON" if self.sleep_enabled else "Sleep: OFF"
+        try:
+            bbox = draw.textbbox((0, 0), sleep_text, font=self.font)
+            sleep_width = bbox[2] - bbox[0]
+            sleep_x = self.width - sleep_width - 40
+        except:
+            sleep_x = self.width - 140
+        draw.text((sleep_x, self.height - 40), sleep_text, font=self.font, fill=0)
+
         return image
 
 

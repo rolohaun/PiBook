@@ -206,6 +206,8 @@ class PiBookWebServer:
                 self.app_instance.config.set('power.sleep_timeout', settings_data['sleep_timeout'])
                 self.app_instance.sleep_timeout = settings_data['sleep_timeout']
                 self.app_instance.sleep_enabled = settings_data['sleep_enabled']
+                # Update library screen to show current sleep status
+                self.app_instance.library_screen.sleep_enabled = settings_data['sleep_enabled']
 
                 # Update config with library settings
                 self.app_instance.config.set('library.items_per_page', settings_data['items_per_page'])
@@ -353,15 +355,60 @@ HTML_TEMPLATE = '''
     <title>PiBook Manager</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 0;
+            padding: 0;
             background: #f5f5f5;
         }
-        h1, h2 {
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
             color: #333;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tabs {
+            display: flex;
+            background: white;
+            border-bottom: 2px solid #4CAF50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            background: #f0f0f0;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            background: #e0e0e0;
+        }
+        .tab.active {
+            background: white;
+            color: #4CAF50;
+            border-bottom: 3px solid #4CAF50;
+            margin-bottom: -2px;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+        .tab-content.active {
+            display: block;
         }
         .section {
             background: white;
@@ -369,6 +416,10 @@ HTML_TEMPLATE = '''
             margin: 20px 0;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
         }
         .controls {
             display: grid;
@@ -425,71 +476,112 @@ HTML_TEMPLATE = '''
     </style>
 </head>
 <body>
-    <h1>📚 PiBook Manager</h1>
+    <div class="container">
+        <h1>📚 PiBook Manager</h1>
 
-    <!-- Remote Control -->
-    <div class="section">
-        <h2>🎮 Remote Control</h2>
-        <div class="controls">
-            <button class="btn" onclick="control('prev')">◀ Previous</button>
-            <button class="btn btn-secondary" onclick="control('select')">✓ Select</button>
-            <button class="btn" onclick="control('next')">Next ▶</button>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab(event, 'library')">📖 Library</button>
+            <button class="tab" onclick="switchTab(event, 'settings')">⚙️ Settings</button>
+            <button class="tab" onclick="switchTab(event, 'debug')">🔧 Debug</button>
         </div>
-        <div class="controls" style="margin-top: 10px;">
-            <button class="btn btn-secondary" onclick="control('back')">← Back</button>
-            <button class="btn btn-secondary" onclick="control('menu')">≡ Menu</button>
-            <button class="btn" onclick="location.reload()">🔄 Refresh</button>
-        </div>
-        <div class="controls" style="margin-top: 10px;">
-            <button class="btn btn-secondary" onclick="window.location.href='/settings'">⚙️ Settings</button>
-        </div>
-    </div>
 
-    <!-- File Upload -->
-    <div class="section">
-        <h2>📤 Upload EPUB Books</h2>
-        <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
-            <input type="file" name="file" accept=".epub" multiple required>
-            <button type="submit" class="btn">Upload</button>
-        </form>
-        <p style="color: #666; font-size: 14px; margin-top: 10px;">
-            💡 Tip: Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple files
-        </p>
-    </div>
+        <!-- Library Tab -->
+        <div id="library" class="tab-content active">
+            <!-- File Upload -->
+            <div class="section">
+                <h2>📤 Upload EPUB Books</h2>
+                <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+                    <input type="file" name="file" accept=".epub" multiple required>
+                    <button type="submit" class="btn">Upload</button>
+                </form>
+                <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                    💡 Tip: Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple files
+                </p>
+            </div>
 
-    <!-- Book List -->
-    <div class="section">
-        <h2>📖 Library ({{ books|length }} books)</h2>
-        {% if books %}
-        <table>
-            <tr>
-                <th>Filename</th>
-                <th>Size</th>
-                <th>Actions</th>
-            </tr>
-            {% for book in books %}
-            <tr>
-                <td>{{ book.filename }}</td>
-                <td>{{ book.size }}</td>
-                <td>
-                    <a href="/delete/{{ book.filename }}"
-                       onclick="return confirm('Delete {{ book.filename }}?')"
-                       class="btn btn-danger"
-                       style="padding: 5px 10px; text-decoration: none; font-size: 12px;">
-                        Delete
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
-        {% else %}
-        <div class="empty">
-            <p>No books yet. Upload an EPUB to get started!</p>
+            <!-- Book List -->
+            <div class="section">
+                <h2>📖 Library ({{ books|length }} books)</h2>
+                {% if books %}
+                <table>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Size</th>
+                        <th>Actions</th>
+                    </tr>
+                    {% for book in books %}
+                    <tr>
+                        <td>{{ book.filename }}</td>
+                        <td>{{ book.size }}</td>
+                        <td>
+                            <a href="/delete/{{ book.filename }}"
+                               onclick="return confirm('Delete {{ book.filename }}?')"
+                               class="btn btn-danger"
+                               style="padding: 5px 10px; text-decoration: none; font-size: 12px;">
+                                Delete
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="empty">
+                    <p>No books yet. Upload an EPUB to get started!</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
-        {% endif %}
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="section">
+                <p>Loading settings...</p>
+                <script>
+                    // Redirect to settings page
+                    setTimeout(() => window.location.href='/settings', 100);
+                </script>
+            </div>
+        </div>
+
+        <!-- Debug Tab -->
+        <div id="debug" class="tab-content">
+            <!-- Remote Control -->
+            <div class="section">
+                <h2>🎮 Remote Control</h2>
+                <p style="color: #666; margin-bottom: 15px;">Control your PiBook e-reader remotely</p>
+                <div class="controls">
+                    <button class="btn" onclick="control('prev')">◀ Previous</button>
+                    <button class="btn btn-secondary" onclick="control('select')">✓ Select</button>
+                    <button class="btn" onclick="control('next')">Next ▶</button>
+                </div>
+                <div class="controls" style="margin-top: 10px;">
+                    <button class="btn btn-secondary" onclick="control('back')">← Back</button>
+                    <button class="btn btn-secondary" onclick="control('menu')">≡ Menu</button>
+                    <button class="btn" onclick="location.reload()">🔄 Refresh</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        function switchTab(event, tabName) {
+            // Hide all tab content
+            const tabContents = document.getElementsByClassName('tab-content');
+            for (let content of tabContents) {
+                content.classList.remove('active');
+            }
+
+            // Remove active class from all tabs
+            const tabs = document.getElementsByClassName('tab');
+            for (let tab of tabs) {
+                tab.classList.remove('active');
+            }
+
+            // Show selected tab and mark button as active
+            document.getElementById(tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
         function control(action) {
             fetch('/control/' + action)
                 .then(response => response.json())
