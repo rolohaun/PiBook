@@ -210,15 +210,16 @@ class LibraryScreen:
             return self.books[self.current_index]
         return None
 
-    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int):
+    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int, is_charging: bool = False):
         """
-        Draw battery icon with percentage
+        Draw battery icon with percentage and charging indicator
 
         Args:
             draw: ImageDraw object
             x: X position (top-right corner)
             y: Y position
             percentage: Battery percentage (0-100)
+            is_charging: Whether battery is currently charging
         """
         # Battery dimensions
         battery_width = 30
@@ -249,6 +250,24 @@ class LibraryScreen:
                 [(battery_x + 2, y + 2), (battery_x + 2 + fill_width, y + battery_height - 2)],
                 fill=0
             )
+
+        # Draw charging indicator (lightning bolt) if charging
+        if is_charging:
+            # Lightning bolt coordinates (centered in battery)
+            bolt_center_x = battery_x + battery_width // 2
+            bolt_center_y = y + battery_height // 2
+            # Simple lightning bolt shape
+            bolt_points = [
+                (bolt_center_x, bolt_center_y - 4),      # Top
+                (bolt_center_x - 2, bolt_center_y),       # Middle left
+                (bolt_center_x + 1, bolt_center_y),       # Middle right (offset)
+                (bolt_center_x - 1, bolt_center_y + 4)    # Bottom
+            ]
+            # Draw as white (inverted) if battery is full, black otherwise
+            bolt_color = 1 if fill_width > battery_width - 8 else 0
+            draw.line([bolt_points[0], bolt_points[1]], fill=bolt_color, width=2)
+            draw.line([bolt_points[1], bolt_points[2]], fill=bolt_color, width=2)
+            draw.line([bolt_points[2], bolt_points[3]], fill=bolt_color, width=2)
 
         # Draw percentage text
         percentage_text = f"{percentage}%"
@@ -298,7 +317,8 @@ class LibraryScreen:
         # Draw battery status in top-right corner
         if self.battery_monitor:
             battery_percentage = self.battery_monitor.get_percentage()
-            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage)
+            is_charging = self.battery_monitor.is_charging()
+            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage, is_charging)
 
         # Draw title
         draw.text((40, 30), "Library", font=self.title_font, fill=0)
@@ -602,15 +622,16 @@ class ReaderScreen:
         draw.text((pct_x, bar_y + bar_height + 20), pct_text, font=small_font, fill=0)
 
         return image
-    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int):
+    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int, is_charging: bool = False):
         """
-        Draw battery icon with percentage
+        Draw battery icon with percentage and charging indicator
 
         Args:
             draw: ImageDraw object
             x: X position (top-right corner)
             y: Y position
             percentage: Battery percentage (0-100)
+            is_charging: Whether battery is currently charging
         """
         # Battery dimensions
         battery_width = 30
@@ -641,6 +662,24 @@ class ReaderScreen:
                 [(battery_x + 2, y + 2), (battery_x + 2 + fill_width, y + battery_height - 2)],
                 fill=0
             )
+
+        # Draw charging indicator (lightning bolt) if charging
+        if is_charging:
+            # Lightning bolt coordinates (centered in battery)
+            bolt_center_x = battery_x + battery_width // 2
+            bolt_center_y = y + battery_height // 2
+            # Simple lightning bolt shape
+            bolt_points = [
+                (bolt_center_x, bolt_center_y - 4),      # Top
+                (bolt_center_x - 2, bolt_center_y),       # Middle left
+                (bolt_center_x + 1, bolt_center_y),       # Middle right (offset)
+                (bolt_center_x - 1, bolt_center_y + 4)    # Bottom
+            ]
+            # Draw as white (inverted) if battery is full, black otherwise
+            bolt_color = 1 if fill_width > battery_width - 8 else 0
+            draw.line([bolt_points[0], bolt_points[1]], fill=bolt_color, width=2)
+            draw.line([bolt_points[1], bolt_points[2]], fill=bolt_color, width=2)
+            draw.line([bolt_points[2], bolt_points[3]], fill=bolt_color, width=2)
 
         # Draw percentage text
         percentage_text = f"{percentage}%"
@@ -681,7 +720,8 @@ class ReaderScreen:
             img = img.copy()
             draw = ImageDraw.Draw(img)
             battery_percentage = self.battery_monitor.get_percentage()
-            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage)
+            is_charging = self.battery_monitor.is_charging()
+            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage, is_charging)
 
         return img
 

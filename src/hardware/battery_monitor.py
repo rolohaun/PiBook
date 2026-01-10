@@ -14,22 +14,27 @@ from abc import ABC, abstractmethod
 
 class BatteryBackend(ABC):
     """Abstract base class for battery monitoring backends"""
-    
+
     @abstractmethod
     def read_voltage(self) -> float:
         """Read battery voltage in volts"""
         pass
-    
+
     @abstractmethod
     def read_percentage(self) -> int:
         """Read battery percentage (0-100)"""
         pass
-    
+
+    @abstractmethod
+    def is_charging(self) -> bool:
+        """Check if battery is currently charging"""
+        pass
+
     @abstractmethod
     def is_available(self) -> bool:
         """Check if backend is available"""
         pass
-    
+
     @abstractmethod
     def get_name(self) -> str:
         """Get backend name"""
@@ -89,7 +94,19 @@ class PiSugar2Backend(BatteryBackend):
             except:
                 pass
         return 0
-    
+
+    def is_charging(self) -> bool:
+        """Check if battery is charging from PiSugar2"""
+        response = self._send_command("get battery_charging")
+        if response:
+            try:
+                # Response format: "battery_charging: true" or "battery_charging: false"
+                charging_str = response.split(":")[-1].strip().lower()
+                return charging_str == "true"
+            except:
+                pass
+        return False
+
     def is_available(self) -> bool:
         return self._available
     
@@ -165,7 +182,11 @@ class ADS1115Backend(BatteryBackend):
         voltage = max(self.min_voltage, min(self.max_voltage, voltage))
         percentage = ((voltage - self.min_voltage) / (self.max_voltage - self.min_voltage)) * 100
         return int(round(percentage))
-    
+
+    def is_charging(self) -> bool:
+        """ADS1115 doesn't detect charging status"""
+        return False
+
     def is_available(self) -> bool:
         return self._available
     
@@ -186,7 +207,11 @@ class MockBackend(BatteryBackend):
     def read_percentage(self) -> int:
         """Return simulated percentage"""
         return 75
-    
+
+    def is_charging(self) -> bool:
+        """Mock backend always returns False for charging"""
+        return False
+
     def is_available(self) -> bool:
         return True
     
@@ -234,7 +259,8 @@ class BatteryMonitor:
         # Cached values
         self._cached_voltage: Optional[float] = None
         self._cached_percentage: Optional[int] = None
-        
+        self._cached_charging: Optional[bool] = None
+
         # Auto-detect backend
         self.backend = self._detect_backend(
             pisugar_socket=pisugar_socket,
@@ -298,7 +324,10 @@ class BatteryMonitor:
         else:
             # Calculate from smoothed voltage for other backends
             self._cached_percentage = self.backend.read_percentage()
-        
+
+        # Get charging status
+        self._cached_charging = self.backend.is_charging()
+
         # Update timestamp
         self.last_update = time.time()
         
@@ -329,9 +358,22 @@ class BatteryMonitor:
         # Update if needed
         if time.time() - self.last_update >= self.update_interval:
             self._update_reading()
-        
+
         return self._cached_percentage if self._cached_percentage is not None else 0
-    
+
+    def is_charging(self) -> bool:
+        """
+        Check if battery is currently charging
+
+        Returns:
+            True if battery is charging
+        """
+        # Update if needed
+        if time.time() - self.last_update >= self.update_interval:
+            self._update_reading()
+
+        return self._cached_charging if self._cached_charging is not None else False
+
     def is_low_battery(self, threshold: int = 20) -> bool:
         """
         Check if battery is below threshold
@@ -349,14 +391,16 @@ class BatteryMonitor:
         Get complete battery status
 
         Returns:
-            Dictionary with voltage, percentage, and status
+            Dictionary with voltage, percentage, charging status, and other info
         """
         percentage = self.get_percentage()
         voltage = self.get_voltage()
-        
+        charging = self.is_charging()
+
         return {
             'voltage': voltage,
             'percentage': percentage,
+            'is_charging': charging,
             'is_low': self.is_low_battery(),
             'backend': self.backend.get_name(),
             'last_update': self.last_update
