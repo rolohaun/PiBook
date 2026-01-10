@@ -43,7 +43,8 @@ class PiBookWebServer:
         @self.flask_app.route('/')
         def index():
             """Main page with file manager and controls"""
-            return render_template_string(HTML_TEMPLATE, books=self._get_books())
+            settings_data = self._load_settings('settings.json')
+            return render_template_string(HTML_TEMPLATE, books=self._get_books(), settings=settings_data)
 
         @self.flask_app.route('/upload', methods=['POST'])
         def upload():
@@ -473,6 +474,40 @@ HTML_TEMPLATE = '''
             color: #999;
             padding: 40px;
         }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        h3 {
+            color: #555;
+        }
     </style>
 </head>
 <body>
@@ -482,7 +517,7 @@ HTML_TEMPLATE = '''
         <div class="tabs">
             <button class="tab active" onclick="switchTab(event, 'library')">📖 Library</button>
             <button class="tab" onclick="switchTab(event, 'settings')">⚙️ Settings</button>
-            <button class="tab" onclick="switchTab(event, 'debug')">🔧 Debug</button>
+            <button class="tab" onclick="switchTab(event, 'navigation')">🧭 Navigation</button>
         </div>
 
         <!-- Library Tab -->
@@ -536,18 +571,104 @@ HTML_TEMPLATE = '''
         <div id="settings" class="tab-content">
             <div class="section">
                 <h2>⚙️ PiBook Settings</h2>
-                <p style="margin: 20px 0; color: #666;">Configure display, power management, and e-reader preferences.</p>
-                <button class="btn" style="font-size: 18px; padding: 20px;" onclick="window.location.href='/settings'">
-                    Open Settings Page →
-                </button>
-                <p style="margin-top: 15px; font-size: 14px; color: #999;">
-                    Settings will open in a new view with all configuration options
-                </p>
+                <form action="/save_settings" method="post">
+                    <h3 style="margin-top: 20px; color: #555; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">📖 Reading Settings</h3>
+
+                    <div class="form-group">
+                        <label for="zoom">Zoom Level</label>
+                        <input type="number" id="zoom" name="zoom"
+                               value="{{ settings.zoom }}" min="0.5" max="2.0" step="0.1">
+                        <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, &lt;1.0 = smaller, &gt;1.0 = larger</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dpi">DPI (Rendering Quality)</label>
+                        <input type="number" id="dpi" name="dpi"
+                               value="{{ settings.dpi }}" min="72" max="300" step="1">
+                        <p class="help-text">Rendering resolution (72-300). Higher = sharper text but slower. Default: 150</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="full_refresh_interval">Full Refresh Interval</label>
+                        <input type="number" id="full_refresh_interval" name="full_refresh_interval"
+                               value="{{ settings.full_refresh_interval }}" min="1" max="20" step="1">
+                        <p class="help-text">Number of page turns before full refresh to clear ghosting (1-20)</p>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="show_page_numbers" name="show_page_numbers"
+                                   {% if settings.show_page_numbers %}checked{% endif %}>
+                            <label for="show_page_numbers" style="margin: 0;">Show Page Numbers</label>
+                        </div>
+                        <p class="help-text">Display "Page X of Y" at bottom of screen when reading</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="items_per_page">Books Per Page</label>
+                        <input type="number" id="items_per_page" name="items_per_page"
+                               value="{{ settings.items_per_page }}" min="3" max="6" step="1">
+                        <p class="help-text">Number of books shown on library screen (3-6)</p>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="wifi_while_reading" name="wifi_while_reading"
+                                   {% if settings.wifi_while_reading %}checked{% endif %}>
+                            <label for="wifi_while_reading" style="margin: 0;">Keep WiFi On While Reading</label>
+                        </div>
+                        <p class="help-text">🔋 Uncheck to save battery (WiFi turns off when reading, on when in library)</p>
+                    </div>
+
+                    <h3 style="margin-top: 30px; color: #555; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">🔋 Power Management</h3>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="sleep_enabled" name="sleep_enabled"
+                                   {% if settings.sleep_enabled %}checked{% endif %}>
+                            <label for="sleep_enabled" style="margin: 0;">Enable Sleep Mode</label>
+                        </div>
+                        <p class="help-text">🔋 When enabled, device sleeps after inactivity to save battery</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sleep_timeout">Sleep Timeout (seconds)</label>
+                        <input type="number" id="sleep_timeout" name="sleep_timeout"
+                               value="{{ settings.sleep_timeout }}" min="30" max="600" step="30">
+                        <p class="help-text">Time of inactivity before sleep (30-600 seconds). Lower = better battery</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sleep_message">Sleep Screen Message</label>
+                        <input type="text" id="sleep_message" name="sleep_message"
+                               value="{{ settings.sleep_message }}" maxlength="50"
+                               style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ddd; border-radius: 5px;">
+                        <p class="help-text">Message displayed when device goes to sleep (max 50 characters)</p>
+                    </div>
+
+                    <h3 style="margin-top: 30px; color: #555; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">⚡ CPU Undervolting (Experimental)</h3>
+
+                    <div class="form-group">
+                        <label for="undervolt">Undervolt Level</label>
+                        <input type="number" id="undervolt" name="undervolt"
+                               value="{{ settings.undervolt }}" min="-8" max="0" step="1">
+                        <p class="help-text">CPU voltage reduction: 0 = none, -2 = 50mV (safe), -4 = 100mV, -6 = 150mV, -8 = 200mV (max)</p>
+                        <p class="help-text" style="color: #d32f2f; font-weight: bold;">⚠️ WARNING: Values below -4 may cause instability. Requires reboot to apply.</p>
+                        <p class="help-text" id="voltage-status" style="color: #1976d2; font-weight: bold;">Current CPU Voltage: Loading...</p>
+                    </div>
+
+                    <button type="submit" class="btn">Save Settings</button>
+                </form>
+
+                <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ff9800;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">💡 Undervolt changes require reboot</p>
+                    <button class="btn" style="background: #ff9800; margin-top: 0;" onclick="if(confirm('Reboot PiBook now? This will close all connections.')) { fetch('/reboot').then(() => alert('Rebooting... Wait 30 seconds then reconnect.')); }">Reboot PiBook</button>
+                </div>
             </div>
         </div>
 
-        <!-- Debug Tab -->
-        <div id="debug" class="tab-content">
+        <!-- Navigation Tab -->
+        <div id="navigation" class="tab-content">
             <!-- Remote Control -->
             <div class="section">
                 <h2>🎮 Remote Control</h2>
@@ -593,6 +714,24 @@ HTML_TEMPLATE = '''
                 })
                 .catch(error => console.error('Error:', error));
         }
+
+        // Load current CPU voltage when page loads
+        fetch('/api/cpu_voltage')
+            .then(response => response.json())
+            .then(data => {
+                const statusEl = document.getElementById('voltage-status');
+                if (statusEl && data.voltage) {
+                    statusEl.textContent = 'Current CPU Voltage: ' + data.voltage + ' (Undervolt: ' + data.undervolt_setting + ')';
+                } else if (statusEl) {
+                    statusEl.textContent = 'Current CPU Voltage: Unable to read';
+                }
+            })
+            .catch(err => {
+                const statusEl = document.getElementById('voltage-status');
+                if (statusEl) {
+                    statusEl.textContent = 'Current CPU Voltage: Error loading';
+                }
+            });
     </script>
 </body>
 </html>
