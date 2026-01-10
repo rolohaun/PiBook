@@ -114,11 +114,11 @@ case $choice in
 
         # Update or add over_voltage setting
         if grep -q "^over_voltage=" "$CONFIG_FILE"; then
-            # Update existing
-            sed -i "s/^over_voltage=.*/over_voltage=$LEVEL/" "$CONFIG_FILE"
+            # Update existing (use | as delimiter to avoid issues with negative numbers)
+            sed -i "s|^over_voltage=.*|over_voltage=$LEVEL|" "$CONFIG_FILE"
         elif grep -q "^# over_voltage=" "$CONFIG_FILE"; then
             # Uncomment existing
-            sed -i "s/^# over_voltage=.*/over_voltage=$LEVEL/" "$CONFIG_FILE"
+            sed -i "s|^# over_voltage=.*|over_voltage=$LEVEL|" "$CONFIG_FILE"
         else
             # Add new setting (look for CPU Power Management section)
             if grep -q "# ---- CPU Power Management ----" "$CONFIG_FILE"; then
