@@ -330,9 +330,9 @@ class BatteryMonitor:
 
         # Update timestamp
         self.last_update = time.time()
-        
+
         self.logger.debug(
-            f"Battery: {self._cached_voltage:.2f}V ({self._cached_percentage}%)"
+            f"Battery: {self._cached_voltage:.2f}V ({self._cached_percentage}%) Charging: {self._cached_charging}"
         )
     
     def get_voltage(self) -> float:
