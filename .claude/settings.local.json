@@ -17,7 +17,9 @@
       "Bash(chmod:*)",
       "Bash(ls -la \"c:\\\\Users\\\\Ron\\\\Downloads\\\\DEV\\\\PiBook\\\\src\\\\web\"\" 2>/dev/null || echo \"Directory not found \")",
       "Bash(ssh pi@pibook.local:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(sshpass -p raspberry ssh pi@pibook.local \"sudo journalctl -u pibook -n 100 --no-pager | grep -i undervolt\")",
+      "Bash(find:*)"
     ]
   }
 }

@@ -219,6 +219,13 @@ class PiBookWebServer:
                 new_undervolt = settings_data['undervolt']
                 self.app_instance.config.set('power.undervolt', new_undervolt)
 
+                # Save config changes to disk
+                try:
+                    self.app_instance.config.save()
+                    self.logger.info("Configuration saved to disk")
+                except Exception as e:
+                    self.logger.error(f"Failed to save config.yaml: {e}")
+
                 # Update /boot/firmware/config.txt if undervolt changed
                 undervolt_error = None
                 if old_undervolt != new_undervolt:

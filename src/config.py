@@ -23,6 +23,7 @@ class Config:
             config_path: Path to config.yaml
         """
         self.logger = logging.getLogger(__name__)
+        self.config_path = config_path
 
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
@@ -84,13 +85,16 @@ class Config:
         config[keys[-1]] = value
         self.logger.debug(f"Config set: {path} = {value}")
 
-    def save(self, config_path: str):
+    def save(self, config_path: str = None):
         """
         Save configuration to YAML file
 
         Args:
-            config_path: Path to save config file
+            config_path: Path to save config file (default: original config path)
         """
+        if config_path is None:
+            config_path = self.config_path
+
         with open(config_path, 'w') as f:
             yaml.safe_dump(self._config, f, default_flow_style=False)
 
