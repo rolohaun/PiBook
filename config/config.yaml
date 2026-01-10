@@ -58,6 +58,14 @@ power:
   sleep_timeout: 120          # Seconds of inactivity before sleep (2 minutes)
   cpu_scaling: true           # Enable CPU frequency scaling
   wifi_power_save: true       # Enable WiFi power management
+  # CPU Undervolting (EXPERIMENTAL - reduces power consumption)
+  # WARNING: Setting too low may prevent boot! Have SD card reader ready for recovery.
+  # Range: 0 to -8 (each step = -25mV)
+  # Start conservative: -2 (50mV reduction), test stability before increasing
+  # Forum reference: https://forums.raspberrypi.com/viewtopic.php?t=324988
+  undervolt: -2               # -2 = 50mV reduction (safe starting point for Pi Zero 2 W)
+  # More aggressive: -4 to -6 (100-150mV) after stability testing
+  # Maximum tested: -8 (200mV) - forum user achieved 1.06W from 2.07W on Pi Zero 2 W
 
 reading_progress:
   enabled: true               # Enable reading position tracking

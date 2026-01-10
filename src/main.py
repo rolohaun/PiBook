@@ -193,6 +193,34 @@ class PiBookApp:
             handlers=handlers
         )
 
+    def _log_cpu_voltage(self):
+        """Log CPU core voltage for undervolt diagnostics"""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['vcgencmd', 'measure_volts', 'core'],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if result.returncode == 0:
+                voltage = result.stdout.strip()
+                undervolt_setting = self.config.get('power.undervolt', 0)
+                self.logger.info(f"CPU Core Voltage: {voltage} (undervolt setting: {undervolt_setting})")
+
+                # Log undervolt status
+                if undervolt_setting < 0:
+                    voltage_reduction = abs(undervolt_setting) * 25
+                    self.logger.info(f"Undervolting ACTIVE: -{voltage_reduction}mV reduction for power savings")
+                else:
+                    self.logger.info("Undervolting DISABLED (set power.undervolt in config.yaml)")
+            else:
+                self.logger.warning(f"Could not read CPU voltage: {result.stderr}")
+        except FileNotFoundError:
+            self.logger.warning("vcgencmd not found - cannot monitor CPU voltage")
+        except Exception as e:
+            self.logger.warning(f"Failed to read CPU voltage: {e}")
+
     def start(self):
         """Start the application"""
         try:
@@ -200,6 +228,9 @@ class PiBookApp:
             self.logger.info("Initializing hardware...")
             self.display.initialize()
             self._register_gpio_callbacks()
+
+            # Log CPU voltage for undervolt diagnostics
+            self._log_cpu_voltage()
 
             # Load library
             books_dir = self.config.get('library.books_directory', '/home/pi/PiBook/books')

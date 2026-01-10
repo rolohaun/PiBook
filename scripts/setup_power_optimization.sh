@@ -77,6 +77,14 @@ force_turbo=0
 arm_boost=0
 arm_freq_min=600
 
+# ---- CPU Undervolting (EXPERIMENTAL) ----
+# Reduces core voltage to save power during sleep
+# Range: 0 to -16 (each step = -25mV), but -8 is practical max
+# Forum testing: -8 reduced power from 2.07W to 1.06W on Pi Zero 2 W
+# WARNING: Too low may prevent boot - have SD card reader ready!
+# Start with -2 (50mV), test stability, then increase to -4 or -6
+over_voltage=-2
+
 # ---- Minimize GPU Memory (more RAM for CPU) ----
 gpu_mem=16
 
@@ -107,17 +115,24 @@ echo "========================================"
 echo "✅ Power Optimizations Applied!"
 echo "========================================"
 echo ""
-echo "Expected power savings: ~50mA"
-echo "Expected battery life: 30-40 hours reading"
+echo "Expected power savings: ~50mA + undervolt savings"
+echo "Expected battery life: 30-40+ hours reading"
 echo ""
 echo "Changes made:"
 echo "  ✓ HDMI disabled (~14mA)"
 echo "  ✓ Bluetooth disabled (~25mA)"
 echo "  ✓ Audio disabled (~8mA)"
 echo "  ✓ LEDs disabled (~3mA)"
+echo "  ✓ CPU undervolted -2 steps (50mV reduction)"
 echo "  ✓ Unnecessary services stopped"
 echo ""
 echo "⚠️  REBOOT REQUIRED for changes to take effect!"
+echo ""
+echo "After reboot, check voltage with:"
+echo "  vcgencmd measure_volts core"
+echo ""
+echo "If stable, you can increase undervolt to -4 or -6 in config.txt"
+echo "Edit: $CONFIG_FILE (search for 'over_voltage')"
 echo ""
 echo "Backup saved to: $BACKUP_FILE"
 echo ""
