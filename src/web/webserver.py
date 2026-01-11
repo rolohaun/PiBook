@@ -695,6 +695,16 @@ HTML_TEMPLATE = '''
                     <button class="btn" onclick="location.reload()">🔄 Refresh</button>
                 </div>
             </div>
+
+            <!-- External Links -->
+            <div class="section" style="margin-top: 30px;">
+                <h2>🔗 External Links</h2>
+                <p style="color: #666; margin-bottom: 15px;">Access related services</p>
+                <div class="controls">
+                    <button class="btn" onclick="window.open('http://' + window.location.hostname + ':8421', '_blank')" style="background: #9C27B0;">🔋 PiSugar Battery Manager</button>
+                </div>
+                <p class="help-text" style="margin-top: 10px;">Opens PiSugar web interface for advanced battery management and configuration</p>
+            </div>
         </div>
     </div>
 
