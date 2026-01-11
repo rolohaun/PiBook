@@ -26,6 +26,11 @@
             <span class="nav-text">E-Reader</span>
         </div>
 
+        <div class="nav-item" data-section="todo" onclick="switchSection('todo')">
+            <span class="nav-icon">✓</span>
+            <span class="nav-text">To-Do</span>
+        </div>
+
         <div class="nav-item" data-section="settings" onclick="switchSection('settings')">
             <span class="nav-icon">⚙️</span>
             <span class="nav-text">Settings</span>
@@ -47,6 +52,11 @@
         <!-- Library Section -->
         <div id="library" class="content-section">
             {% include 'library.html' %}
+        </div>
+
+        <!-- To-Do Section -->
+        <div id="todo" class="content-section">
+            {% include 'todo.html' %}
         </div>
 
         <!-- Settings Section -->

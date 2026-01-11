@@ -128,6 +128,101 @@ class PiBookWebServer:
 
             return jsonify({'status': 'ok', 'action': action})
 
+        # To-Do List API Routes
+        @self.flask_app.route('/api/todos', methods=['GET'])
+        def get_todos():
+            """Get all to-do tasks"""
+            try:
+                todos = self._load_todos()
+                return jsonify(todos)
+            except Exception as e:
+                self.logger.error(f"Failed to load todos: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/todos', methods=['POST'])
+        def add_todo():
+            """Add a new to-do task"""
+            try:
+                data = request.get_json()
+                task_text = data.get('text', '').strip()
+                
+                if not task_text:
+                    return jsonify({'error': 'Task text is required'}), 400
+                
+                todos = self._load_todos()
+                
+                # Generate new ID
+                import uuid
+                new_task = {
+                    'id': str(uuid.uuid4()),
+                    'text': task_text,
+                    'completed': False,
+                    'created_at': __import__('datetime').datetime.now().isoformat()
+                }
+                
+                todos['tasks'].append(new_task)
+                self._save_todos(todos)
+                
+                self.logger.info(f"Added todo: {task_text}")
+                return jsonify({'success': True, 'task': new_task})
+                
+            except Exception as e:
+                self.logger.error(f"Failed to add todo: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/todos/<task_id>', methods=['PUT'])
+        def toggle_todo(task_id):
+            """Toggle task completion status"""
+            try:
+                todos = self._load_todos()
+                
+                for task in todos['tasks']:
+                    if task['id'] == task_id:
+                        task['completed'] = not task['completed']
+                        self._save_todos(todos)
+                        self.logger.info(f"Toggled todo {task_id}: {task['completed']}")
+                        return jsonify({'success': True, 'task': task})
+                
+                return jsonify({'error': 'Task not found'}), 404
+                
+            except Exception as e:
+                self.logger.error(f"Failed to toggle todo: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/todos/<task_id>', methods=['DELETE'])
+        def delete_todo(task_id):
+            """Delete a to-do task"""
+            try:
+                todos = self._load_todos()
+                initial_count = len(todos['tasks'])
+                
+                todos['tasks'] = [t for t in todos['tasks'] if t['id'] != task_id]
+                
+                if len(todos['tasks']) < initial_count:
+                    self._save_todos(todos)
+                    self.logger.info(f"Deleted todo {task_id}")
+                    return jsonify({'success': True})
+                else:
+                    return jsonify({'error': 'Task not found'}), 404
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to delete todo: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/remote/open_todo', methods=['POST'])
+        def open_todo():
+            """Open To-Do app on PiBook"""
+            try:
+                # Navigate to To-Do screen
+                from src.ui.navigation import Screen
+                self.app_instance.navigation.navigate_to(Screen.TODO)
+                self.app_instance._render_current_screen()
+                self.logger.info("Opened To-Do app from web interface")
+                return jsonify({'success': True})
+            except Exception as e:
+                self.logger.error(f"Failed to open To-Do app: {e}")
+                return jsonify({'error': str(e)}), 500
+
         @self.flask_app.route('/api/cpu_voltage')
         def cpu_voltage():
             """Get current CPU voltage"""
@@ -468,6 +563,28 @@ class PiBookWebServer:
                         'size': f"{size:.2f} MB"
                     })
         return books
+
+    def _load_todos(self):
+        """Load to-do tasks from todos.json"""
+        todos_file = 'todos.json'
+        if os.path.exists(todos_file):
+            try:
+                with open(todos_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                self.logger.error(f"Error loading todos: {e}")
+                return {'tasks': []}
+        return {'tasks': []}
+
+    def _save_todos(self, todos):
+        """Save to-do tasks to todos.json"""
+        todos_file = 'todos.json'
+        try:
+            with open(todos_file, 'w') as f:
+                json.dump(todos, f, indent=2)
+        except Exception as e:
+            self.logger.error(f"Error saving todos: {e}")
+            raise
 
     def _load_settings(self, settings_file: str) -> dict:
         """Load settings from file, with defaults from config.yaml"""

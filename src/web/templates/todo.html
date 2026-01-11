@@ -1,0 +1,27 @@
+<h2>✓ To-Do List</h2>
+<p style="color: #666; margin-bottom: 24px;">Manage your tasks - changes sync to the e-ink display</p>
+
+<!-- Open To-Do App Button -->
+<button class="btn" onclick="openTodoApp()" style="margin-bottom: 24px; width: 100%;">📱 Open To-Do App on
+    PiBook</button>
+
+<!-- Add Task Form -->
+<h3>Add New Task</h3>
+<div style="display: flex; gap: 12px; margin-bottom: 32px;">
+    <input type="text" id="new-task-input" placeholder="Enter task description..."
+        style="flex: 1; padding: 12px; font-size: 15px; border: 2px solid #e0e0e0; border-radius: 6px;">
+    <button class="btn" onclick="addTodo()" style="width: 120px;">Add Task</button>
+</div>
+
+<!-- Task List -->
+<h3>Tasks</h3>
+<div id="todo-list" style="margin-top: 16px;">
+    <p style="color: #999; text-align: center; padding: 40px;">Loading tasks...</p>
+</div>
+
+<script>
+    // Auto-refresh tasks when navigating to this section
+    if (document.getElementById('todo').classList.contains('active')) {
+        loadTodos();
+    }
+</script>

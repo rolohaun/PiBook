@@ -25,8 +25,11 @@ function switchSection(sectionId) {
     }
 
     // Auto-refresh system stats when navigating to info or navigation section
+    // Load todos when navigating to todo section
     if (sectionId === 'info' || sectionId === 'navigation') {
         refreshSystemStats();
+    } else if (sectionId === 'todo') {
+        loadTodos();
     }
 }
 
@@ -373,3 +376,138 @@ function sendCommand(command) {
             alert('Error: ' + error.message);
         });
 }
+
+// To-Do List Functions
+function loadTodos() {
+    fetch('/api/todos')
+        .then(response => response.json())
+        .then(data => {
+            const todoList = document.getElementById('todo-list');
+            if (!todoList) return;
+
+            if (data.tasks && data.tasks.length > 0) {
+                let html = '';
+                data.tasks.forEach(task => {
+                    const checkedClass = task.completed ? 'checked' : '';
+                    const textStyle = task.completed ? 'text-decoration: line-through; color: #999;' : '';
+                    html += `
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #f9f9f9; border-radius: 6px; margin-bottom: 8px;">
+                            <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                                   onclick="toggleTodo('${task.id}')" 
+                                   style="width: 20px; height: 20px; cursor: pointer;">
+                            <span style="flex: 1; ${textStyle}">${escapeHtml(task.text)}</span>
+                            <button class="btn btn-danger" onclick="deleteTodo('${task.id}')" style="padding: 8px 16px;">Delete</button>
+                        </div>
+                    `;
+                });
+                todoList.innerHTML = html;
+            } else {
+                todoList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No tasks yet. Add one above!</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load todos:', error);
+            const todoList = document.getElementById('todo-list');
+            if (todoList) {
+                todoList.innerHTML = '<p style="color: #f44336; text-align: center; padding: 40px;">Error loading tasks</p>';
+            }
+        });
+}
+
+function addTodo() {
+    const input = document.getElementById('new-task-input');
+    const text = input.value.trim();
+
+    if (!text) {
+        alert('Please enter a task description');
+        return;
+    }
+
+    fetch('/api/todos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: text })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                input.value = '';
+                loadTodos();
+            } else {
+                alert('Failed to add task: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error adding task: ' + error.message);
+        });
+}
+
+function toggleTodo(taskId) {
+    fetch(`/api/todos/${taskId}`, {
+        method: 'PUT'
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadTodos();
+            } else {
+                alert('Failed to update task: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error updating task: ' + error.message);
+        });
+}
+
+function deleteTodo(taskId) {
+    if (!confirm('Delete this task?')) {
+        return;
+    }
+
+    fetch(`/api/todos/${taskId}`, {
+        method: 'DELETE'
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadTodos();
+            } else {
+                alert('Failed to delete task: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error deleting task: ' + error.message);
+        });
+}
+
+function openTodoApp() {
+    fetch('/remote/open_todo', {
+        method: 'POST'
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Optionally show a success message
+                console.log('To-Do app opened on PiBook');
+            } else {
+                alert('Failed to open To-Do app: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error opening To-Do app: ' + error.message);
+        });
+}
+
+// Enter key support for todo input
+document.addEventListener('DOMContentLoaded', function () {
+    const todoInput = document.getElementById('new-task-input');
+    if (todoInput) {
+        todoInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                addTodo();
+            }
+        });
+    }
+});
