@@ -235,6 +235,11 @@ class DisplayDriver:
         self.full_refresh_interval = max(1, interval)
         self.logger.info(f"Full refresh interval set to {self.full_refresh_interval}")
 
+    def reset_partial_counter(self):
+        """Reset the partial refresh counter (call when changing screens)"""
+        self.partial_refresh_count = 0
+        self.logger.debug("Partial refresh counter reset")
+
     def sleep(self):
         """Put display into low-power sleep mode"""
         if not self.hardware_available or not self.epd:

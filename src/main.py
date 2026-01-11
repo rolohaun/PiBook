@@ -858,6 +858,11 @@ class PiBookApp:
             # Update last screen tracker
             self.last_screen = current_screen
 
+            # Reset partial refresh counter when leaving reader
+            # This ensures the periodic full refresh only applies to reader page turns
+            if screen_changed and not self.navigation.is_on_screen(Screen.READER):
+                self.display.reset_partial_counter()
+
             # Display image with appropriate refresh mode
             if screen_changed:
                 self.logger.info(f"Screen changed - using full refresh")
