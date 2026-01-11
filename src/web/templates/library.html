@@ -1,4 +1,23 @@
-<h2>📖 Library</h2>
+<h2>📖 E-Reader</h2>
+
+<!-- Remote Control -->
+<h3>🎮 Remote Control</h3>
+<p style="color: #666; margin-bottom: 16px;">Control your PiBook e-reader remotely</p>
+
+<div class="controls">
+    <button class="btn" onclick="sendCommand('prev')">◀ Previous</button>
+    <button class="btn btn-secondary" onclick="sendCommand('select')">✓ Select</button>
+    <button class="btn" onclick="sendCommand('next')">Next ▶</button>
+</div>
+
+<div class="controls" style="margin-top: 12px;">
+    <button class="btn btn-secondary" onclick="sendCommand('back')">← Back</button>
+    <button class="btn btn-secondary" onclick="sendCommand('menu')">≡ Menu</button>
+    <button class="btn" onclick="location.reload()">🔄 Refresh</button>
+</div>
+
+<!-- Book Library -->
+<h3 style="margin-top: 40px;">📚 Book Library</h3>
 <p style="color: #666; margin-bottom: 24px;">Manage your EPUB books</p>
 
 <!-- Upload Form -->
