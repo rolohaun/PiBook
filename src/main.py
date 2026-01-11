@@ -64,7 +64,7 @@ class PiBookApp:
         self.display.set_full_refresh_interval(self.settings.get('full_refresh_interval', 5))
 
         self.gpio = GPIOHandler(self.config.get('gpio_config', 'config/gpio_mapping.yaml'))
-        self.navigation = NavigationManager(Screen.LIBRARY)
+        self.navigation = NavigationManager()  # Defaults to Screen.MAIN_MENU
 
         # Initialize battery monitor (if enabled)
         self.battery_monitor = None
