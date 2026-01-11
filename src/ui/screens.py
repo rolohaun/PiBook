@@ -92,19 +92,19 @@ class MainMenuScreen:
         self.apps = [
             {
                 'name': 'eReader',
-                'icon_path': 'assets/icons/ereader.png',
+                'icon_filename': 'ereader.png',
                 'description': 'Read EPUB books',
                 'screen': 'library'
             },
             {
                 'name': 'IP Scanner',
-                'icon_path': 'assets/icons/ip_scanner.png',
+                'icon_filename': 'ip_scanner.png',
                 'description': 'Scan network devices',
                 'screen': 'ip_scanner'
             },
             {
                 'name': 'To Do',
-                'icon_path': 'assets/icons/todo.png',
+                'icon_filename': 'todo.png',
                 'description': 'Manage tasks',
                 'screen': 'todo'
             }
@@ -114,10 +114,27 @@ class MainMenuScreen:
         self.icons = {}
         icon_size = (120, 120)  # Standard size for icons
         
+        # Calculate absolute path to assets directory
+        # src/ui/screens.py -> src/ui -> src -> root -> assets/icons
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        # Adjust for differing structures if needed, but assuming standard:
+        # If __file__ is in src/ui/screens.py:
+        # dirname -> src/ui
+        # grandparent -> src
+        # great-grandparent -> root
+        
+        # Correct calculation:
+        # os.path.dirname(__file__) is .../src/ui
+        assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets', 'icons')
+        
+        self.logger.info(f"Looking for icons in: {assets_dir}")
+
         for app in self.apps:
             try:
-                if os.path.exists(app['icon_path']):
-                    img = Image.open(app['icon_path'])
+                icon_path = os.path.join(assets_dir, app['icon_filename'])
+                if os.path.exists(icon_path):
+                    img = Image.open(icon_path)
                     # Resize if needed
                     if img.size != icon_size:
                         img = img.resize(icon_size, Image.Resampling.LANCZOS)
@@ -125,7 +142,7 @@ class MainMenuScreen:
                     self.icons[app['name']] = img
                     self.logger.info(f"Loaded icon for {app['name']}")
                 else:
-                    self.logger.warning(f"Icon not found: {app['icon_path']}")
+                    self.logger.warning(f"Icon not found: {icon_path}")
             except Exception as e:
                 self.logger.error(f"Failed to load icon for {app['name']}: {e}")
 
