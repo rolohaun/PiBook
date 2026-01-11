@@ -942,14 +942,14 @@ HTML_TEMPLATE = '''
 
         function appendToTerminal(text) {
             const output = document.getElementById('terminal-output');
-            output.innerHTML += text + '\n';
+            output.innerHTML += text + '<br>';
             // Auto-scroll to bottom
             output.scrollTop = output.scrollHeight;
         }
 
         function clearTerminal() {
             const output = document.getElementById('terminal-output');
-            output.innerHTML = '<span style="color: #4CAF50;">Welcome to PiBook Terminal</span>\n<span style="color: #888;">Type a command above and click Execute, or use Quick Commands</span>\n';
+            output.innerHTML = '<span style="color: #4CAF50;">Welcome to PiBook Terminal</span><br><span style="color: #888;">Type a command above and click Execute, or use Quick Commands</span><br>';
         }
 
         function copyOutput() {
