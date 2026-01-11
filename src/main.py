@@ -422,7 +422,8 @@ class PiBookApp:
                     # Refresh if currently scanning OR just finished scanning
                     if current_scanning or (last_scanning_state and not current_scanning):
                         try:
-                            self._render_current_screen()
+                            # Force partial refresh during scanning (no full refresh needed)
+                            self._render_current_screen(force_partial=True)
                             if not current_scanning and last_scanning_state:
                                 self.logger.info("IP scan completed - final refresh done")
                         except Exception as scan_error:
@@ -823,15 +824,20 @@ class PiBookApp:
         except Exception as e:
             self.logger.error(f"Battery display update error: {e}", exc_info=True)
 
-    def _render_current_screen(self):
-        """Render the current screen to display"""
+    def _render_current_screen(self, force_partial: bool = False):
+        """Render the current screen to display
+
+        Args:
+            force_partial: If True, always use partial refresh (for scan updates)
+        """
         try:
             # Check if we changed screens - if so, do full refresh
             current_screen = self.navigation.current_screen
             screen_changed = (self.last_screen != current_screen)
 
             # Default to partial refresh unless screen changed
-            use_partial = not screen_changed
+            # But if force_partial is True (e.g., during scanning), always use partial
+            use_partial = force_partial or not screen_changed
 
             if self.navigation.is_on_screen(Screen.MAIN_MENU):
                 image = self.main_menu_screen.render()

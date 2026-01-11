@@ -298,7 +298,7 @@ class IPScannerScreen:
         self.scanning = False
         self.scan_progress = 0
         self.current_page = 0
-        self.items_per_page = 12  # Increased from 8 to 12
+        self.items_per_page = 17  # Increased from 12 to 17 (fits on 480px height)
 
     def start_scan(self):
         """Start network scan in background"""
@@ -664,7 +664,7 @@ class IPScannerScreen:
             draw.text((40, 100), f"Found {len(self.devices)} devices (Page {self.current_page + 1}/{total_pages}):", font=self.font, fill=0)
 
             y = 130
-            line_height = 30  # Reduced from 40 to fit 12 items
+            line_height = 20  # Reduced to 20 to fit 17 items
 
             # Calculate visible range based on current page
             start_idx = self.current_page * self.items_per_page
