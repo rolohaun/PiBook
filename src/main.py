@@ -320,12 +320,39 @@ class PiBookApp:
             self.logger.info("PiSugar button callbacks registered")
 
     def _monitor_inactivity(self):
-        """Background thread to check for inactivity"""
+        """Background thread to check for inactivity and battery status"""
+        last_battery_check = 0
+        last_battery_percentage = None
+        last_battery_charging = None
+
         while self.running:
             try:
                 # Only enter sleep if sleep mode is enabled
                 if self.sleep_enabled and not self.is_sleeping and (time.time() - self.last_activity_time > self.sleep_timeout):
                     self._enter_sleep()
+
+                # Check battery status every 60 seconds on library screen
+                current_time = time.time()
+                if (self.battery_monitor and
+                    self.navigation.is_on_screen(Screen.LIBRARY) and
+                    not self.is_sleeping and
+                    current_time - last_battery_check >= 60):
+
+                    battery_percentage = self.battery_monitor.get_percentage()
+                    battery_charging = self.battery_monitor.is_charging()
+
+                    # Update display if battery status changed
+                    if (last_battery_percentage != battery_percentage or
+                        last_battery_charging != battery_charging):
+
+                        self.logger.info(f"Battery status changed: {battery_percentage}% Charging: {battery_charging}")
+                        self._update_battery_display()
+
+                        last_battery_percentage = battery_percentage
+                        last_battery_charging = battery_charging
+
+                    last_battery_check = current_time
+
                 time.sleep(10)
             except Exception as e:
                 self.logger.error(f"Error in monitor thread: {e}")
@@ -658,6 +685,21 @@ class PiBookApp:
         except Exception as e:
             self.logger.error(f"Failed to open book: {e}", exc_info=True)
             # Stay on library screen
+
+    def _update_battery_display(self):
+        """Update just the battery icon area with a partial refresh"""
+        try:
+            if not self.navigation.is_on_screen(Screen.LIBRARY):
+                return
+
+            # Re-render the library screen to get updated battery icon
+            image = self.library_screen.render()
+
+            # Display with partial refresh (only updates changed pixels)
+            self.display.display_image(image, use_partial=True)
+
+        except Exception as e:
+            self.logger.error(f"Battery display update error: {e}", exc_info=True)
 
     def _render_current_screen(self):
         """Render the current screen to display"""
