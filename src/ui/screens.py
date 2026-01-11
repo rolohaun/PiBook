@@ -227,6 +227,27 @@ class LibraryScreen:
         terminal_width = 2
         terminal_height = 6
 
+        # Clear area before drawing to prevent ghosting/overlap
+        # Calculate area needed for "100%" text
+        try:
+            bbox = draw.textbbox((0, 0), "100%", font=self.font)
+            max_text_width = bbox[2] - bbox[0]
+            max_text_height = bbox[3] - bbox[1]
+        except:
+            max_text_width = 40
+            max_text_height = 20
+
+        # Define clear area (text + battery + terminal)
+        clear_x = x - battery_width - max_text_width - 10
+        clear_width = max_text_width + battery_width + terminal_width + 15
+        clear_height = max(battery_height, max_text_height) + 4
+        
+        draw.rectangle(
+            [(clear_x, y - 2), (clear_x + clear_width, y + clear_height)],
+            fill=1,  # White
+            outline=None
+        )
+
         # Draw battery outline
         battery_x = x - battery_width
         draw.rectangle(
@@ -638,6 +659,30 @@ class ReaderScreen:
         battery_height = 14
         terminal_width = 2
         terminal_height = 6
+
+        # Clear area before drawing to prevent ghosting/overlap
+        # Use default font as used in this method
+        try:
+            # We need to load the default font here for measurement
+            # (It is also loaded later for drawing, which is fine)
+            font = ImageFont.load_default()
+            bbox = draw.textbbox((0, 0), "100%", font=font)
+            max_text_width = bbox[2] - bbox[0]
+            max_text_height = bbox[3] - bbox[1]
+        except:
+            max_text_width = 40
+            max_text_height = 20
+
+        # Define clear area (text + battery + terminal)
+        clear_x = x - battery_width - max_text_width - 10
+        clear_width = max_text_width + battery_width + terminal_width + 15
+        clear_height = max(battery_height, max_text_height) + 4
+        
+        draw.rectangle(
+            [(clear_x, y - 2), (clear_x + clear_width, y + clear_height)],
+            fill=1,  # White
+            outline=None
+        )
 
         # Draw battery outline
         battery_x = x - battery_width
