@@ -256,6 +256,69 @@ class PiBookApp:
         except Exception as e:
             self.logger.warning(f"Failed to read CPU voltage: {e}")
 
+    def _set_cpu_cores(self, num_cores: int):
+        """
+        Set number of active CPU cores for power management
+        
+        Args:
+            num_cores: Number of cores to keep online (1-4)
+        """
+        try:
+            # Check if feature is enabled
+            if not self.config.get('power.single_core_reading', True):
+                return
+            
+            # Get total cores
+            with open('/sys/devices/system/cpu/present', 'r') as f:
+                present = f.read().strip()
+                if '-' in present:
+                    total_cores = int(present.split('-')[1]) + 1
+                else:
+                    total_cores = 1
+            
+            # Clamp to valid range
+            num_cores = max(1, min(num_cores, total_cores))
+            
+            # Set cores online/offline
+            for cpu_num in range(1, total_cores):  # cpu0 cannot be disabled
+                target_state = '1' if cpu_num < num_cores else '0'
+                cpu_path = f'/sys/devices/system/cpu/cpu{cpu_num}/online'
+                
+                try:
+                    # Use sudo to write to sysfs
+                    import subprocess
+                    subprocess.run(
+                        ['sudo', 'tee', cpu_path],
+                        input=target_state,
+                        text=True,
+                        capture_output=True,
+                        timeout=2
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to set CPU{cpu_num} state: {e}")
+            
+            self.logger.info(f"CPU cores set to {num_cores}/{total_cores} (power management)")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to manage CPU cores: {e}")
+
+    def _enable_single_core_mode(self):
+        """Enable single-core mode for power saving during reading"""
+        self._set_cpu_cores(1)
+
+    def _restore_all_cores(self):
+        """Restore all CPU cores when not reading"""
+        try:
+            with open('/sys/devices/system/cpu/present', 'r') as f:
+                present = f.read().strip()
+                if '-' in present:
+                    total_cores = int(present.split('-')[1]) + 1
+                else:
+                    total_cores = 1
+            self._set_cpu_cores(total_cores)
+        except:
+            self._set_cpu_cores(4)  # Default to 4 cores if detection fails
+
     def start(self):
         """Start the application"""
         try:
@@ -661,6 +724,8 @@ class PiBookApp:
         if self.navigation.is_on_screen(Screen.READER):
             # Return to library
             self.reader_screen.close()
+            # Restore all CPU cores when leaving reader
+            self._restore_all_cores()
             self.navigation.navigate_to(Screen.LIBRARY)
             self._render_current_screen()
         elif self.navigation.is_on_screen(Screen.LIBRARY):
@@ -683,6 +748,8 @@ class PiBookApp:
         # Always return to main menu
         if self.navigation.is_on_screen(Screen.READER):
             self.reader_screen.close()
+            # Restore all CPU cores when leaving reader
+            self._restore_all_cores()
 
         self.navigation.navigate_to(Screen.MAIN_MENU)
         self._render_current_screen()
@@ -739,6 +806,8 @@ class PiBookApp:
                 )
             
             self.reader_screen.close()
+            # Restore all CPU cores when leaving reader
+            self._restore_all_cores()
             self.navigation.navigate_to(Screen.LIBRARY)
             
             # Re-enable WiFi when returning to library (battery optimization)
@@ -815,6 +884,9 @@ class PiBookApp:
                     self.logger.info("📶 WiFi disabled (entering reader)")
                 except Exception as e:
                     self.logger.warning(f"Failed to disable WiFi: {e}")
+            
+            # Enable single-core mode for power saving during reading
+            self._enable_single_core_mode()
 
             # Navigate to reader screen
             self.navigation.navigate_to(Screen.READER, {'book': book})
