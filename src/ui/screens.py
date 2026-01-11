@@ -99,8 +99,8 @@ class MainMenuScreen:
             {
                 'name': 'IP Scanner',
                 'icon': '🔍',
-                'description': 'Coming soon',
-                'screen': None
+                'description': 'Scan network devices',
+                'screen': 'ip_scanner'
             }
         ]
 
@@ -258,6 +258,280 @@ class MainMenuScreen:
 
         instr_x = (self.width - instr_width) // 2
         draw.text((instr_x, self.height - 40), instruction, font=self.app_font, fill=0)
+
+        return image
+
+
+class IPScannerScreen:
+    """
+    IP Scanner screen - scans local network and displays devices
+    """
+
+    def __init__(self, width: int = 800, height: int = 480, font_size: int = 18, battery_monitor=None):
+        """
+        Initialize IP scanner screen
+
+        Args:
+            width: Screen width
+            height: Screen height
+            font_size: Base font size
+            battery_monitor: Optional BatteryMonitor instance
+        """
+        self.width = width
+        self.height = height
+        self.font_size = font_size
+        self.battery_monitor = battery_monitor
+        self.logger = logging.getLogger(__name__)
+
+        # Load fonts
+        try:
+            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
+            self.title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+            self.small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+        except:
+            self.font = ImageFont.load_default()
+            self.title_font = ImageFont.load_default()
+            self.small_font = ImageFont.load_default()
+
+        # Scan state
+        self.devices: List[Dict[str, str]] = []
+        self.scanning = False
+        self.scan_progress = 0
+        self.current_index = 0
+        self.items_per_page = 8
+
+    def start_scan(self):
+        """Start network scan in background"""
+        import threading
+        if not self.scanning:
+            self.scanning = True
+            self.scan_progress = 0
+            self.devices = []
+            thread = threading.Thread(target=self._scan_network, daemon=True)
+            thread.start()
+
+    def _scan_network(self):
+        """Scan the local network for devices"""
+        try:
+            # Get local IP and network
+            local_ip = get_ip_address()
+            if local_ip == "No Network":
+                self.scanning = False
+                return
+
+            # Extract network prefix (e.g., 192.168.1)
+            ip_parts = local_ip.split('.')
+            network_prefix = '.'.join(ip_parts[:3])
+
+            self.logger.info(f"Scanning network {network_prefix}.0/24")
+
+            # Scan range 1-254
+            for i in range(1, 255):
+                if not self.scanning:
+                    break
+
+                ip = f"{network_prefix}.{i}"
+                self.scan_progress = int((i / 254) * 100)
+
+                # Ping the IP (quick timeout)
+                try:
+                    result = subprocess.run(
+                        ['ping', '-c', '1', '-W', '1', ip],
+                        capture_output=True,
+                        timeout=2
+                    )
+
+                    if result.returncode == 0:
+                        # Get hostname
+                        hostname = self._get_hostname(ip)
+                        self.devices.append({
+                            'ip': ip,
+                            'hostname': hostname
+                        })
+                        self.logger.info(f"Found device: {ip} ({hostname})")
+
+                except Exception as e:
+                    self.logger.debug(f"Error pinging {ip}: {e}")
+                    continue
+
+            self.scanning = False
+            self.logger.info(f"Scan complete. Found {len(self.devices)} devices")
+
+        except Exception as e:
+            self.logger.error(f"Network scan error: {e}", exc_info=True)
+            self.scanning = False
+
+    def _get_hostname(self, ip: str) -> str:
+        """Get hostname for an IP address"""
+        try:
+            hostname = socket.gethostbyaddr(ip)[0]
+            return hostname
+        except:
+            return "Unknown"
+
+    def next_item(self):
+        """Move to next device in list"""
+        if len(self.devices) > 0:
+            self.current_index = (self.current_index + 1) % len(self.devices)
+
+    def prev_item(self):
+        """Move to previous device in list"""
+        if len(self.devices) > 0:
+            self.current_index = (self.current_index - 1 + len(self.devices)) % len(self.devices)
+
+    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int, is_charging: bool = False):
+        """
+        Draw battery icon with percentage and charging indicator
+        (Same implementation as MainMenuScreen)
+        """
+        # Battery body (20x10 rectangle)
+        battery_width = 25
+        battery_height = 12
+        battery_x = x - battery_width - 5
+        battery_y = y
+
+        # Draw battery outline
+        draw.rectangle(
+            [(battery_x, battery_y), (battery_x + battery_width, battery_y + battery_height)],
+            outline=0,
+            width=2
+        )
+
+        # Draw battery terminal (small rectangle on right)
+        terminal_width = 2
+        terminal_height = 6
+        terminal_x = battery_x + battery_width
+        terminal_y = battery_y + (battery_height - terminal_height) // 2
+        draw.rectangle(
+            [(terminal_x, terminal_y), (terminal_x + terminal_width, terminal_y + terminal_height)],
+            fill=0
+        )
+
+        # Fill battery based on percentage
+        if percentage > 0:
+            fill_width = int((battery_width - 4) * (percentage / 100))
+            draw.rectangle(
+                [(battery_x + 2, battery_y + 2),
+                 (battery_x + 2 + fill_width, battery_y + battery_height - 2)],
+                fill=0
+            )
+
+        # Draw charging indicator (lightning bolt) if charging
+        if is_charging:
+            bolt_x = battery_x + battery_width // 2 - 2
+            bolt_y = battery_y + 2
+            draw.text((bolt_x, bolt_y), "⚡", font=self.small_font, fill=0)
+
+        # Draw percentage text to the left
+        percentage_text = f"{percentage}%"
+        try:
+            bbox = draw.textbbox((0, 0), percentage_text, font=self.font)
+            text_width = bbox[2] - bbox[0]
+        except:
+            text_width = len(percentage_text) * 8
+
+        text_x = battery_x - text_width - 5
+        draw.text((text_x, y), percentage_text, font=self.font, fill=0)
+
+    def render(self) -> Image.Image:
+        """Render IP scanner screen"""
+        # Create white background
+        image = Image.new('1', (self.width, self.height), 1)
+        draw = ImageDraw.Draw(image)
+
+        # Draw battery status in top-right corner
+        if self.battery_monitor:
+            battery_percentage = self.battery_monitor.get_percentage()
+            is_charging = self.battery_monitor.is_charging()
+            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage, is_charging)
+
+        # Draw title
+        draw.text((40, 30), "IP Scanner", font=self.title_font, fill=0)
+        draw.line([(40, 65), (self.width - 40, 65)], fill=0, width=2)
+
+        # Show local IP
+        local_ip = get_ip_address()
+        draw.text((40, 75), f"Local IP: {local_ip}", font=self.font, fill=0)
+
+        if self.scanning:
+            # Show scanning progress
+            draw.text((40, 110), f"Scanning network... {self.scan_progress}%", font=self.font, fill=0)
+
+            # Draw progress bar
+            bar_width = self.width - 80
+            bar_height = 20
+            bar_x = 40
+            bar_y = 140
+
+            # Outline
+            draw.rectangle(
+                [(bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height)],
+                outline=0,
+                width=2
+            )
+
+            # Fill
+            fill_width = int(bar_width * (self.scan_progress / 100))
+            if fill_width > 0:
+                draw.rectangle(
+                    [(bar_x + 2, bar_y + 2), (bar_x + fill_width - 2, bar_y + bar_height - 2)],
+                    fill=0
+                )
+
+            draw.text((40, 170), f"Found {len(self.devices)} devices so far", font=self.small_font, fill=0)
+
+        elif len(self.devices) == 0:
+            # No devices found yet
+            draw.text((40, 110), "No devices found.", font=self.font, fill=0)
+            draw.text((40, 140), "Press button to start scan", font=self.small_font, fill=0)
+
+        else:
+            # Display device list
+            draw.text((40, 100), f"Found {len(self.devices)} devices:", font=self.font, fill=0)
+
+            y = 130
+            line_height = 40
+
+            # Calculate visible range
+            start_idx = 0
+            end_idx = min(self.items_per_page, len(self.devices))
+
+            for i in range(start_idx, end_idx):
+                device = self.devices[i]
+
+                # Highlight selected device
+                if i == self.current_index:
+                    draw.rectangle(
+                        [(35, y - 2), (self.width - 35, y + line_height - 5)],
+                        outline=0,
+                        width=2
+                    )
+
+                # Draw IP address
+                draw.text((40, y), device['ip'], font=self.font, fill=0)
+
+                # Draw hostname below
+                hostname = device['hostname']
+                if len(hostname) > 50:
+                    hostname = hostname[:47] + "..."
+                draw.text((40, y + 18), hostname, font=self.small_font, fill=0)
+
+                y += line_height
+
+        # Draw instructions at bottom
+        if self.scanning:
+            instruction = "Scanning... Please wait"
+        else:
+            instruction = "Hold: Start Scan  |  Menu: Home"
+
+        try:
+            bbox = draw.textbbox((0, 0), instruction, font=self.small_font)
+            instr_width = bbox[2] - bbox[0]
+        except:
+            instr_width = len(instruction) * 7
+
+        instr_x = (self.width - instr_width) // 2
+        draw.text((instr_x, self.height - 30), instruction, font=self.small_font, fill=0)
 
         return image
 

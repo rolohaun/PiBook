@@ -21,7 +21,7 @@ from src.display.display_driver import DisplayDriver
 from src.hardware.gpio_handler import GPIOHandler
 from src.hardware.battery_monitor import BatteryMonitor
 from src.ui.navigation import NavigationManager, Screen
-from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen
+from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen, IPScannerScreen
 from src.web.webserver import PiBookWebServer
 from src.utils.progress_manager import ProgressManager
 
@@ -138,6 +138,13 @@ class PiBookApp:
             dpi=dpi,
             cache_size=self.config.get('reader.page_cache_size', 5),
             show_page_numbers=self.settings.get('show_page_numbers', True),
+            battery_monitor=self.battery_monitor
+        )
+
+        self.ip_scanner_screen = IPScannerScreen(
+            width=display_width,
+            height=display_height,
+            font_size=self.config.get('ip_scanner.font_size', 18),
             battery_monitor=self.battery_monitor
         )
 
@@ -649,6 +656,9 @@ class PiBookApp:
             if app['screen'] == 'library':
                 self.navigation.navigate_to(Screen.LIBRARY)
                 self._render_current_screen()
+            elif app['screen'] == 'ip_scanner':
+                self.navigation.navigate_to(Screen.IP_SCANNER)
+                self._render_current_screen()
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
         elif self.navigation.is_on_screen(Screen.LIBRARY):
@@ -703,7 +713,12 @@ class PiBookApp:
                     self.logger.info("🔌 Web server restarted (returning to library)")
                 except:
                     pass
-            
+
+            self._render_current_screen()
+        elif self.navigation.is_on_screen(Screen.IP_SCANNER):
+            # On IP scanner - start scan
+            self.logger.info("🔍 Action: TOGGLE - Starting network scan")
+            self.ip_scanner_screen.start_scan()
             self._render_current_screen()
 
     def _open_book(self, book: dict):
@@ -792,6 +807,9 @@ class PiBookApp:
             elif self.navigation.is_on_screen(Screen.LIBRARY):
                 image = self.library_screen.render()
                 use_partial = True  # Use partial refresh for library navigation too (faster)
+            elif self.navigation.is_on_screen(Screen.IP_SCANNER):
+                image = self.ip_scanner_screen.render()
+                use_partial = True  # Use partial refresh for IP scanner
             elif self.navigation.is_on_screen(Screen.READER):
                 image = self.reader_screen.get_current_image()
                 use_partial = True  # Use partial refresh for page turns
