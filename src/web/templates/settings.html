@@ -1,0 +1,98 @@
+<h2>⚙️ PiBook Settings</h2>
+
+<form id="settings-form">
+    <h3>📖 Reading Settings</h3>
+
+    <div class="form-group">
+        <label for="zoom">Zoom Level</label>
+        <input type="number" id="zoom" name="zoom" value="{{ settings.zoom }}" min="0.5" max="2.0" step="0.1">
+        <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, less than 1.0 = smaller, greater than 1.0 =
+            larger</p>
+    </div>
+
+    <div class="form-group">
+        <label for="dpi">DPI (Rendering Quality)</label>
+        <input type="number" id="dpi" name="dpi" value="{{ settings.dpi }}" min="72" max="300" step="1">
+        <p class="help-text">Rendering resolution (72-300). Higher = sharper text but slower. Default: 150</p>
+    </div>
+
+    <div class="form-group">
+        <label for="full_refresh_interval">Full Refresh Interval</label>
+        <input type="number" id="full_refresh_interval" name="full_refresh_interval"
+            value="{{ settings.full_refresh_interval }}" min="1" max="20" step="1">
+        <p class="help-text">Number of page turns before full refresh to clear ghosting (1-20)</p>
+    </div>
+
+    <div class="form-group">
+        <div class="checkbox-group">
+            <input type="checkbox" id="show_page_numbers" name="show_page_numbers" {% if settings.show_page_numbers
+                %}checked{% endif %}>
+            <label for="show_page_numbers" style="margin: 0;">Show Page Numbers</label>
+        </div>
+        <p class="help-text">Display "Page X of Y" at bottom of screen when reading</p>
+    </div>
+
+    <div class="form-group">
+        <label for="items_per_page">Books Per Page</label>
+        <input type="number" id="items_per_page" name="items_per_page" value="{{ settings.items_per_page }}" min="3"
+            max="6" step="1">
+        <p class="help-text">Number of books shown on library screen (3-6)</p>
+    </div>
+
+    <div class="form-group">
+        <div class="checkbox-group">
+            <input type="checkbox" id="wifi_while_reading" name="wifi_while_reading" {% if settings.wifi_while_reading
+                %}checked{% endif %}>
+            <label for="wifi_while_reading" style="margin: 0;">Keep WiFi On While Reading</label>
+        </div>
+        <p class="help-text">🔋 Uncheck to save battery (WiFi turns off when reading, on when in library)</p>
+    </div>
+
+    <h3>🔋 Power Management</h3>
+
+    <div class="form-group">
+        <div class="checkbox-group">
+            <input type="checkbox" id="sleep_enabled" name="sleep_enabled" {% if settings.sleep_enabled %}checked{%
+                endif %}>
+            <label for="sleep_enabled" style="margin: 0;">Enable Sleep Mode</label>
+        </div>
+        <p class="help-text">🔋 When enabled, device sleeps after inactivity to save battery</p>
+    </div>
+
+    <div class="form-group">
+        <label for="sleep_timeout">Sleep Timeout (seconds)</label>
+        <input type="number" id="sleep_timeout" name="sleep_timeout" value="{{ settings.sleep_timeout }}" min="30"
+            max="600" step="30">
+        <p class="help-text">Time of inactivity before sleep (30-600 seconds). Lower = better battery</p>
+    </div>
+
+    <div class="form-group">
+        <label for="sleep_message">Sleep Screen Message</label>
+        <input type="text" id="sleep_message" name="sleep_message" value="{{ settings.sleep_message }}" maxlength="50">
+        <p class="help-text">Message displayed when device goes to sleep (max 50 characters)</p>
+    </div>
+
+    <h3 style="color: #FF9800;">⚡ CPU Undervolting (Experimental)</h3>
+
+    <div class="form-group">
+        <label for="undervolt">Undervolt Level</label>
+        <input type="number" id="undervolt" name="undervolt" value="{{ settings.undervolt }}" min="-8" max="0" step="1">
+        <p class="help-text">CPU voltage reduction: 0 = none, -2 = 50mV (safe), -4 = 100mV, -6 = 150mV, -8 = 200mV (max)
+        </p>
+        <p class="help-text" style="color: #d32f2f; font-weight: bold;">⚠️ WARNING: Values below -4 may cause
+            instability. Requires reboot to apply.</p>
+        <p class="help-text" id="voltage-status" style="color: #1976d2; font-weight: bold;">Current CPU Voltage:
+            Loading...</p>
+    </div>
+
+    <button type="submit" class="btn">Save Settings</button>
+</form>
+
+<div id="settings-message" style="margin-top: 24px; display: none;"></div>
+
+<div style="margin-top: 24px; padding: 16px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ff9800;">
+    <p style="margin: 0 0 12px 0; font-weight: bold; color: #856404;">💡 Undervolt changes require reboot</p>
+    <button class="btn" style="background: #ff9800;"
+        onclick="if(confirm('Reboot PiBook now? This will close all connections.')) { fetch('/reboot').then(() => alert('Rebooting... Wait 30 seconds then reconnect.')); }">Reboot
+        PiBook</button>
+</div>

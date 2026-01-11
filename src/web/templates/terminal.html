@@ -1,0 +1,38 @@
+<h2>💻 Terminal</h2>
+<p style="color: #666; margin-bottom: 24px;">Execute shell commands on your PiBook</p>
+
+<!-- Quick Commands -->
+<div style="margin-bottom: 24px;">
+    <label style="font-weight: 600; margin-bottom: 12px; display: block;">Quick Commands:</label>
+    <div class="controls">
+        <button class="btn btn-secondary" onclick="setCommand('git status')">git status</button>
+        <button class="btn btn-secondary" onclick="setCommand('git pull')">git pull</button>
+        <button class="btn btn-secondary" onclick="setCommand('ls -la')">ls -la</button>
+        <button class="btn btn-secondary" onclick="setCommand('df -h')">df -h (disk)</button>
+        <button class="btn btn-secondary" onclick="setCommand('free -h')">free -h (memory)</button>
+        <button class="btn btn-secondary" onclick="setCommand('sudo systemctl restart pibook')">restart pibook</button>
+    </div>
+</div>
+
+<!-- Terminal Output -->
+<div style="margin-bottom: 24px;">
+    <label style="font-weight: 600; margin-bottom: 12px; display: block;">Output:</label>
+    <div id="terminal-output"><span style="color: #4CAF50;">Welcome to PiBook Terminal</span>
+        <span style="color: #888;">Type a command below and click Execute, or use Quick Commands</span>
+    </div>
+    <div style="margin-top: 12px; display: flex; gap: 12px;">
+        <button class="btn btn-secondary" onclick="clearTerminal()" style="flex: 1;">Clear Output</button>
+        <button class="btn btn-secondary" onclick="copyOutput()" style="flex: 1;">Copy Output</button>
+    </div>
+</div>
+
+<!-- Command Input -->
+<div>
+    <label for="terminal-input" style="font-weight: 600; margin-bottom: 12px; display: block;">Command:</label>
+    <div style="display: flex; gap: 12px;">
+        <input type="text" id="terminal-input" placeholder="Enter command (e.g., ls -la, git status, pwd)"
+            style="flex: 1; padding: 12px; font-family: 'Courier New', monospace; font-size: 14px; border: 2px solid #e0e0e0; border-radius: 6px;">
+        <button class="btn" onclick="executeCommand()" style="width: 120px;">Execute</button>
+    </div>
+    <p class="help-text">⚠️ Commands run in /home/pi/PiBook directory with 30s timeout</p>
+</div>

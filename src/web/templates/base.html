@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiBook Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>📚 PiBook</h1>
+            <p>E-Reader Manager</p>
+        </div>
+        
+        <div class="nav-item active" data-section="library" onclick="switchSection('library')">
+            <span class="nav-icon">📖</span>
+            <span class="nav-text">Library</span>
+        </div>
+        
+        <div class="nav-item" data-section="settings" onclick="switchSection('settings')">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-text">Settings</span>
+        </div>
+        
+        <div class="nav-item" data-section="navigation" onclick="switchSection('navigation')">
+            <span class="nav-icon">🧭</span>
+            <span class="nav-text">Navigate</span>
+        </div>
+        
+        <div class="nav-item" data-section="terminal" onclick="switchSection('terminal')">
+            <span class="nav-icon">💻</span>
+            <span class="nav-text">Terminal</span>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Library Section -->
+        <div id="library" class="content-section active">
+            {% include 'library.html' %}
+        </div>
+        
+        <!-- Settings Section -->
+        <div id="settings" class="content-section">
+            {% include 'settings.html' %}
+        </div>
+        
+        <!-- Navigation Section -->
+        <div id="navigation" class="content-section">
+            {% include 'navigation.html' %}
+        </div>
+        
+        <!-- Terminal Section -->
+        <div id="terminal" class="content-section">
+            {% include 'terminal.html' %}
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Refresh system stats on page load
+            refreshSystemStats();
+        });
+    </script>
+</body>
+</html>

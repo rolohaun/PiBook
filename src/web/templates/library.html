@@ -1,0 +1,36 @@
+<h2>📖 Library</h2>
+<p style="color: #666; margin-bottom: 24px;">Manage your EPUB books</p>
+
+<!-- Upload Form -->
+<form onsubmit="uploadFile(event)" class="upload-form">
+    <input type="file" name="file" accept=".epub" required>
+    <button type="submit" class="btn">Upload EPUB</button>
+</form>
+
+<!-- Books Table -->
+{% if books %}
+<table>
+    <thead>
+        <tr>
+            <th>Filename</th>
+            <th>Size</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for book in books %}
+        <tr>
+            <td>{{ book.filename }}</td>
+            <td>{{ book.size }}</td>
+            <td>
+                <button class="btn btn-danger" onclick="deleteFile('{{ book.filename }}')">Delete</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty">
+    <p>📚 No books yet. Upload an EPUB to get started!</p>
+</div>
+{% endif %}

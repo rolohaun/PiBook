@@ -6,7 +6,7 @@ Provides web interface for:
 - Book selection
 """
 
-from flask import Flask, render_template_string, request, jsonify, send_from_directory, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
 import os
 import logging
 import json
@@ -32,7 +32,11 @@ class PiBookWebServer:
         self.books_dir = books_dir
         self.app_instance = app_instance
         self.port = port
-        self.flask_app = Flask(__name__)
+        
+        # Configure Flask with template and static folders
+        template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+        static_dir = os.path.join(os.path.dirname(__file__), 'static')
+        self.flask_app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.flask_app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 
         self._setup_routes()
@@ -44,7 +48,7 @@ class PiBookWebServer:
         def index():
             """Main page with file manager and controls"""
             settings_data = self._load_settings('settings.json')
-            return render_template_string(HTML_TEMPLATE, books=self._get_books(), settings=settings_data)
+            return render_template('base.html', books=self._get_books(), settings=settings_data)
 
         @self.flask_app.route('/upload', methods=['POST'])
         def upload():
@@ -504,9 +508,6 @@ class PiBookWebServer:
         """Internal method to run Flask server"""
         self.flask_app.run(host='0.0.0.0', port=self.port, debug=False, use_reloader=False)
 
-
-# HTML Template for the web interface
-HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>

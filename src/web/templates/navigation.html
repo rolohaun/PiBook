@@ -1,0 +1,64 @@
+<h2>🎮 Remote Control</h2>
+<p style="color: #666; margin-bottom: 24px;">Control your PiBook e-reader remotely</p>
+
+<div class="controls">
+    <button class="btn" onclick="sendCommand('prev')">◀ Previous</button>
+    <button class="btn btn-secondary" onclick="sendCommand('select')">✓ Select</button>
+    <button class="btn" onclick="sendCommand('next')">Next ▶</button>
+</div>
+
+<div class="controls" style="margin-top: 12px;">
+    <button class="btn btn-secondary" onclick="sendCommand('back')">← Back</button>
+    <button class="btn btn-secondary" onclick="sendCommand('menu')">≡ Menu</button>
+    <button class="btn" onclick="location.reload()">🔄 Refresh</button>
+</div>
+
+<h2 style="margin-top: 48px;">📊 System Information</h2>
+<p style="color: #666; margin-bottom: 24px;">Real-time system statistics</p>
+
+<div class="stats-grid">
+    <div class="stat-card" style="border-left-color: #4CAF50;">
+        <div class="stat-label">CPU Temperature</div>
+        <div id="cpu-temp" class="stat-value">Loading...</div>
+    </div>
+
+    <div class="stat-card" style="border-left-color: #2196F3;">
+        <div class="stat-label">CPU Voltage</div>
+        <div id="cpu-voltage" class="stat-value">Loading...</div>
+    </div>
+
+    <div class="stat-card" style="border-left-color: #FF9800;">
+        <div class="stat-label">Undervolt Setting</div>
+        <div id="undervolt-setting" class="stat-value">Loading...</div>
+    </div>
+
+    <div class="stat-card" style="border-left-color: #9C27B0;">
+        <div class="stat-label">Throttle Status</div>
+        <div id="throttle-status" class="stat-value">Loading...</div>
+    </div>
+
+    <div class="stat-card" style="border-left-color: #00BCD4;">
+        <div class="stat-label">Operating System</div>
+        <div id="os-info" class="stat-value" style="font-size: 18px;">Loading...</div>
+    </div>
+
+    <div class="stat-card" style="border-left-color: #607D8B;">
+        <div class="stat-label">System Uptime</div>
+        <div id="uptime" class="stat-value" style="font-size: 18px;">Loading...</div>
+    </div>
+
+    <div class="stat-card" style="border-left-color: #3F51B5;">
+        <div class="stat-label">Active CPU Cores</div>
+        <div id="cpu-cores" class="stat-value">Loading...</div>
+    </div>
+</div>
+
+<button class="btn" onclick="refreshSystemStats()" style="margin-top: 24px; width: 100%;">🔄 Refresh Stats</button>
+
+<h2 style="margin-top: 48px;">🔗 External Links</h2>
+<p style="color: #666; margin-bottom: 24px;">Access related services</p>
+
+<button class="btn" style="background: #9C27B0; width: 100%;"
+    onclick="window.open('http://' + window.location.hostname + ':8421', '_blank')">🔋 PiSugar Battery Manager</button>
+<p class="help-text" style="margin-top: 12px;">Opens PiSugar web interface for advanced battery management and
+    configuration</p>
