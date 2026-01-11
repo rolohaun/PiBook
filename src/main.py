@@ -548,8 +548,8 @@ class PiBookApp:
             self.logger.info("📖 Action: NEXT (Library - Move down)")
             self.library_screen.next_item()
         elif self.navigation.is_on_screen(Screen.IP_SCANNER):
-            self.logger.info("🔍 Action: NEXT (IP Scanner - Next device)")
-            self.ip_scanner_screen.next_item()
+            self.logger.info("🔍 Action: NEXT (IP Scanner - Next page)")
+            self.ip_scanner_screen.next_page()
         elif self.navigation.is_on_screen(Screen.READER):
             self.logger.info("📄 Action: NEXT PAGE (Reader)")
             self.reader_screen.next_page()
@@ -584,8 +584,8 @@ class PiBookApp:
             self.logger.info("📖 Action: PREVIOUS (Library - Move up)")
             self.library_screen.prev_item()
         elif self.navigation.is_on_screen(Screen.IP_SCANNER):
-            self.logger.info("🔍 Action: PREVIOUS (IP Scanner - Previous device)")
-            self.ip_scanner_screen.prev_item()
+            self.logger.info("🔍 Action: PREVIOUS (IP Scanner - Previous page)")
+            self.ip_scanner_screen.prev_page()
         elif self.navigation.is_on_screen(Screen.READER):
             self.logger.info("📄 Action: PREVIOUS PAGE (Reader)")
             self.reader_screen.prev_page()

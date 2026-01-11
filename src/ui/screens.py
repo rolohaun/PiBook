@@ -297,8 +297,8 @@ class IPScannerScreen:
         self.devices: List[Dict[str, str]] = []
         self.scanning = False
         self.scan_progress = 0
-        self.current_index = 0
-        self.items_per_page = 8
+        self.current_page = 0
+        self.items_per_page = 12  # Increased from 8 to 12
 
     def start_scan(self):
         """Start network scan in background"""
@@ -426,21 +426,38 @@ class IPScannerScreen:
             self.scanning = False
 
     def _parse_arp_scan_output(self, output: str):
-        """Parse arp-scan output and extract devices"""
+        """Parse arp-scan output and extract devices with vendor info"""
         lines = output.strip().split('\n')
         for line in lines:
-            # arp-scan output format: IP    MAC    Hostname
-            if line and not line.startswith('Interface:') and not line.startswith('Starting') and not line.startswith('Ending'):
-                parts = line.split()
+            # arp-scan output format: IP    MAC    Vendor/Hostname
+            # Skip header/footer lines
+            if line and not line.startswith('Interface:') and not line.startswith('Starting') and not line.startswith('Ending') and not line.startswith('Packets'):
+                parts = line.split('\t')  # arp-scan uses tabs
+                if len(parts) < 2:
+                    parts = line.split()  # Fallback to spaces
+
                 if len(parts) >= 2:
                     # Check if first part looks like an IP
-                    ip = parts[0]
+                    ip = parts[0].strip()
                     if ip.count('.') == 3:
                         try:
                             # Validate IP format
                             octets = ip.split('.')
                             if all(0 <= int(octet) <= 255 for octet in octets):
-                                hostname = self._get_hostname(ip)
+                                # Try to get vendor name from arp-scan output (3rd column)
+                                vendor = None
+                                if len(parts) >= 3:
+                                    vendor = ' '.join(parts[2:]).strip()
+                                    # Clean up vendor name
+                                    if vendor and vendor != '(Unknown)':
+                                        # Remove common suffixes
+                                        vendor = vendor.replace(', Inc.', '').replace(' Inc.', '')
+                                        vendor = vendor.replace(', Ltd.', '').replace(' Ltd.', '')
+                                        vendor = vendor.replace(' Corporation', '').replace(' Corp.', '')
+
+                                # Try to get proper hostname
+                                hostname = self._get_hostname(ip, vendor)
+
                                 self.devices.append({
                                     'ip': ip,
                                     'hostname': hostname
@@ -474,17 +491,19 @@ class IPScannerScreen:
                     except:
                         continue
 
-    def _get_hostname(self, ip: str) -> str:
-        """Get hostname for an IP address with timeout"""
+    def _get_hostname(self, ip: str, vendor: str = None) -> str:
+        """Get hostname for an IP address with multiple methods"""
         try:
             # Set socket timeout for faster lookups
-            socket.setdefaulttimeout(2.0)
+            socket.setdefaulttimeout(1.0)
 
             # Try reverse DNS lookup
             hostname = socket.gethostbyaddr(ip)[0]
 
             # Don't return IP as hostname
             if hostname != ip:
+                # Clean up hostname (remove domain suffix for brevity)
+                hostname = hostname.split('.')[0]
                 return hostname
 
         except (socket.herror, socket.gaierror, socket.timeout):
@@ -492,25 +511,45 @@ class IPScannerScreen:
         except Exception as e:
             self.logger.debug(f"Hostname lookup error for {ip}: {e}")
 
+        # Try mDNS/Avahi lookup for .local hostnames
+        try:
+            # Try common mDNS patterns
+            for suffix in ['.local', '.home', '.lan']:
+                try:
+                    result = socket.gethostbyname(f"{ip.split('.')[-1]}{suffix}")
+                    if result == ip:
+                        return f"Device-{ip.split('.')[-1]}"
+                except:
+                    pass
+        except:
+            pass
+
         # Try getfqdn as fallback
         try:
             fqdn = socket.getfqdn(ip)
             if fqdn and fqdn != ip:
-                return fqdn
+                return fqdn.split('.')[0]
         except:
             pass
 
-        return "Unknown"
+        # Use vendor name if available
+        if vendor and vendor != '(Unknown)':
+            return vendor
 
-    def next_item(self):
-        """Move to next device in list"""
-        if len(self.devices) > 0:
-            self.current_index = (self.current_index + 1) % len(self.devices)
+        # Last resort: descriptive unknown
+        return f"Device-{ip.split('.')[-1]}"
 
-    def prev_item(self):
-        """Move to previous device in list"""
+    def next_page(self):
+        """Move to next page"""
         if len(self.devices) > 0:
-            self.current_index = (self.current_index - 1 + len(self.devices)) % len(self.devices)
+            total_pages = (len(self.devices) + self.items_per_page - 1) // self.items_per_page
+            self.current_page = (self.current_page + 1) % total_pages
+
+    def prev_page(self):
+        """Move to previous page"""
+        if len(self.devices) > 0:
+            total_pages = (len(self.devices) + self.items_per_page - 1) // self.items_per_page
+            self.current_page = (self.current_page - 1 + total_pages) % total_pages
 
     def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int, is_charging: bool = False):
         """
@@ -620,37 +659,28 @@ class IPScannerScreen:
 
         else:
             # Display device list with pagination
-            current_page = self.current_index // self.items_per_page
             total_pages = (len(self.devices) + self.items_per_page - 1) // self.items_per_page
 
-            draw.text((40, 100), f"Found {len(self.devices)} devices (Page {current_page + 1}/{total_pages}):", font=self.font, fill=0)
+            draw.text((40, 100), f"Found {len(self.devices)} devices (Page {self.current_page + 1}/{total_pages}):", font=self.font, fill=0)
 
             y = 130
-            line_height = 40
+            line_height = 30  # Reduced from 40 to fit 12 items
 
             # Calculate visible range based on current page
-            start_idx = current_page * self.items_per_page
+            start_idx = self.current_page * self.items_per_page
             end_idx = min(start_idx + self.items_per_page, len(self.devices))
 
             for i in range(start_idx, end_idx):
                 device = self.devices[i]
 
-                # Highlight selected device
-                if i == self.current_index:
-                    draw.rectangle(
-                        [(35, y - 2), (self.width - 35, y + line_height - 5)],
-                        outline=0,
-                        width=2
-                    )
-
                 # Draw IP address
                 draw.text((40, y), device['ip'], font=self.font, fill=0)
 
-                # Draw hostname below
+                # Draw hostname on the same line (right side)
                 hostname = device['hostname']
-                if len(hostname) > 50:
-                    hostname = hostname[:47] + "..."
-                draw.text((40, y + 18), hostname, font=self.small_font, fill=0)
+                if len(hostname) > 35:
+                    hostname = hostname[:32] + "..."
+                draw.text((200, y), hostname, font=self.small_font, fill=0)
 
                 y += line_height
 
