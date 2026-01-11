@@ -8,16 +8,19 @@ echo "Setting up CPU core management permissions..."
 SUDOERS_FILE="/etc/sudoers.d/pibook-cpu-management"
 
 # Create sudoers entry
-cat \u003c\u003cEOF | sudo tee "$SUDOERS_FILE" \u003e /dev/null
+cat > /tmp/pibook-sudoers << 'HEREDOC'
 # Allow pi user to manage CPU cores for power optimization
 pi ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu*/online
-EOF
+HEREDOC
+
+# Move to sudoers directory with sudo
+sudo mv /tmp/pibook-sudoers "$SUDOERS_FILE"
 
 # Set correct permissions on sudoers file
 sudo chmod 0440 "$SUDOERS_FILE"
 
 # Verify the file was created correctly
-if sudo visudo -c -f "$SUDOERS_FILE" \u003e/dev/null 2\u003e\u00261; then
+if sudo visudo -c -f "$SUDOERS_FILE" > /dev/null 2>&1; then
     echo "✓ CPU core management permissions configured successfully"
     echo "  PiBook can now manage CPU cores for power saving"
 else
