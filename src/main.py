@@ -160,6 +160,9 @@ class PiBookApp:
         sleep_status = "enabled" if self.sleep_enabled else "disabled"
         self.logger.info(f"Sleep mode {sleep_status}, timeout set to {self.sleep_timeout}s for battery optimization")
 
+        # Track last screen for full refresh on screen change
+        self.last_screen = None
+
         # Sync sleep status to library screen now that it's defined
         self.library_screen.sleep_enabled = self.sleep_enabled
 
@@ -823,20 +826,21 @@ class PiBookApp:
     def _render_current_screen(self):
         """Render the current screen to display"""
         try:
-            use_partial = False  # Default to full refresh
+            # Check if we changed screens - if so, do full refresh
+            current_screen = self.navigation.current_screen
+            screen_changed = (self.last_screen != current_screen)
+
+            # Default to partial refresh unless screen changed
+            use_partial = not screen_changed
 
             if self.navigation.is_on_screen(Screen.MAIN_MENU):
                 image = self.main_menu_screen.render()
-                use_partial = True  # Use partial refresh for main menu
             elif self.navigation.is_on_screen(Screen.LIBRARY):
                 image = self.library_screen.render()
-                use_partial = True  # Use partial refresh for library navigation too (faster)
             elif self.navigation.is_on_screen(Screen.IP_SCANNER):
                 image = self.ip_scanner_screen.render()
-                use_partial = True  # Use partial refresh for IP scanner
             elif self.navigation.is_on_screen(Screen.READER):
                 image = self.reader_screen.get_current_image()
-                use_partial = True  # Use partial refresh for page turns
 
                 # Log page info
                 info = self.reader_screen.get_page_info()
@@ -851,7 +855,12 @@ class PiBookApp:
                 self.logger.warning(f"Unknown screen: {self.navigation.current_screen}")
                 return
 
+            # Update last screen tracker
+            self.last_screen = current_screen
+
             # Display image with appropriate refresh mode
+            if screen_changed:
+                self.logger.info(f"Screen changed - using full refresh")
             self.display.display_image(image, use_partial=use_partial)
 
         except Exception as e:
