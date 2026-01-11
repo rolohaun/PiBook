@@ -475,12 +475,32 @@ class IPScannerScreen:
                         continue
 
     def _get_hostname(self, ip: str) -> str:
-        """Get hostname for an IP address"""
+        """Get hostname for an IP address with timeout"""
         try:
+            # Set socket timeout for faster lookups
+            socket.setdefaulttimeout(2.0)
+
+            # Try reverse DNS lookup
             hostname = socket.gethostbyaddr(ip)[0]
-            return hostname
+
+            # Don't return IP as hostname
+            if hostname != ip:
+                return hostname
+
+        except (socket.herror, socket.gaierror, socket.timeout):
+            pass
+        except Exception as e:
+            self.logger.debug(f"Hostname lookup error for {ip}: {e}")
+
+        # Try getfqdn as fallback
+        try:
+            fqdn = socket.getfqdn(ip)
+            if fqdn and fqdn != ip:
+                return fqdn
         except:
-            return "Unknown"
+            pass
+
+        return "Unknown"
 
     def next_item(self):
         """Move to next device in list"""
@@ -599,15 +619,18 @@ class IPScannerScreen:
             draw.text((40, 140), "Press button to start scan", font=self.small_font, fill=0)
 
         else:
-            # Display device list
-            draw.text((40, 100), f"Found {len(self.devices)} devices:", font=self.font, fill=0)
+            # Display device list with pagination
+            current_page = self.current_index // self.items_per_page
+            total_pages = (len(self.devices) + self.items_per_page - 1) // self.items_per_page
+
+            draw.text((40, 100), f"Found {len(self.devices)} devices (Page {current_page + 1}/{total_pages}):", font=self.font, fill=0)
 
             y = 130
             line_height = 40
 
-            # Calculate visible range
-            start_idx = 0
-            end_idx = min(self.items_per_page, len(self.devices))
+            # Calculate visible range based on current page
+            start_idx = current_page * self.items_per_page
+            end_idx = min(start_idx + self.items_per_page, len(self.devices))
 
             for i in range(start_idx, end_idx):
                 device = self.devices[i]
@@ -634,6 +657,8 @@ class IPScannerScreen:
         # Draw instructions at bottom
         if self.scanning:
             instruction = "Scanning... Please wait"
+        elif len(self.devices) > 0:
+            instruction = "Press: Next  |  Hold: Scan  |  Menu: Home"
         else:
             instruction = "Hold: Start Scan  |  Menu: Home"
 
