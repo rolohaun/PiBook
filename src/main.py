@@ -338,6 +338,9 @@ class PiBookApp:
                     not self.is_sleeping and
                     current_time - last_battery_check >= 60):
 
+                    # Force a fresh battery reading
+                    self.battery_monitor.force_update()
+
                     battery_percentage = self.battery_monitor.get_percentage()
                     battery_charging = self.battery_monitor.is_charging()
 

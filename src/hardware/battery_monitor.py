@@ -374,6 +374,10 @@ class BatteryMonitor:
 
         return self._cached_charging if self._cached_charging is not None else False
 
+    def force_update(self):
+        """Force an immediate battery reading update"""
+        self._update_reading()
+
     def is_low_battery(self, threshold: int = 20) -> bool:
         """
         Check if battery is below threshold
