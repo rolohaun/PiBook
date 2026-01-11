@@ -263,6 +263,43 @@ class PiBookWebServer:
                 self.logger.error(f"Failed to save settings: {e}")
                 return jsonify({'error': str(e)}), 400
 
+        @self.flask_app.route('/terminal/execute', methods=['POST'])
+        def terminal_execute():
+            """Execute a terminal command"""
+            try:
+                command = request.json.get('command', '').strip()
+                
+                if not command:
+                    return jsonify({'error': 'No command provided'}), 400
+                
+                # Log the command
+                self.logger.info(f"Terminal command: {command}")
+                
+                # Execute command with timeout
+                import subprocess
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd='/home/pi/PiBook'
+                )
+                
+                # Return output
+                return jsonify({
+                    'stdout': result.stdout,
+                    'stderr': result.stderr,
+                    'returncode': result.returncode,
+                    'command': command
+                })
+                
+            except subprocess.TimeoutExpired:
+                return jsonify({'error': 'Command timed out (30s limit)'}), 408
+            except Exception as e:
+                self.logger.error(f"Terminal command failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
     def _get_books(self):
         """Get list of EPUB files"""
         books = []
@@ -525,6 +562,7 @@ HTML_TEMPLATE = '''
             <button class="tab active" onclick="switchTab(event, 'library')">📖 Library</button>
             <button class="tab" onclick="switchTab(event, 'settings')">⚙️ Settings</button>
             <button class="tab" onclick="switchTab(event, 'navigation')">🧭 Navigation</button>
+            <button class="tab" onclick="switchTab(event, 'terminal')">💻 Terminal</button>
         </div>
 
         <!-- Library Tab -->
@@ -706,6 +744,48 @@ HTML_TEMPLATE = '''
                 <p class="help-text" style="margin-top: 10px;">Opens PiSugar web interface for advanced battery management and configuration</p>
             </div>
         </div>
+
+        <!-- Terminal Tab -->
+        <div id="terminal" class="tab-content">
+            <div class="section">
+                <h2>💻 Terminal</h2>
+                <p style="color: #666; margin-bottom: 15px;">Execute shell commands on your PiBook</p>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="terminal-input" style="font-weight: bold; margin-bottom: 5px; display: block;">Command:</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="terminal-input" placeholder="Enter command (e.g., ls -la, git status, pwd)" 
+                               style="flex: 1; padding: 10px; font-family: 'Courier New', monospace; font-size: 14px; border: 1px solid #ddd; border-radius: 5px;">
+                        <button class="btn" onclick="executeCommand()" style="width: 120px;">Execute</button>
+                    </div>
+                    <p class="help-text">⚠️ Commands run in /home/pi/PiBook directory with 30s timeout</p>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">Quick Commands:</label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                        <button class="btn btn-secondary" onclick="setCommand('git status')" style="padding: 8px; font-size: 14px;">git status</button>
+                        <button class="btn btn-secondary" onclick="setCommand('git pull')" style="padding: 8px; font-size: 14px;">git pull</button>
+                        <button class="btn btn-secondary" onclick="setCommand('ls -la')" style="padding: 8px; font-size: 14px;">ls -la</button>
+                        <button class="btn btn-secondary" onclick="setCommand('df -h')" style="padding: 8px; font-size: 14px;">df -h (disk space)</button>
+                        <button class="btn btn-secondary" onclick="setCommand('free -h')" style="padding: 8px; font-size: 14px;">free -h (memory)</button>
+                        <button class="btn btn-secondary" onclick="setCommand('sudo systemctl restart pibook')" style="padding: 8px; font-size: 14px;">restart pibook</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">Output:</label>
+                    <div id="terminal-output" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 13px; min-height: 400px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+<span style="color: #4CAF50;">Welcome to PiBook Terminal</span>
+<span style="color: #888;">Type a command above and click Execute, or use Quick Commands</span>
+                    </div>
+                    <div style="margin-top: 10px; display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="clearTerminal()" style="flex: 1;">Clear Output</button>
+                        <button class="btn btn-secondary" onclick="copyOutput()" style="flex: 1;">Copy Output</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -807,6 +887,99 @@ HTML_TEMPLATE = '''
                     statusEl.textContent = 'Current CPU Voltage: Error loading';
                 }
             });
+
+        // Terminal functions
+        function setCommand(cmd) {
+            document.getElementById('terminal-input').value = cmd;
+        }
+
+        function executeCommand() {
+            const input = document.getElementById('terminal-input');
+            const output = document.getElementById('terminal-output');
+            const command = input.value.trim();
+
+            if (!command) {
+                return;
+            }
+
+            // Add command to output
+            appendToTerminal(`<span style="color: #4CAF50;">$ ${escapeHtml(command)}</span>`);
+
+            // Execute command
+            fetch('/terminal/execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ command: command })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    appendToTerminal(`<span style="color: #f44336;">Error: ${escapeHtml(data.error)}</span>`);
+                } else {
+                    // Show stdout
+                    if (data.stdout) {
+                        appendToTerminal(escapeHtml(data.stdout));
+                    }
+                    // Show stderr in red
+                    if (data.stderr) {
+                        appendToTerminal(`<span style="color: #ff9800;">${escapeHtml(data.stderr)}</span>`);
+                    }
+                    // Show return code if non-zero
+                    if (data.returncode !== 0) {
+                        appendToTerminal(`<span style="color: #f44336;">Exit code: ${data.returncode}</span>`);
+                    }
+                }
+                appendToTerminal(''); // Empty line for spacing
+            })
+            .catch(error => {
+                appendToTerminal(`<span style="color: #f44336;">Network error: ${escapeHtml(error.message)}</span>`);
+            });
+
+            // Clear input
+            input.value = '';
+        }
+
+        function appendToTerminal(text) {
+            const output = document.getElementById('terminal-output');
+            output.innerHTML += text + '\n';
+            // Auto-scroll to bottom
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearTerminal() {
+            const output = document.getElementById('terminal-output');
+            output.innerHTML = '<span style="color: #4CAF50;">Welcome to PiBook Terminal</span>\n<span style="color: #888;">Type a command above and click Execute, or use Quick Commands</span>\n';
+        }
+
+        function copyOutput() {
+            const output = document.getElementById('terminal-output');
+            const text = output.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Output copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Allow Enter key to execute command
+        document.addEventListener('DOMContentLoaded', function() {
+            const terminalInput = document.getElementById('terminal-input');
+            if (terminalInput) {
+                terminalInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        executeCommand();
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>
