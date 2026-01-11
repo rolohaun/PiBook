@@ -775,10 +775,9 @@ HTML_TEMPLATE = '''
 
                 <div>
                     <label style="font-weight: bold; margin-bottom: 5px; display: block;">Output:</label>
-                    <div id="terminal-output" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 13px; min-height: 400px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
-<span style="color: #4CAF50;">Welcome to PiBook Terminal</span>
+                    <div id="terminal-output" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 13px; min-height: 400px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"><span style="color: #4CAF50;">Welcome to PiBook Terminal</span>
 <span style="color: #888;">Type a command above and click Execute, or use Quick Commands</span>
-                    </div>
+</div>
                     <div style="margin-top: 10px; display: flex; gap: 10px;">
                         <button class="btn btn-secondary" onclick="clearTerminal()" style="flex: 1;">Clear Output</button>
                         <button class="btn btn-secondary" onclick="copyOutput()" style="flex: 1;">Copy Output</button>
