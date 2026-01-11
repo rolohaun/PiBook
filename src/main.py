@@ -414,11 +414,15 @@ class PiBookApp:
                 if (self.navigation.is_on_screen(Screen.IP_SCANNER) and
                     self.ip_scanner_screen.scanning and
                     not self.is_sleeping):
-                    self._render_current_screen()
+                    try:
+                        self._render_current_screen()
+                    except Exception as scan_error:
+                        self.logger.error(f"Error refreshing IP scanner: {scan_error}", exc_info=True)
 
                 time.sleep(1)  # Check more frequently for IP scanner updates
             except Exception as e:
-                self.logger.error(f"Error in monitor thread: {e}")
+                self.logger.error(f"Error in monitor thread: {e}", exc_info=True)
+                time.sleep(1)  # Continue monitoring even if error occurs
 
     def _enter_sleep(self):
         """Enter sleep mode"""

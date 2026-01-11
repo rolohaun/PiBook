@@ -329,6 +329,7 @@ class IPScannerScreen:
             # Try using arp-scan first (much faster)
             try:
                 self.scan_progress = 10
+                self.logger.info("Trying arp-scan...")
                 result = subprocess.run(
                     ['sudo', 'arp-scan', '--localnet', '--interface=wlan0'],
                     capture_output=True,
@@ -336,19 +337,28 @@ class IPScannerScreen:
                     timeout=30
                 )
 
+                self.logger.info(f"arp-scan return code: {result.returncode}")
                 if result.returncode == 0:
                     self.logger.info("Using arp-scan for network discovery")
+                    self.logger.debug(f"arp-scan output: {result.stdout}")
                     self._parse_arp_scan_output(result.stdout)
                     self.scanning = False
                     self.scan_progress = 100
                     return
+                else:
+                    self.logger.warning(f"arp-scan failed with stderr: {result.stderr}")
 
-            except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-                self.logger.info(f"arp-scan not available, falling back to nmap: {e}")
+            except FileNotFoundError:
+                self.logger.info("arp-scan not installed, falling back to nmap")
+            except subprocess.TimeoutExpired:
+                self.logger.warning("arp-scan timed out, falling back to nmap")
+            except Exception as e:
+                self.logger.error(f"arp-scan error: {e}", exc_info=True)
 
             # Try nmap as second option
             try:
                 self.scan_progress = 20
+                self.logger.info("Trying nmap...")
                 result = subprocess.run(
                     ['nmap', '-sn', network],
                     capture_output=True,
@@ -356,15 +366,23 @@ class IPScannerScreen:
                     timeout=60
                 )
 
+                self.logger.info(f"nmap return code: {result.returncode}")
                 if result.returncode == 0:
                     self.logger.info("Using nmap for network discovery")
+                    self.logger.debug(f"nmap output: {result.stdout}")
                     self._parse_nmap_output(result.stdout)
                     self.scanning = False
                     self.scan_progress = 100
                     return
+                else:
+                    self.logger.warning(f"nmap failed with stderr: {result.stderr}")
 
-            except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-                self.logger.info(f"nmap not available, falling back to ping sweep: {e}")
+            except FileNotFoundError:
+                self.logger.info("nmap not installed, falling back to ping sweep")
+            except subprocess.TimeoutExpired:
+                self.logger.warning("nmap timed out, falling back to ping sweep")
+            except Exception as e:
+                self.logger.error(f"nmap error: {e}", exc_info=True)
 
             # Fall back to ping sweep (slowest but most reliable)
             self.logger.info("Using ping sweep for network discovery")
