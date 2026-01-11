@@ -347,6 +347,8 @@ class PiBookApp:
         # Debouncing for charging status to filter PiSugar glitches
         charging_debounce_count = 0
         pending_charging_state = None
+        # Track IP scanner state for final refresh
+        last_scanning_state = False
 
         while self.running:
             try:
@@ -410,14 +412,20 @@ class PiBookApp:
 
                     last_battery_check = current_time
 
-                # Refresh IP scanner screen while scanning
-                if (self.navigation.is_on_screen(Screen.IP_SCANNER) and
-                    self.ip_scanner_screen.scanning and
-                    not self.is_sleeping):
-                    try:
-                        self._render_current_screen()
-                    except Exception as scan_error:
-                        self.logger.error(f"Error refreshing IP scanner: {scan_error}", exc_info=True)
+                # Refresh IP scanner screen while scanning AND once when it completes
+                if self.navigation.is_on_screen(Screen.IP_SCANNER) and not self.is_sleeping:
+                    current_scanning = self.ip_scanner_screen.scanning
+
+                    # Refresh if currently scanning OR just finished scanning
+                    if current_scanning or (last_scanning_state and not current_scanning):
+                        try:
+                            self._render_current_screen()
+                            if not current_scanning and last_scanning_state:
+                                self.logger.info("IP scan completed - final refresh done")
+                        except Exception as scan_error:
+                            self.logger.error(f"Error refreshing IP scanner: {scan_error}", exc_info=True)
+
+                    last_scanning_state = current_scanning
 
                 time.sleep(1)  # Check more frequently for IP scanner updates
             except Exception as e:
