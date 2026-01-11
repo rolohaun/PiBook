@@ -162,6 +162,7 @@ class PiBookWebServer:
                 
                 todos['tasks'].append(new_task)
                 self._save_todos(todos)
+                self._refresh_todo_screen()
                 
                 self.logger.info(f"Added todo: {task_text}")
                 return jsonify({'success': True, 'task': new_task})
@@ -180,6 +181,7 @@ class PiBookWebServer:
                     if task['id'] == task_id:
                         task['completed'] = not task['completed']
                         self._save_todos(todos)
+                        self._refresh_todo_screen()
                         self.logger.info(f"Toggled todo {task_id}: {task['completed']}")
                         return jsonify({'success': True, 'task': task})
                 
@@ -187,6 +189,32 @@ class PiBookWebServer:
                 
             except Exception as e:
                 self.logger.error(f"Failed to toggle todo: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/todos/<task_id>', methods=['PATCH'])
+        def edit_todo(task_id):
+            """Edit task text"""
+            try:
+                data = request.get_json()
+                new_text = data.get('text', '').strip()
+                
+                if not new_text:
+                    return jsonify({'error': 'Task text is required'}), 400
+                
+                todos = self._load_todos()
+                
+                for task in todos['tasks']:
+                    if task['id'] == task_id:
+                        task['text'] = new_text
+                        self._save_todos(todos)
+                        self._refresh_todo_screen()
+                        self.logger.info(f"Edited todo {task_id}: {new_text}")
+                        return jsonify({'success': True, 'task': task})
+                
+                return jsonify({'error': 'Task not found'}), 404
+                
+            except Exception as e:
+                self.logger.error(f"Failed to edit todo: {e}")
                 return jsonify({'error': str(e)}), 500
 
         @self.flask_app.route('/api/todos/<task_id>', methods=['DELETE'])
@@ -200,6 +228,7 @@ class PiBookWebServer:
                 
                 if len(todos['tasks']) < initial_count:
                     self._save_todos(todos)
+                    self._refresh_todo_screen()
                     self.logger.info(f"Deleted todo {task_id}")
                     return jsonify({'success': True})
                 else:
@@ -585,6 +614,17 @@ class PiBookWebServer:
         except Exception as e:
             self.logger.error(f"Error saving todos: {e}")
             raise
+
+    def _refresh_todo_screen(self):
+        """Refresh To-Do screen on e-ink display with partial refresh"""
+        try:
+            from src.ui.navigation import Screen
+            # Only refresh if currently on To-Do screen
+            if self.app_instance.navigation.is_on_screen(Screen.TODO):
+                self.app_instance._render_current_screen(force_partial=True)
+                self.logger.debug("Refreshed To-Do screen (partial)")
+        except Exception as e:
+            self.logger.error(f"Failed to refresh To-Do screen: {e}")
 
     def _load_settings(self, settings_file: str) -> dict:
         """Load settings from file, with defaults from config.yaml"""

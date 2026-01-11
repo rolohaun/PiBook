@@ -25,11 +25,12 @@ function switchSection(sectionId) {
     }
 
     // Auto-refresh system stats when navigating to info or navigation section
-    // Load todos when navigating to todo section
+    // Load todos and open app when navigating to todo section
     if (sectionId === 'info' || sectionId === 'navigation') {
         refreshSystemStats();
     } else if (sectionId === 'todo') {
         loadTodos();
+        openTodoApp();
     }
 }
 
@@ -395,8 +396,12 @@ function loadTodos() {
                             <input type="checkbox" ${task.completed ? 'checked' : ''} 
                                    onclick="toggleTodo('${task.id}')" 
                                    style="width: 20px; height: 20px; cursor: pointer;">
-                            <span style="flex: 1; ${textStyle}">${escapeHtml(task.text)}</span>
-                            <button class="btn btn-danger" onclick="deleteTodo('${task.id}')" style="padding: 8px 16px;">Delete</button>
+                            <span id="task-text-${task.id}" style="flex: 1; ${textStyle}">${escapeHtml(task.text)}</span>
+                            <input type="text" id="task-edit-${task.id}" style="flex: 1; padding: 8px; display: none; border: 2px solid #2196F3; border-radius: 4px;">
+                            <button class="btn btn-secondary" onclick="startEditTodo('${task.id}', \`${escapeHtml(task.text).replace(/`/g, '\\`')}\`)" id="edit-btn-${task.id}" style="padding: 8px 16px;">Edit</button>
+                            <button class="btn" onclick="saveEditTodo('${task.id}')" id="save-btn-${task.id}" style="padding: 8px 16px; display: none; background: #4CAF50;">Save</button>
+                            <button class="btn btn-secondary" onclick="cancelEditTodo('${task.id}', \`${escapeHtml(task.text).replace(/`/g, '\\`')}\`)" id="cancel-btn-${task.id}" style="padding: 8px 16px; display: none;">Cancel</button>
+                            <button class="btn btn-danger" onclick="deleteTodo('${task.id}')" id="delete-btn-${task.id}" style="padding: 8px 16px;">Delete</button>
                         </div>
                     `;
                 });
@@ -411,6 +416,60 @@ function loadTodos() {
             if (todoList) {
                 todoList.innerHTML = '<p style="color: #f44336; text-align: center; padding: 40px;">Error loading tasks</p>';
             }
+        });
+}
+
+function startEditTodo(taskId, currentText) {
+    // Hide text and edit button, show input and save/cancel buttons
+    document.getElementById(`task-text-${taskId}`).style.display = 'none';
+    document.getElementById(`edit-btn-${taskId}`).style.display = 'none';
+    document.getElementById(`delete-btn-${taskId}`).style.display = 'none';
+
+    const editInput = document.getElementById(`task-edit-${taskId}`);
+    editInput.style.display = 'block';
+    editInput.value = currentText;
+    editInput.focus();
+
+    document.getElementById(`save-btn-${taskId}`).style.display = 'block';
+    document.getElementById(`cancel-btn-${taskId}`).style.display = 'block';
+}
+
+function cancelEditTodo(taskId, originalText) {
+    // Restore original state
+    document.getElementById(`task-text-${taskId}`).style.display = 'block';
+    document.getElementById(`edit-btn-${taskId}`).style.display = 'block';
+    document.getElementById(`delete-btn-${taskId}`).style.display = 'block';
+
+    document.getElementById(`task-edit-${taskId}`).style.display = 'none';
+    document.getElementById(`save-btn-${taskId}`).style.display = 'none';
+    document.getElementById(`cancel-btn-${taskId}`).style.display = 'none';
+}
+
+function saveEditTodo(taskId) {
+    const newText = document.getElementById(`task-edit-${taskId}`).value.trim();
+
+    if (!newText) {
+        alert('Task description cannot be empty');
+        return;
+    }
+
+    fetch(`/api/todos/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: newText })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadTodos();
+            } else {
+                alert('Failed to edit task: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error editing task: ' + error.message);
         });
 }
 
