@@ -324,6 +324,9 @@ class PiBookApp:
         last_battery_check = 0
         last_battery_percentage = None
         last_battery_charging = None
+        # Debouncing for charging status to filter PiSugar glitches
+        charging_debounce_count = 0
+        pending_charging_state = None
 
         while self.running:
             try:
@@ -344,15 +347,33 @@ class PiBookApp:
                     battery_percentage = self.battery_monitor.get_percentage()
                     battery_charging = self.battery_monitor.is_charging()
 
-                    # Update display if battery status changed
-                    if (last_battery_percentage != battery_percentage or
-                        last_battery_charging != battery_charging):
+                    # Debounce charging status changes (PiSugar can glitch)
+                    # Only update if charging state is stable for 2 consecutive checks
+                    if battery_charging != last_battery_charging:
+                        if pending_charging_state == battery_charging:
+                            # Second consecutive reading confirms the change
+                            charging_debounce_count += 1
+                            if charging_debounce_count >= 1:  # Need 2 total readings (1 previous + 1 now)
+                                self.logger.info(f"Battery charging changed (debounced): {last_battery_charging} -> {battery_charging}")
+                                last_battery_charging = battery_charging
+                                self._update_battery_display()
+                                charging_debounce_count = 0
+                                pending_charging_state = None
+                        else:
+                            # First reading of potential change
+                            self.logger.debug(f"Battery charging change pending: {last_battery_charging} -> {battery_charging}")
+                            pending_charging_state = battery_charging
+                            charging_debounce_count = 0
+                    else:
+                        # Charging state stable, reset debounce
+                        charging_debounce_count = 0
+                        pending_charging_state = None
 
-                        self.logger.info(f"Battery status changed: {battery_percentage}% Charging: {battery_charging}")
-                        self._update_battery_display()
-
+                    # Update display if battery percentage changed
+                    if last_battery_percentage != battery_percentage:
+                        self.logger.info(f"Battery percentage changed: {last_battery_percentage}% -> {battery_percentage}%")
                         last_battery_percentage = battery_percentage
-                        last_battery_charging = battery_charging
+                        self._update_battery_display()
 
                     last_battery_check = current_time
 
