@@ -370,10 +370,23 @@ class PiBookApp:
                         pending_charging_state = None
 
                     # Update display if battery percentage changed
-                    if last_battery_percentage != battery_percentage:
-                        self.logger.info(f"Battery percentage changed: {last_battery_percentage}% -> {battery_percentage}%")
+                    # Filter out unrealistic jumps (PiSugar glitches during charging transitions)
+                    if last_battery_percentage is not None and battery_percentage != last_battery_percentage:
+                        percentage_change = abs(battery_percentage - last_battery_percentage)
+
+                        # Allow changes if:
+                        # 1. Small gradual change (<=5% in 1 minute)
+                        # 2. OR charging state is changing (can cause legitimate jumps)
+                        if percentage_change <= 5 or battery_charging != last_battery_charging:
+                            self.logger.info(f"Battery percentage changed: {last_battery_percentage}% -> {battery_percentage}%")
+                            last_battery_percentage = battery_percentage
+                            self._update_battery_display()
+                        else:
+                            # Ignore unrealistic jump (likely PiSugar glitch)
+                            self.logger.warning(f"Ignoring unrealistic battery jump: {last_battery_percentage}% -> {battery_percentage}% (change: {percentage_change}%)")
+                    elif last_battery_percentage is None:
+                        # First reading
                         last_battery_percentage = battery_percentage
-                        self._update_battery_display()
 
                     last_battery_check = current_time
 
