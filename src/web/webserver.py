@@ -623,7 +623,7 @@ HTML_TEMPLATE = '''
                         <label for="zoom">Zoom Level</label>
                         <input type="number" id="zoom" name="zoom"
                                value="{{ settings.zoom }}" min="0.5" max="2.0" step="0.1">
-                        <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, &lt;1.0 = smaller, &gt;1.0 = larger</p>
+                        <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, less than 1.0 = smaller, greater than 1.0 = larger</p>
                     </div>
 
                     <div class="form-group">
@@ -1069,7 +1069,7 @@ SETTINGS_TEMPLATE = '''
                 <label for="zoom">Zoom Level</label>
                 <input type="number" id="zoom" name="zoom"
                        value="{{ settings.zoom }}" min="0.5" max="2.0" step="0.1">
-                <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, &lt;1.0 = smaller, &gt;1.0 = larger</p>
+                <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, less than 1.0 = smaller, greater than 1.0 = larger</p>
             </div>
 
             <div class="form-group">
