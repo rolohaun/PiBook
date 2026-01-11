@@ -411,6 +411,44 @@ class PiBookWebServer:
                     stats['total_cores'] = 'N/A'
                     stats['active_cores'] = 'N/A'
                 
+                # Disk Space
+                try:
+                    result = subprocess.run(['df', '-h', '/'], capture_output=True, text=True, timeout=2)
+                    if result.returncode == 0:
+                        lines = result.stdout.strip().split('\n')
+                        if len(lines) > 1:
+                            parts = lines[1].split()
+                            if len(parts) >= 4:
+                                stats['disk_total'] = parts[1]
+                                stats['disk_used'] = parts[2]
+                                stats['disk_free'] = parts[3]
+                                stats['disk_percent'] = parts[4] if len(parts) > 4 else 'N/A'
+                except:
+                    stats['disk_free'] = 'N/A'
+                
+                # Memory Usage
+                try:
+                    result = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=2)
+                    if result.returncode == 0:
+                        lines = result.stdout.strip().split('\n')
+                        if len(lines) > 1:
+                            parts = lines[1].split()
+                            if len(parts) >= 3:
+                                stats['memory_total'] = parts[1]
+                                stats['memory_used'] = parts[2]
+                                stats['memory_free'] = parts[3] if len(parts) > 3 else 'N/A'
+                                # Calculate percentage
+                                try:
+                                    total = float(parts[1].replace('Gi', '').replace('Mi', ''))
+                                    used = float(parts[2].replace('Gi', '').replace('Mi', ''))
+                                    percent = int((used / total) * 100) if total > 0 else 0
+                                    stats['memory_percent'] = f"{percent}%"
+                                except:
+                                    stats['memory_percent'] = 'N/A'
+                except:
+                    stats['memory_used'] = 'N/A'
+                    stats['memory_total'] = 'N/A'
+                
                 return jsonify(stats)
                 
             except Exception as e:

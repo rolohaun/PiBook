@@ -24,8 +24,8 @@ function switchSection(sectionId) {
         navItem.classList.add('active');
     }
 
-    // Auto-refresh system stats when navigating to navigation section
-    if (sectionId === 'navigation') {
+    // Auto-refresh system stats when navigating to info or navigation section
+    if (sectionId === 'info' || sectionId === 'navigation') {
         refreshSystemStats();
     }
 }
@@ -322,6 +322,34 @@ function refreshSystemStats() {
                     coresEl.style.color = '#4CAF50'; // Green - power saving mode
                 } else {
                     coresEl.style.color = '#2196F3'; // Blue - normal mode
+                }
+            }
+
+            // Update Memory Usage
+            const memoryEl = document.getElementById('memory-usage');
+            if (memoryEl && data.memory_used && data.memory_total) {
+                memoryEl.textContent = `${data.memory_used} / ${data.memory_total}`;
+                // Color code based on percentage if available
+                if (data.memory_percent) {
+                    const percent = parseInt(data.memory_percent);
+                    if (percent < 70) {
+                        memoryEl.style.color = '#4CAF50'; // Green
+                    } else if (percent < 85) {
+                        memoryEl.style.color = '#ff9800'; // Orange
+                    } else {
+                        memoryEl.style.color = '#f44336'; // Red
+                    }
+                }
+            }
+
+            // Update Disk Space
+            const diskEl = document.getElementById('disk-free');
+            if (diskEl && data.disk_free) {
+                if (data.disk_used && data.disk_total) {
+                    diskEl.textContent = `${data.disk_free} free`;
+                    diskEl.title = `${data.disk_used} used of ${data.disk_total}`;
+                } else {
+                    diskEl.textContent = data.disk_free;
                 }
             }
         })
