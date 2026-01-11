@@ -1522,8 +1522,8 @@ class ToDoScreen:
         self.items_per_page = 15  # Number of items visible per page
         self.current_page = 0
 
-        # Load todos from file
-        self.todos_file = "data/todos.json"
+        # Load todos from file (same location as web server)
+        self.todos_file = "todos.json"
         self._load_todos()
 
     def _load_todos(self):
@@ -1534,7 +1534,9 @@ class ToDoScreen:
         if os.path.exists(self.todos_file):
             try:
                 with open(self.todos_file, 'r') as f:
-                    self.todos = json.load(f)
+                    data = json.load(f)
+                    # Extract tasks array from JSON structure
+                    self.todos = data.get('tasks', [])
                 self.logger.info(f"Loaded {len(self.todos)} todos from {self.todos_file}")
             except Exception as e:
                 self.logger.error(f"Failed to load todos: {e}")
@@ -1713,7 +1715,7 @@ class ToDoScreen:
                 )
 
         # Draw help text at bottom
-        help_text = "Next: Navigate | Hold: Toggle | Menu: Home"
+        help_text = "Hold GPIO5: Return to Menu"
         help_bbox = draw.textbbox((0, 0), help_text, font=self.item_font)
         help_width = help_bbox[2] - help_bbox[0]
         draw.text(
