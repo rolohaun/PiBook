@@ -85,13 +85,14 @@ class DisplayDriver:
         except Exception as e:
             self.logger.error(f"Display clear failed: {e}")
 
-    def display_image(self, image: Image.Image, use_partial: bool = True):
+    def display_image(self, image: Image.Image, use_partial: bool = True, skip_counter: bool = False):
         """
         Display a PIL Image on the screen with partial or full refresh
 
         Args:
             image: PIL Image object (will be resized and rotated as needed)
-            use_partial: Use partial refresh if True, full refresh if False
+            use_partial: Whether to use partial refresh (if False, forces full refresh)
+            skip_counter: If True, bypass periodic full refresh counter (for non-reader screens)
         """
         # Ensure image is correct size
         # NOTE: If this resize happens, there's a bug in the renderer - it should produce
@@ -159,7 +160,8 @@ class DisplayDriver:
                 
                 # Decide whether to use partial or full refresh
                 # Always do full refresh on first display to clear any ghosting from previous session
-                should_full_refresh = self.first_display or not use_partial or (self.partial_refresh_count >= self.full_refresh_interval)
+                # If skip_counter is True, ignore the periodic refresh counter (for non-reader screens)
+                should_full_refresh = self.first_display or not use_partial or (not skip_counter and self.partial_refresh_count >= self.full_refresh_interval)
 
                 if should_full_refresh:
                     # Full refresh - clears ghosting

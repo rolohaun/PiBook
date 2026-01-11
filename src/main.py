@@ -869,10 +869,14 @@ class PiBookApp:
             if screen_changed and not self.navigation.is_on_screen(Screen.READER):
                 self.display.reset_partial_counter()
 
+            # Skip periodic refresh counter for non-reader screens
+            # Only eReader should count page turns for periodic full refresh
+            skip_counter = not self.navigation.is_on_screen(Screen.READER)
+
             # Display image with appropriate refresh mode
             if screen_changed:
                 self.logger.info(f"Screen changed - using full refresh")
-            self.display.display_image(image, use_partial=use_partial)
+            self.display.display_image(image, use_partial=use_partial, skip_counter=skip_counter)
 
         except Exception as e:
             self.logger.error(f"Render error: {e}", exc_info=True)
