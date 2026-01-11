@@ -1555,10 +1555,78 @@ class ToDoScreen:
 
         try:
             with open(self.todos_file, 'w') as f:
-                json.dump(self.todos, f, indent=2)
+                json.dump({'tasks': self.todos}, f, indent=2)
             self.logger.info(f"Saved {len(self.todos)} todos to {self.todos_file}")
         except Exception as e:
             self.logger.error(f"Failed to save todos: {e}")
+
+    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int, is_charging: bool = False):
+        """
+        Draw battery icon with percentage and charging indicator
+
+        Args:
+            draw: ImageDraw object
+            x: X position (top-right corner)
+            y: Y position
+            percentage: Battery percentage (0-100)
+            is_charging: Whether battery is currently charging
+        """
+        # Battery dimensions
+        battery_width = 30
+        battery_height = 14
+        terminal_width = 2
+        terminal_height = 6
+
+        # Draw battery outline
+        battery_x = x - battery_width
+        draw.rectangle(
+            [(battery_x, y), (battery_x + battery_width, y + battery_height)],
+            outline='black',
+            width=1
+        )
+
+        # Draw battery terminal (positive end)
+        terminal_x = battery_x + battery_width
+        terminal_y = y + (battery_height - terminal_height) // 2
+        draw.rectangle(
+            [(terminal_x, terminal_y), (terminal_x + terminal_width, terminal_y + terminal_height)],
+            fill='black'
+        )
+
+        # Draw battery fill based on percentage
+        fill_width = int((battery_width - 4) * (percentage / 100))
+        if fill_width > 0:
+            draw.rectangle(
+                [(battery_x + 2, y + 2), (battery_x + 2 + fill_width, y + battery_height - 2)],
+                fill='black'
+            )
+
+        # Draw charging indicator (lightning bolt) if charging
+        if is_charging:
+            bolt_center_x = battery_x + battery_width // 2
+            bolt_center_y = y + battery_height // 2
+            bolt_points = [
+                (bolt_center_x + 1, bolt_center_y - 5),
+                (bolt_center_x - 1, bolt_center_y - 1),
+                (bolt_center_x + 2, bolt_center_y - 1),
+                (bolt_center_x - 1, bolt_center_y + 5),
+                (bolt_center_x + 1, bolt_center_y + 1),
+                (bolt_center_x - 2, bolt_center_y + 1),
+            ]
+            # For a white background, bolt should be black
+            bolt_color = 'black'
+            draw.polygon(bolt_points, fill=bolt_color)
+
+        # Draw percentage text
+        percentage_text = f"{percentage}%"
+        try:
+            bbox = draw.textbbox((0, 0), percentage_text, font=self.font)
+            text_width = bbox[2] - bbox[0]
+        except:
+            text_width = len(percentage_text) * 8
+
+        text_x = battery_x - text_width - 5
+        draw.text((text_x, y), percentage_text, font=self.font, fill='black')
 
     def add_todo(self, text: str):
         """Add a new todo item"""
@@ -1625,27 +1693,13 @@ class ToDoScreen:
         draw.text((title_x, y_offset), title, fill='black', font=self.title_font)
         y_offset += 40
 
-        # Draw battery status if available (top right corner - icon only)
+        # Draw battery status if available (top right corner)
         if self.battery_monitor:
             try:
                 battery_pct = self.battery_monitor.get_percentage()
                 charging = self.battery_monitor.is_charging()
-
-                # Show only icon based on battery level
-                if charging:
-                    battery_icon = "⚡"
-                elif battery_pct > 75:
-                    battery_icon = "🔋"
-                elif battery_pct > 50:
-                    battery_icon = "🔋"
-                elif battery_pct > 25:
-                    battery_icon = "🔋"
-                else:
-                    battery_icon = "🪫"
-
-                battery_bbox = draw.textbbox((0, 0), battery_icon, font=self.item_font)
-                battery_width = battery_bbox[2] - battery_bbox[0]
-                draw.text((self.width - battery_width - 10, 10), battery_icon, fill='black', font=self.item_font)
+                # Use drawn battery icon instead of emoji (emojis show as boxes on e-ink)
+                self._draw_battery_icon(draw, self.width - 10, 10, battery_pct, charging)
             except Exception as e:
                 self.logger.warning(f"Failed to get battery status: {e}")
 
@@ -1698,7 +1752,8 @@ class ToDoScreen:
 
                 # Draw todo text with word wrap
                 text_x = checkbox_x + checkbox_size + 10
-                text_color = 'gray' if todo['completed'] else 'black'
+                # Keep text black even when completed (strikethrough will show it's done)
+                text_color = 'black'
                 max_width = self.width - text_x - 20
                 
                 # Word wrap implementation
@@ -1737,8 +1792,9 @@ class ToDoScreen:
                     # Add strikethrough if completed
                     if todo['completed']:
                         text_bbox = draw.textbbox((text_x, y_offset), line_text, font=self.item_font)
+                        text_height = text_bbox[3] - text_bbox[1]
                         strike_y = y_offset + text_height // 2
-                        draw.line([(text_x, strike_y), (text_bbox[2], strike_y)], fill=text_color, width=2)
+                        draw.line([(text_x, strike_y), (text_bbox[2], strike_y)], fill='black', width=2)
 
                 y_offset += line_height
 
