@@ -378,6 +378,35 @@ class PiBookWebServer:
                 except:
                     stats['uptime'] = 'N/A'
                 
+                # CPU Core Information
+                try:
+                    # Get total CPU cores
+                    with open('/sys/devices/system/cpu/present', 'r') as f:
+                        present = f.read().strip()
+                        # Format is usually "0-3" for 4 cores
+                        if '-' in present:
+                            total_cores = int(present.split('-')[1]) + 1
+                        else:
+                            total_cores = 1
+                    
+                    # Get online/active CPU cores
+                    with open('/sys/devices/system/cpu/online', 'r') as f:
+                        online = f.read().strip()
+                        # Format can be "0-3" or "0,2-3" etc
+                        active_cores = 0
+                        for part in online.split(','):
+                            if '-' in part:
+                                start, end = part.split('-')
+                                active_cores += int(end) - int(start) + 1
+                            else:
+                                active_cores += 1
+                    
+                    stats['total_cores'] = total_cores
+                    stats['active_cores'] = active_cores
+                except:
+                    stats['total_cores'] = 'N/A'
+                    stats['active_cores'] = 'N/A'
+                
                 return jsonify(stats)
                 
             except Exception as e:
@@ -847,6 +876,10 @@ HTML_TEMPLATE = '''
                         <div style="font-size: 12px; color: #666; margin-bottom: 5px;">System Uptime</div>
                         <div id="uptime" style="font-size: 18px; font-weight: bold; color: #333;">Loading...</div>
                     </div>
+                    <div style="padding: 15px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid #3F51B5;">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Active CPU Cores</div>
+                        <div id="cpu-cores" style="font-size: 24px; font-weight: bold; color: #333;">Loading...</div>
+                    </div>
                 </div>
                 <button class="btn" onclick="refreshSystemStats()" style="margin-top: 15px; width: 100%;">🔄 Refresh Stats</button>
             </div>
@@ -1155,6 +1188,18 @@ HTML_TEMPLATE = '''
                     const uptimeEl = document.getElementById('uptime');
                     if (uptimeEl && data.uptime) {
                         uptimeEl.textContent = data.uptime;
+                    }
+                    
+                    // Update CPU Cores
+                    const coresEl = document.getElementById('cpu-cores');
+                    if (coresEl && data.active_cores && data.total_cores) {
+                        coresEl.textContent = `${data.active_cores}/${data.total_cores}`;
+                        // Color code: green if 1 core (power saving), blue if multiple
+                        if (data.active_cores === 1) {
+                            coresEl.style.color = '#4CAF50'; // Green - power saving mode
+                        } else {
+                            coresEl.style.color = '#2196F3'; // Blue - normal mode
+                        }
                     }
                 })
                 .catch(error => {
