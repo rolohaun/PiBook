@@ -410,7 +410,13 @@ class PiBookApp:
 
                     last_battery_check = current_time
 
-                time.sleep(10)
+                # Refresh IP scanner screen while scanning
+                if (self.navigation.is_on_screen(Screen.IP_SCANNER) and
+                    self.ip_scanner_screen.scanning and
+                    not self.is_sleeping):
+                    self._render_current_screen()
+
+                time.sleep(1)  # Check more frequently for IP scanner updates
             except Exception as e:
                 self.logger.error(f"Error in monitor thread: {e}")
 

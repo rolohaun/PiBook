@@ -322,8 +322,53 @@ class IPScannerScreen:
             # Extract network prefix (e.g., 192.168.1)
             ip_parts = local_ip.split('.')
             network_prefix = '.'.join(ip_parts[:3])
+            network = f"{network_prefix}.0/24"
 
-            self.logger.info(f"Scanning network {network_prefix}.0/24")
+            self.logger.info(f"Scanning network {network}")
+
+            # Try using arp-scan first (much faster)
+            try:
+                self.scan_progress = 10
+                result = subprocess.run(
+                    ['sudo', 'arp-scan', '--localnet', '--interface=wlan0'],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                if result.returncode == 0:
+                    self.logger.info("Using arp-scan for network discovery")
+                    self._parse_arp_scan_output(result.stdout)
+                    self.scanning = False
+                    self.scan_progress = 100
+                    return
+
+            except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+                self.logger.info(f"arp-scan not available, falling back to nmap: {e}")
+
+            # Try nmap as second option
+            try:
+                self.scan_progress = 20
+                result = subprocess.run(
+                    ['nmap', '-sn', network],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+
+                if result.returncode == 0:
+                    self.logger.info("Using nmap for network discovery")
+                    self._parse_nmap_output(result.stdout)
+                    self.scanning = False
+                    self.scan_progress = 100
+                    return
+
+            except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+                self.logger.info(f"nmap not available, falling back to ping sweep: {e}")
+
+            # Fall back to ping sweep (slowest but most reliable)
+            self.logger.info("Using ping sweep for network discovery")
+            self.scan_progress = 0
 
             # Scan range 1-254
             for i in range(1, 255):
@@ -355,11 +400,61 @@ class IPScannerScreen:
                     continue
 
             self.scanning = False
+            self.scan_progress = 100
             self.logger.info(f"Scan complete. Found {len(self.devices)} devices")
 
         except Exception as e:
             self.logger.error(f"Network scan error: {e}", exc_info=True)
             self.scanning = False
+
+    def _parse_arp_scan_output(self, output: str):
+        """Parse arp-scan output and extract devices"""
+        lines = output.strip().split('\n')
+        for line in lines:
+            # arp-scan output format: IP    MAC    Hostname
+            if line and not line.startswith('Interface:') and not line.startswith('Starting') and not line.startswith('Ending'):
+                parts = line.split()
+                if len(parts) >= 2:
+                    # Check if first part looks like an IP
+                    ip = parts[0]
+                    if ip.count('.') == 3:
+                        try:
+                            # Validate IP format
+                            octets = ip.split('.')
+                            if all(0 <= int(octet) <= 255 for octet in octets):
+                                hostname = self._get_hostname(ip)
+                                self.devices.append({
+                                    'ip': ip,
+                                    'hostname': hostname
+                                })
+                                self.logger.info(f"Found device: {ip} ({hostname})")
+                        except:
+                            continue
+
+    def _parse_nmap_output(self, output: str):
+        """Parse nmap output and extract devices"""
+        lines = output.strip().split('\n')
+        for line in lines:
+            # nmap output includes lines like: "Nmap scan report for 192.168.1.1"
+            if 'Nmap scan report for' in line:
+                parts = line.split()
+                ip = parts[-1]
+                # Remove parentheses if present
+                ip = ip.strip('()')
+
+                # Validate IP
+                if ip.count('.') == 3:
+                    try:
+                        octets = ip.split('.')
+                        if all(0 <= int(octet) <= 255 for octet in octets):
+                            hostname = self._get_hostname(ip)
+                            self.devices.append({
+                                'ip': ip,
+                                'hostname': hostname
+                            })
+                            self.logger.info(f"Found device: {ip} ({hostname})")
+                    except:
+                        continue
 
     def _get_hostname(self, ip: str) -> str:
         """Get hostname for an IP address"""
