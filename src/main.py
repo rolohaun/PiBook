@@ -353,12 +353,11 @@ class PiBookApp:
                 if self.power_manager.should_enter_sleep():
                     self._enter_sleep()
 
-                # Check battery status every 60 seconds on library screen
+                # Check battery status every 5 minutes on all screens
                 current_time = time.time()
                 if (self.battery_monitor and
-                    self.navigation.is_on_screen(Screen.LIBRARY) and
                     not self.power_manager.is_sleeping and
-                    current_time - last_battery_check >= 60):
+                    current_time - last_battery_check >= 300):  # 5 minutes
 
                     # Force a fresh battery reading
                     self.battery_monitor.force_update()
@@ -394,7 +393,7 @@ class PiBookApp:
                         percentage_change = abs(battery_percentage - last_battery_percentage)
 
                         # Allow changes if:
-                        # 1. Small gradual change (<=5% in 1 minute)
+                        # 1. Small gradual change (<=5% in 5 minutes)
                         # 2. OR charging state is changing (can cause legitimate jumps)
                         if percentage_change <= 5 or battery_charging != last_battery_charging:
                             self.logger.info(f"Battery percentage changed: {last_battery_percentage}% -> {battery_percentage}%")
@@ -790,14 +789,13 @@ class PiBookApp:
     def _update_battery_display(self):
         """Update just the battery icon area with a partial refresh"""
         try:
-            if not self.navigation.is_on_screen(Screen.LIBRARY):
+            # Skip if sleeping
+            if self.power_manager.is_sleeping:
                 return
 
-            # Re-render the library screen to get updated battery icon
-            image = self.library_screen.render()
-
-            # Display with partial refresh (only updates changed pixels)
-            self.display.display_image(image, use_partial=True)
+            # Re-render the current screen to get updated battery icon
+            self._render_current_screen(force_partial=True)
+            self.logger.debug("Battery display updated on current screen")
 
         except Exception as e:
             self.logger.error(f"Battery display update error: {e}", exc_info=True)
