@@ -1625,19 +1625,27 @@ class ToDoScreen:
         draw.text((title_x, y_offset), title, fill='black', font=self.title_font)
         y_offset += 40
 
-        # Draw battery status if available (top right corner)
+        # Draw battery status if available (top right corner - icon only)
         if self.battery_monitor:
             try:
                 battery_pct = self.battery_monitor.get_percentage()
                 charging = self.battery_monitor.is_charging()
 
-                battery_text = f"{battery_pct}%"
+                # Show only icon based on battery level
                 if charging:
-                    battery_text += " ⚡"
+                    battery_icon = "⚡"
+                elif battery_pct > 75:
+                    battery_icon = "🔋"
+                elif battery_pct > 50:
+                    battery_icon = "🔋"
+                elif battery_pct > 25:
+                    battery_icon = "🔋"
+                else:
+                    battery_icon = "🪫"
 
-                battery_bbox = draw.textbbox((0, 0), battery_text, font=self.item_font)
+                battery_bbox = draw.textbbox((0, 0), battery_icon, font=self.item_font)
                 battery_width = battery_bbox[2] - battery_bbox[0]
-                draw.text((self.width - battery_width - 10, 10), battery_text, fill='black', font=self.item_font)
+                draw.text((self.width - battery_width - 10, 10), battery_icon, fill='black', font=self.item_font)
             except Exception as e:
                 self.logger.warning(f"Failed to get battery status: {e}")
 
@@ -1668,39 +1676,69 @@ class ToDoScreen:
                         fill='lightgray'
                     )
 
-                # Draw checkbox
+                # Draw checkbox - centered with text line
                 checkbox_x = 20
-                checkbox_y = y_offset
-                checkbox_size = 16
+                checkbox_size = 24  # Increased from 16 for better visibility
+                # Center checkbox vertically with text
+                text_bbox_temp = draw.textbbox((0, 0), "A", font=self.item_font)
+                text_height = text_bbox_temp[3] - text_bbox_temp[1]
+                checkbox_y = y_offset + (text_height - checkbox_size) // 2
+                
                 draw.rectangle(
                     [(checkbox_x, checkbox_y), (checkbox_x + checkbox_size, checkbox_y + checkbox_size)],
                     outline='black',
                     width=2
                 )
 
-                # Draw checkmark if completed
+                # Draw X if completed
                 if todo['completed']:
-                    draw.text((checkbox_x + 2, checkbox_y - 2), '✓', fill='black', font=self.font)
+                    # Draw X in checkbox
+                    draw.line([(checkbox_x + 4, checkbox_y + 4), (checkbox_x + checkbox_size - 4, checkbox_y + checkbox_size - 4)], fill='black', width=3)
+                    draw.line([(checkbox_x + checkbox_size - 4, checkbox_y + 4), (checkbox_x + 4, checkbox_y + checkbox_size - 4)], fill='black', width=3)
 
-                # Draw todo text
+                # Draw todo text with word wrap
                 text_x = checkbox_x + checkbox_size + 10
                 text_color = 'gray' if todo['completed'] else 'black'
-
-                # Truncate text if too long
                 max_width = self.width - text_x - 20
+                
+                # Word wrap implementation
                 text = todo['text']
-                text_bbox = draw.textbbox((0, 0), text, font=self.item_font)
-                text_width = text_bbox[2] - text_bbox[0]
-
-                while text_width > max_width and len(text) > 0:
-                    text = text[:-1]
-                    text_bbox = draw.textbbox((0, 0), text + "...", font=self.item_font)
-                    text_width = text_bbox[2] - text_bbox[0]
-
-                if len(text) < len(todo['text']):
-                    text += "..."
-
-                draw.text((text_x, checkbox_y), text, fill=text_color, font=self.item_font)
+                words = text.split()
+                lines = []
+                current_line = []
+                
+                for word in words:
+                    test_line = ' '.join(current_line + [word])
+                    test_bbox = draw.textbbox((0, 0), test_line, font=self.item_font)
+                    test_width = test_bbox[2] - test_bbox[0]
+                    
+                    if test_width <= max_width:
+                        current_line.append(word)
+                    else:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = [word]
+                        else:
+                            # Word is too long, truncate it
+                            lines.append(word[:20] + "...")
+                            current_line = []
+                
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                # Draw first line only (to keep items compact)
+                if lines:
+                    line_text = lines[0]
+                    if len(lines) > 1:
+                        line_text += "..."
+                    
+                    draw.text((text_x, y_offset), line_text, fill=text_color, font=self.item_font)
+                    
+                    # Add strikethrough if completed
+                    if todo['completed']:
+                        text_bbox = draw.textbbox((text_x, y_offset), line_text, font=self.item_font)
+                        strike_y = y_offset + text_height // 2
+                        draw.line([(text_x, strike_y), (text_bbox[2], strike_y)], fill=text_color, width=2)
 
                 y_offset += line_height
 
