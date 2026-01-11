@@ -91,14 +91,14 @@ class MainMenuScreen:
         # Define available apps
         self.apps = [
             {
-                'name': 'iReader',
+                'name': 'eReader',
                 'icon': '📖',
                 'description': 'Read EPUB books',
                 'screen': 'library'
             },
             {
-                'name': 'AI Scanner',
-                'icon': '🤖',
+                'name': 'IP Scanner',
+                'icon': '🔍',
                 'description': 'Coming soon',
                 'screen': None
             }
@@ -335,7 +335,15 @@ class LibraryScreen:
                 })
 
         self.books.sort(key=lambda x: x['title'].lower())
-        self.logger.info(f"Loaded {len(self.books)} books")
+
+        # Add Home icon at the end of the list
+        self.books.append({
+            'filename': '__home__',
+            'path': '__home__',
+            'title': '🏠 Home'
+        })
+
+        self.logger.info(f"Loaded {len(self.books) - 1} books")
     
     def _get_cached_wifi_status(self) -> bool:
         """Get WiFi status with caching to avoid expensive subprocess calls"""

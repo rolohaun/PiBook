@@ -581,8 +581,14 @@ class PiBookApp:
         if self.navigation.is_on_screen(Screen.LIBRARY):
             book = self.library_screen.get_selected_book()
             if book:
-                self.logger.info(f"📚 Action: SELECT - Opening book '{book['title']}'")
-                self._open_book(book)
+                # Check if Home icon is selected
+                if book['path'] == '__home__':
+                    self.logger.info("🏠 Action: SELECT - Returning to main menu")
+                    self.navigation.navigate_to(Screen.MAIN_MENU)
+                    self._render_current_screen()
+                else:
+                    self.logger.info(f"📚 Action: SELECT - Opening book '{book['title']}'")
+                    self._open_book(book)
             else:
                 self.logger.warning("No book selected")
 
@@ -649,8 +655,14 @@ class PiBookApp:
             # On library - open selected book (same as select)
             book = self.library_screen.get_selected_book()
             if book:
-                self.logger.info(f"🔄 Action: TOGGLE - Opening book '{book['title']}' from library")
-                self._open_book(book)
+                # Check if Home icon is selected
+                if book['path'] == '__home__':
+                    self.logger.info("🏠 Action: TOGGLE - Returning to main menu")
+                    self.navigation.navigate_to(Screen.MAIN_MENU)
+                    self._render_current_screen()
+                else:
+                    self.logger.info(f"🔄 Action: TOGGLE - Opening book '{book['title']}' from library")
+                    self._open_book(book)
             else:
                 self.logger.warning("No book selected to open")
         elif self.navigation.is_on_screen(Screen.READER):
