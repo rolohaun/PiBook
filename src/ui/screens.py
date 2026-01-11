@@ -1510,7 +1510,7 @@ class ToDoScreen:
         try:
             self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", font_size)
             self.title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 28)
-            self.item_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 16)
+            self.item_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 32)  # Doubled from 16
         except:
             self.font = ImageFont.load_default()
             self.title_font = ImageFont.load_default()
@@ -1519,7 +1519,7 @@ class ToDoScreen:
         # To do items: list of dicts with 'text' and 'completed' keys
         self.todos: List[Dict[str, Any]] = []
         self.current_index = 0  # Currently selected item
-        self.items_per_page = 15  # Number of items visible per page
+        self.items_per_page = 8  # Reduced from 15 for larger font
         self.current_page = 0
 
         # Load todos from file (same location as web server)
@@ -1608,6 +1608,9 @@ class ToDoScreen:
         Returns:
             PIL Image of the screen
         """
+        # Reload todos from file to get latest changes
+        self._load_todos()
+        
         # Create blank image (white background)
         image = Image.new('RGB', (self.width, self.height), 'white')
         draw = ImageDraw.Draw(image)
@@ -1622,10 +1625,10 @@ class ToDoScreen:
         draw.text((title_x, y_offset), title, fill='black', font=self.title_font)
         y_offset += 40
 
-        # Draw battery status if available
+        # Draw battery status if available (top right corner)
         if self.battery_monitor:
             try:
-                battery_pct = self.battery_monitor.get_battery_percentage()
+                battery_pct = self.battery_monitor.get_percentage()
                 charging = self.battery_monitor.is_charging()
 
                 battery_text = f"{battery_pct}%"
@@ -1650,7 +1653,7 @@ class ToDoScreen:
             draw.text(((self.width - msg_width) // 2, self.height // 2), msg, fill='gray', font=self.font)
         else:
             # Draw todo items
-            line_height = 24
+            line_height = 40  # Increased from 24 for larger font
             start_idx = self.current_page * self.items_per_page
             end_idx = min(start_idx + self.items_per_page, len(self.todos))
 
@@ -1716,13 +1719,19 @@ class ToDoScreen:
 
         # Draw help text at bottom
         help_text = "Hold GPIO5: Return to Menu"
-        help_bbox = draw.textbbox((0, 0), help_text, font=self.item_font)
+        # Use smaller font for help text
+        try:
+            help_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 18)
+        except:
+            help_font = self.item_font
+        help_bbox = draw.textbbox((0, 0), help_text, font=help_font)
         help_width = help_bbox[2] - help_bbox[0]
+        help_height = help_bbox[3] - help_bbox[1]
         draw.text(
-            ((self.width - help_width) // 2, self.height - 10),
+            ((self.width - help_width) // 2, self.height - help_height - 15),
             help_text,
             fill='gray',
-            font=self.item_font
+            font=help_font
         )
 
         return image
