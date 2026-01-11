@@ -56,6 +56,212 @@ def get_bluetooth_status():
         return False
 
 
+class MainMenuScreen:
+    """
+    Main menu screen showing available apps
+    Users can navigate with single button: press=next app, hold=select app
+    """
+
+    def __init__(self, width: int = 800, height: int = 480, font_size: int = 24, battery_monitor=None):
+        """
+        Initialize main menu screen
+
+        Args:
+            width: Screen width
+            height: Screen height
+            font_size: Base font size
+            battery_monitor: Optional BatteryMonitor instance
+        """
+        self.width = width
+        self.height = height
+        self.font_size = font_size
+        self.battery_monitor = battery_monitor
+        self.logger = logging.getLogger(__name__)
+
+        # Load fonts
+        try:
+            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", font_size)
+            self.title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 36)
+            self.app_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 20)
+        except:
+            self.font = ImageFont.load_default()
+            self.title_font = ImageFont.load_default()
+            self.app_font = ImageFont.load_default()
+
+        # Define available apps
+        self.apps = [
+            {
+                'name': 'iReader',
+                'icon': '📖',
+                'description': 'Read EPUB books',
+                'screen': 'library'
+            },
+            {
+                'name': 'AI Scanner',
+                'icon': '🤖',
+                'description': 'Coming soon',
+                'screen': None
+            }
+        ]
+
+        self.current_index = 0  # Currently selected app
+
+    def next_app(self):
+        """Move to next app in menu"""
+        self.current_index = (self.current_index + 1) % len(self.apps)
+        self.logger.info(f"Main menu: selected {self.apps[self.current_index]['name']}")
+
+    def get_selected_app(self):
+        """Get currently selected app"""
+        return self.apps[self.current_index]
+
+    def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int, is_charging: bool = False):
+        """Draw battery icon (same as LibraryScreen)"""
+        battery_width = 30
+        battery_height = 14
+        terminal_width = 2
+        terminal_height = 6
+
+        battery_x = x - battery_width
+        draw.rectangle(
+            [(battery_x, y), (battery_x + battery_width, y + battery_height)],
+            outline=0,
+            width=1
+        )
+
+        terminal_x = battery_x + battery_width
+        terminal_y = y + (battery_height - terminal_height) // 2
+        draw.rectangle(
+            [(terminal_x, terminal_y), (terminal_x + terminal_width, terminal_y + terminal_height)],
+            fill=0
+        )
+
+        fill_width = int((battery_width - 4) * (percentage / 100))
+        if fill_width > 0:
+            draw.rectangle(
+                [(battery_x + 2, y + 2), (battery_x + 2 + fill_width, y + battery_height - 2)],
+                fill=0
+            )
+
+        if is_charging:
+            bolt_center_x = battery_x + battery_width // 2
+            bolt_center_y = y + battery_height // 2
+            bolt_points = [
+                (bolt_center_x + 1, bolt_center_y - 5),
+                (bolt_center_x - 1, bolt_center_y - 1),
+                (bolt_center_x + 2, bolt_center_y - 1),
+                (bolt_center_x - 1, bolt_center_y + 5),
+                (bolt_center_x + 1, bolt_center_y + 1),
+                (bolt_center_x - 2, bolt_center_y + 1),
+            ]
+            bolt_color = 1 if fill_width > battery_width - 6 else 0
+            draw.polygon(bolt_points, fill=bolt_color)
+
+        percentage_text = f"{percentage}%"
+        try:
+            bbox = draw.textbbox((0, 0), percentage_text, font=self.font)
+            text_width = bbox[2] - bbox[0]
+        except:
+            text_width = len(percentage_text) * 8
+
+        text_x = battery_x - text_width - 5
+        draw.text((text_x, y), percentage_text, font=self.font, fill=0)
+
+    def render(self) -> Image.Image:
+        """Render main menu screen"""
+        # Create white background
+        image = Image.new('1', (self.width, self.height), 1)
+        draw = ImageDraw.Draw(image)
+
+        # Draw battery status in top-right corner
+        if self.battery_monitor:
+            battery_percentage = self.battery_monitor.get_percentage()
+            is_charging = self.battery_monitor.is_charging()
+            self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage, is_charging)
+
+        # Draw title centered at top
+        title_text = "iBook"
+        try:
+            bbox = draw.textbbox((0, 0), title_text, font=self.title_font)
+            title_width = bbox[2] - bbox[0]
+        except:
+            title_width = len(title_text) * 20
+
+        title_x = (self.width - title_width) // 2
+        draw.text((title_x, 30), title_text, font=self.title_font, fill=0)
+
+        # Calculate app icon layout (centered, grid style)
+        icon_size = 120
+        icon_spacing = 40
+        start_y = 120
+
+        # Draw apps in a grid
+        for idx, app in enumerate(self.apps):
+            # Calculate position (2 apps per row)
+            col = idx % 2
+            row = idx // 2
+
+            x = self.width // 4 + col * (self.width // 2)
+            y = start_y + row * (icon_size + icon_spacing + 60)
+
+            # Highlight selected app with border
+            if idx == self.current_index:
+                # Draw selection box
+                box_size = icon_size + 20
+                box_x = x - box_size // 2
+                box_y = y - 10
+                draw.rectangle(
+                    [(box_x, box_y), (box_x + box_size, box_y + box_size + 50)],
+                    outline=0,
+                    width=3
+                )
+
+            # Draw app icon (large emoji)
+            icon_text = app['icon']
+            try:
+                # Use larger font for icons
+                icon_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 72)
+            except:
+                icon_font = self.title_font
+
+            try:
+                bbox = draw.textbbox((0, 0), icon_text, font=icon_font)
+                icon_width = bbox[2] - bbox[0]
+                icon_height = bbox[3] - bbox[1]
+            except:
+                icon_width = 40
+                icon_height = 40
+
+            icon_x = x - icon_width // 2
+            icon_y = y
+            draw.text((icon_x, icon_y), icon_text, font=icon_font, fill=0)
+
+            # Draw app name below icon
+            name_text = app['name']
+            try:
+                bbox = draw.textbbox((0, 0), name_text, font=self.app_font)
+                name_width = bbox[2] - bbox[0]
+            except:
+                name_width = len(name_text) * 10
+
+            name_x = x - name_width // 2
+            name_y = y + 90
+            draw.text((name_x, name_y), name_text, font=self.app_font, fill=0)
+
+        # Draw instruction text at bottom
+        instruction = "Press: Next App  |  Hold: Select App"
+        try:
+            bbox = draw.textbbox((0, 0), instruction, font=self.app_font)
+            instr_width = bbox[2] - bbox[0]
+        except:
+            instr_width = len(instruction) * 8
+
+        instr_x = (self.width - instr_width) // 2
+        draw.text((instr_x, self.height - 40), instruction, font=self.app_font, fill=0)
+
+        return image
+
+
 class LibraryScreen:
     """
     Book library/selection screen

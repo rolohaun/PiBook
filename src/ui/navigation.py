@@ -10,6 +10,7 @@ import logging
 
 class Screen(Enum):
     """Available screens in the application"""
+    MAIN_MENU = "main_menu"
     LIBRARY = "library"
     READER = "reader"
 
@@ -19,7 +20,7 @@ class NavigationManager:
     Manage UI navigation and state transitions
     """
 
-    def __init__(self, initial_screen: Screen = Screen.LIBRARY):
+    def __init__(self, initial_screen: Screen = Screen.MAIN_MENU):
         """
         Initialize navigation manager
 

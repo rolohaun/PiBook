@@ -21,7 +21,7 @@ from src.display.display_driver import DisplayDriver
 from src.hardware.gpio_handler import GPIOHandler
 from src.hardware.battery_monitor import BatteryMonitor
 from src.ui.navigation import NavigationManager, Screen
-from src.ui.screens import LibraryScreen, ReaderScreen
+from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen
 from src.web.webserver import PiBookWebServer
 from src.utils.progress_manager import ProgressManager
 
@@ -103,12 +103,25 @@ class PiBookApp:
         self.logger.info("Reading progress manager initialized")
         
         # Disable HDMI for battery savings (never needed for e-ink display)
-
-        # HDMI is disabled via /boot/config.txt (dtoverlay=vc4-kms-v3d,nohdmi)
-        self.logger.info("HDMI disabled via boot config")
-
-        # Initialize screens
-        web_port = self.config.get('web.port', 5000)
+
+
+        # HDMI is disabled via /boot/config.txt (dtoverlay=vc4-kms-v3d,nohdmi)
+
+        self.logger.info("HDMI disabled via boot config")
+
+
+
+        # Initialize screens
+
+        web_port = self.config.get('web.port', 5000)
+
+        self.main_menu_screen = MainMenuScreen(
+            width=display_width,
+            height=display_height,
+            font_size=self.config.get('main_menu.font_size', 24),
+            battery_monitor=self.battery_monitor
+        )
+
         self.library_screen = LibraryScreen(
             width=display_width,
             height=display_height,
@@ -503,7 +516,10 @@ class PiBookApp:
 
         self.logger.info("Button: Next")
 
-        if self.navigation.is_on_screen(Screen.LIBRARY):
+        if self.navigation.is_on_screen(Screen.MAIN_MENU):
+            self.logger.info("🏠 Action: NEXT APP (Main Menu)")
+            self.main_menu_screen.next_app()
+        elif self.navigation.is_on_screen(Screen.LIBRARY):
             self.logger.info("📖 Action: NEXT (Library - Move down)")
             self.library_screen.next_item()
         elif self.navigation.is_on_screen(Screen.READER):
@@ -573,7 +589,7 @@ class PiBookApp:
     def _handle_back(self):
         """Handle back button press"""
         if not self.running: return
-        
+
         self._reset_activity()
         if self.is_sleeping:
             self._wake_from_sleep()
@@ -586,11 +602,16 @@ class PiBookApp:
             self.reader_screen.close()
             self.navigation.navigate_to(Screen.LIBRARY)
             self._render_current_screen()
+        elif self.navigation.is_on_screen(Screen.LIBRARY):
+            # Return to main menu
+            self.logger.info("🏠 Action: BACK - Returning to main menu")
+            self.navigation.navigate_to(Screen.MAIN_MENU)
+            self._render_current_screen()
 
     def _handle_menu(self):
         """Handle menu button press"""
         if not self.running: return
-        
+
         self._reset_activity()
         if self.is_sleeping:
             self._wake_from_sleep()
@@ -598,23 +619,33 @@ class PiBookApp:
 
         self.logger.info("Button: Menu")
 
-        # Always return to library
+        # Always return to main menu
         if self.navigation.is_on_screen(Screen.READER):
             self.reader_screen.close()
 
-        self.navigation.navigate_to(Screen.LIBRARY)
+        self.navigation.navigate_to(Screen.MAIN_MENU)
         self._render_current_screen()
 
     def _handle_toggle(self):
         """Handle toggle button press (PiSugar long press)"""
         if not self.running: return
-        
+
         self._reset_activity()
         if self.is_sleeping:
             self._wake_from_sleep()
             return
 
-        if self.navigation.is_on_screen(Screen.LIBRARY):
+        if self.navigation.is_on_screen(Screen.MAIN_MENU):
+            # On main menu - select and launch app
+            app = self.main_menu_screen.get_selected_app()
+            self.logger.info(f"🚀 Action: TOGGLE - Launching app '{app['name']}'")
+
+            if app['screen'] == 'library':
+                self.navigation.navigate_to(Screen.LIBRARY)
+                self._render_current_screen()
+            elif app['screen'] is None:
+                self.logger.info(f"App '{app['name']}' not yet implemented")
+        elif self.navigation.is_on_screen(Screen.LIBRARY):
             # On library - open selected book (same as select)
             book = self.library_screen.get_selected_book()
             if book:
@@ -743,7 +774,10 @@ class PiBookApp:
         try:
             use_partial = False  # Default to full refresh
 
-            if self.navigation.is_on_screen(Screen.LIBRARY):
+            if self.navigation.is_on_screen(Screen.MAIN_MENU):
+                image = self.main_menu_screen.render()
+                use_partial = True  # Use partial refresh for main menu
+            elif self.navigation.is_on_screen(Screen.LIBRARY):
                 image = self.library_screen.render()
                 use_partial = True  # Use partial refresh for library navigation too (faster)
             elif self.navigation.is_on_screen(Screen.READER):
