@@ -14,6 +14,7 @@ class Screen(Enum):
     LIBRARY = "library"
     READER = "reader"
     IP_SCANNER = "ip_scanner"
+    TODO = "todo"
 
 
 class NavigationManager:

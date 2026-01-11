@@ -21,7 +21,7 @@ from src.display.display_driver import DisplayDriver
 from src.hardware.gpio_handler import GPIOHandler
 from src.hardware.battery_monitor import BatteryMonitor
 from src.ui.navigation import NavigationManager, Screen
-from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen, IPScannerScreen
+from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen, IPScannerScreen, ToDoScreen
 from src.web.webserver import PiBookWebServer
 from src.utils.progress_manager import ProgressManager
 
@@ -145,6 +145,13 @@ class PiBookApp:
             width=display_width,
             height=display_height,
             font_size=self.config.get('ip_scanner.font_size', 18),
+            battery_monitor=self.battery_monitor
+        )
+
+        self.todo_screen = ToDoScreen(
+            width=display_width,
+            height=display_height,
+            font_size=self.config.get('todo.font_size', 18),
             battery_monitor=self.battery_monitor
         )
 
@@ -552,8 +559,18 @@ class PiBookApp:
             self.logger.info("📖 Action: NEXT (Library - Move down)")
             self.library_screen.next_item()
         elif self.navigation.is_on_screen(Screen.IP_SCANNER):
-            self.logger.info("🔍 Action: NEXT (IP Scanner - Next page)")
-            self.ip_scanner_screen.next_page()
+            # Start scan if no results yet, otherwise scroll pages
+            if len(self.ip_scanner_screen.devices) == 0 and not self.ip_scanner_screen.scanning:
+                self.logger.info("🔍 Action: NEXT - Starting network scan")
+                self.ip_scanner_screen.start_scan()
+            elif not self.ip_scanner_screen.scanning and len(self.ip_scanner_screen.devices) > 0:
+                self.logger.info("🔍 Action: NEXT (IP Scanner - Next page)")
+                self.ip_scanner_screen.next_page()
+            else:
+                self.logger.info("🔍 Action: NEXT - Scan in progress, waiting...")
+        elif self.navigation.is_on_screen(Screen.TODO):
+            self.logger.info("✓ Action: NEXT (To Do - Move down)")
+            self.todo_screen.next_item()
         elif self.navigation.is_on_screen(Screen.READER):
             self.logger.info("📄 Action: NEXT PAGE (Reader)")
             self.reader_screen.next_page()
@@ -590,6 +607,9 @@ class PiBookApp:
         elif self.navigation.is_on_screen(Screen.IP_SCANNER):
             self.logger.info("🔍 Action: PREVIOUS (IP Scanner - Previous page)")
             self.ip_scanner_screen.prev_page()
+        elif self.navigation.is_on_screen(Screen.TODO):
+            self.logger.info("✓ Action: PREVIOUS (To Do - Move up)")
+            self.todo_screen.prev_item()
         elif self.navigation.is_on_screen(Screen.READER):
             self.logger.info("📄 Action: PREVIOUS PAGE (Reader)")
             self.reader_screen.prev_page()
@@ -687,6 +707,9 @@ class PiBookApp:
             elif app['screen'] == 'ip_scanner':
                 self.navigation.navigate_to(Screen.IP_SCANNER)
                 self._render_current_screen()
+            elif app['screen'] == 'todo':
+                self.navigation.navigate_to(Screen.TODO)
+                self._render_current_screen()
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
         elif self.navigation.is_on_screen(Screen.LIBRARY):
@@ -744,9 +767,14 @@ class PiBookApp:
 
             self._render_current_screen()
         elif self.navigation.is_on_screen(Screen.IP_SCANNER):
-            # On IP scanner - start scan
-            self.logger.info("🔍 Action: TOGGLE - Starting network scan")
-            self.ip_scanner_screen.start_scan()
+            # On IP scanner - return to main menu
+            self.logger.info("🏠 Action: TOGGLE - Returning to main menu from IP Scanner")
+            self.navigation.navigate_to(Screen.MAIN_MENU)
+            self._render_current_screen()
+        elif self.navigation.is_on_screen(Screen.TODO):
+            # On To Do - toggle completion status of current item
+            self.logger.info("✓ Action: TOGGLE - Toggle todo completion")
+            self.todo_screen.toggle_todo()
             self._render_current_screen()
 
     def _open_book(self, book: dict):
@@ -845,6 +873,8 @@ class PiBookApp:
                 image = self.library_screen.render()
             elif self.navigation.is_on_screen(Screen.IP_SCANNER):
                 image = self.ip_scanner_screen.render()
+            elif self.navigation.is_on_screen(Screen.TODO):
+                image = self.todo_screen.render()
             elif self.navigation.is_on_screen(Screen.READER):
                 image = self.reader_screen.get_current_image()
 

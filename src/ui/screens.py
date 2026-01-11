@@ -92,17 +92,42 @@ class MainMenuScreen:
         self.apps = [
             {
                 'name': 'eReader',
-                'icon': '📖',
+                'icon_path': 'assets/icons/ereader.png',
                 'description': 'Read EPUB books',
                 'screen': 'library'
             },
             {
                 'name': 'IP Scanner',
-                'icon': '🔍',
+                'icon_path': 'assets/icons/ip_scanner.png',
                 'description': 'Scan network devices',
                 'screen': 'ip_scanner'
+            },
+            {
+                'name': 'To Do',
+                'icon_path': 'assets/icons/todo.png',
+                'description': 'Manage tasks',
+                'screen': 'todo'
             }
         ]
+
+        # Pre-load icons
+        self.icons = {}
+        icon_size = (120, 120)  # Standard size for icons
+        
+        for app in self.apps:
+            try:
+                if os.path.exists(app['icon_path']):
+                    img = Image.open(app['icon_path'])
+                    # Resize if needed
+                    if img.size != icon_size:
+                        img = img.resize(icon_size, Image.Resampling.LANCZOS)
+                    # Convert to 1-bit if needed (or keep as is and convert during paste)
+                    self.icons[app['name']] = img
+                    self.logger.info(f"Loaded icon for {app['name']}")
+                else:
+                    self.logger.warning(f"Icon not found: {app['icon_path']}")
+            except Exception as e:
+                self.logger.error(f"Failed to load icon for {app['name']}: {e}")
 
         self.current_index = 0  # Currently selected app
 
@@ -216,25 +241,18 @@ class MainMenuScreen:
                     width=3
                 )
 
-            # Draw app icon (large emoji)
-            icon_text = app['icon']
-            try:
-                # Use larger font for icons
-                icon_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 72)
-            except:
-                icon_font = self.title_font
-
-            try:
-                bbox = draw.textbbox((0, 0), icon_text, font=icon_font)
-                icon_width = bbox[2] - bbox[0]
-                icon_height = bbox[3] - bbox[1]
-            except:
-                icon_width = 40
-                icon_height = 40
-
-            icon_x = x - icon_width // 2
-            icon_y = y
-            draw.text((icon_x, icon_y), icon_text, font=icon_font, fill=0)
+            # Draw app icon
+            if app['name'] in self.icons:
+                # Center the 120x120 icon
+                icon_x = x - 60
+                icon_y = y
+                image.paste(self.icons[app['name']], (icon_x, icon_y))
+            else:
+                # Fallback: draw placeholder box
+                icon_x = x - 60
+                icon_y = y
+                draw.rectangle([(icon_x, icon_y), (icon_x + 120, icon_y + 120)], outline=0, width=2)
+                draw.text((icon_x + 45, icon_y + 40), app['name'][0], font=self.title_font, fill=0)
 
             # Draw app name below icon
             name_text = app['name']
@@ -1453,3 +1471,244 @@ class ReaderScreen:
             self.page_cache = None
 
         self.logger.info("Reader closed")
+
+
+class ToDoScreen:
+    """
+    To Do list screen for managing tasks
+    """
+
+    def __init__(self, width: int = 800, height: int = 480, font_size: int = 18, battery_monitor=None):
+        """
+        Initialize To Do screen
+
+        Args:
+            width: Screen width
+            height: Screen height
+            font_size: Base font size
+            battery_monitor: Optional BatteryMonitor instance
+        """
+        self.width = width
+        self.height = height
+        self.font_size = font_size
+        self.battery_monitor = battery_monitor
+        self.logger = logging.getLogger(__name__)
+
+        # Load fonts
+        try:
+            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", font_size)
+            self.title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 28)
+            self.item_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 16)
+        except:
+            self.font = ImageFont.load_default()
+            self.title_font = ImageFont.load_default()
+            self.item_font = ImageFont.load_default()
+
+        # To do items: list of dicts with 'text' and 'completed' keys
+        self.todos: List[Dict[str, Any]] = []
+        self.current_index = 0  # Currently selected item
+        self.items_per_page = 15  # Number of items visible per page
+        self.current_page = 0
+
+        # Load todos from file
+        self.todos_file = "data/todos.json"
+        self._load_todos()
+
+    def _load_todos(self):
+        """Load todos from JSON file"""
+        import os
+        import json
+
+        if os.path.exists(self.todos_file):
+            try:
+                with open(self.todos_file, 'r') as f:
+                    self.todos = json.load(f)
+                self.logger.info(f"Loaded {len(self.todos)} todos from {self.todos_file}")
+            except Exception as e:
+                self.logger.error(f"Failed to load todos: {e}")
+                self.todos = []
+        else:
+            self.logger.info("No todos file found, starting with empty list")
+            self.todos = []
+
+    def _save_todos(self):
+        """Save todos to JSON file"""
+        import os
+        import json
+
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(self.todos_file), exist_ok=True)
+
+        try:
+            with open(self.todos_file, 'w') as f:
+                json.dump(self.todos, f, indent=2)
+            self.logger.info(f"Saved {len(self.todos)} todos to {self.todos_file}")
+        except Exception as e:
+            self.logger.error(f"Failed to save todos: {e}")
+
+    def add_todo(self, text: str):
+        """Add a new todo item"""
+        self.todos.append({
+            'text': text,
+            'completed': False
+        })
+        self._save_todos()
+        self.logger.info(f"Added todo: {text}")
+
+    def toggle_todo(self):
+        """Toggle completion status of current todo"""
+        if 0 <= self.current_index < len(self.todos):
+            self.todos[self.current_index]['completed'] = not self.todos[self.current_index]['completed']
+            self._save_todos()
+            status = "completed" if self.todos[self.current_index]['completed'] else "uncompleted"
+            self.logger.info(f"Marked todo as {status}: {self.todos[self.current_index]['text']}")
+
+    def delete_todo(self):
+        """Delete current todo item"""
+        if 0 <= self.current_index < len(self.todos):
+            deleted = self.todos.pop(self.current_index)
+            self._save_todos()
+            # Adjust current index if needed
+            if self.current_index >= len(self.todos) and len(self.todos) > 0:
+                self.current_index = len(self.todos) - 1
+            self.logger.info(f"Deleted todo: {deleted['text']}")
+
+    def next_item(self):
+        """Move to next todo item"""
+        if len(self.todos) > 0:
+            self.current_index = (self.current_index + 1) % len(self.todos)
+            # Update page if needed
+            self.current_page = self.current_index // self.items_per_page
+
+    def prev_item(self):
+        """Move to previous todo item"""
+        if len(self.todos) > 0:
+            self.current_index = (self.current_index - 1) % len(self.todos)
+            # Update page if needed
+            self.current_page = self.current_index // self.items_per_page
+
+    def render(self) -> Image.Image:
+        """
+        Render the To Do screen
+
+        Returns:
+            PIL Image of the screen
+        """
+        # Create blank image (white background)
+        image = Image.new('RGB', (self.width, self.height), 'white')
+        draw = ImageDraw.Draw(image)
+
+        y_offset = 10
+
+        # Draw title
+        title = "To Do List"
+        title_bbox = draw.textbbox((0, 0), title, font=self.title_font)
+        title_width = title_bbox[2] - title_bbox[0]
+        title_x = (self.width - title_width) // 2
+        draw.text((title_x, y_offset), title, fill='black', font=self.title_font)
+        y_offset += 40
+
+        # Draw battery status if available
+        if self.battery_monitor:
+            try:
+                battery_pct = self.battery_monitor.get_battery_percentage()
+                charging = self.battery_monitor.is_charging()
+
+                battery_text = f"{battery_pct}%"
+                if charging:
+                    battery_text += " ⚡"
+
+                battery_bbox = draw.textbbox((0, 0), battery_text, font=self.item_font)
+                battery_width = battery_bbox[2] - battery_bbox[0]
+                draw.text((self.width - battery_width - 10, 10), battery_text, fill='black', font=self.item_font)
+            except Exception as e:
+                self.logger.warning(f"Failed to get battery status: {e}")
+
+        # Draw separator line
+        draw.line([(10, y_offset), (self.width - 10, y_offset)], fill='black', width=2)
+        y_offset += 10
+
+        # If no todos, show message
+        if len(self.todos) == 0:
+            msg = "No tasks yet"
+            msg_bbox = draw.textbbox((0, 0), msg, font=self.font)
+            msg_width = msg_bbox[2] - msg_bbox[0]
+            draw.text(((self.width - msg_width) // 2, self.height // 2), msg, fill='gray', font=self.font)
+        else:
+            # Draw todo items
+            line_height = 24
+            start_idx = self.current_page * self.items_per_page
+            end_idx = min(start_idx + self.items_per_page, len(self.todos))
+
+            for i in range(start_idx, end_idx):
+                todo = self.todos[i]
+
+                # Highlight current selection
+                if i == self.current_index:
+                    # Draw selection background
+                    draw.rectangle(
+                        [(10, y_offset - 2), (self.width - 10, y_offset + line_height - 2)],
+                        fill='lightgray'
+                    )
+
+                # Draw checkbox
+                checkbox_x = 20
+                checkbox_y = y_offset
+                checkbox_size = 16
+                draw.rectangle(
+                    [(checkbox_x, checkbox_y), (checkbox_x + checkbox_size, checkbox_y + checkbox_size)],
+                    outline='black',
+                    width=2
+                )
+
+                # Draw checkmark if completed
+                if todo['completed']:
+                    draw.text((checkbox_x + 2, checkbox_y - 2), '✓', fill='black', font=self.font)
+
+                # Draw todo text
+                text_x = checkbox_x + checkbox_size + 10
+                text_color = 'gray' if todo['completed'] else 'black'
+
+                # Truncate text if too long
+                max_width = self.width - text_x - 20
+                text = todo['text']
+                text_bbox = draw.textbbox((0, 0), text, font=self.item_font)
+                text_width = text_bbox[2] - text_bbox[0]
+
+                while text_width > max_width and len(text) > 0:
+                    text = text[:-1]
+                    text_bbox = draw.textbbox((0, 0), text + "...", font=self.item_font)
+                    text_width = text_bbox[2] - text_bbox[0]
+
+                if len(text) < len(todo['text']):
+                    text += "..."
+
+                draw.text((text_x, checkbox_y), text, fill=text_color, font=self.item_font)
+
+                y_offset += line_height
+
+            # Draw page indicator if multiple pages
+            total_pages = (len(self.todos) + self.items_per_page - 1) // self.items_per_page
+            if total_pages > 1:
+                page_info = f"Page {self.current_page + 1}/{total_pages}"
+                page_bbox = draw.textbbox((0, 0), page_info, font=self.item_font)
+                page_width = page_bbox[2] - page_bbox[0]
+                draw.text(
+                    ((self.width - page_width) // 2, self.height - 30),
+                    page_info,
+                    fill='black',
+                    font=self.item_font
+                )
+
+        # Draw help text at bottom
+        help_text = "Next: Navigate | Hold: Toggle | Menu: Home"
+        help_bbox = draw.textbbox((0, 0), help_text, font=self.item_font)
+        help_width = help_bbox[2] - help_bbox[0]
+        draw.text(
+            ((self.width - help_width) // 2, self.height - 10),
+            help_text,
+            fill='gray',
+            font=self.item_font
+        )
+
+        return image
