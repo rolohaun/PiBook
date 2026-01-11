@@ -115,18 +115,10 @@ class MainMenuScreen:
         icon_size = (120, 120)  # Standard size for icons
         
         # Calculate absolute path to assets directory
-        # src/ui/screens.py -> src/ui -> src -> root -> assets/icons
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        # Adjust for differing structures if needed, but assuming standard:
-        # If __file__ is in src/ui/screens.py:
-        # dirname -> src/ui
-        # grandparent -> src
-        # great-grandparent -> root
-        
-        # Correct calculation:
-        # os.path.dirname(__file__) is .../src/ui
-        assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets', 'icons')
+        # __file__ is src/ui/screens.py
+        # Go up 2 levels: src/ui -> src -> PiBook (project root)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        assets_dir = os.path.join(project_root, 'assets', 'icons')
         
         self.logger.info(f"Looking for icons in: {assets_dir}")
 
@@ -138,7 +130,10 @@ class MainMenuScreen:
                     # Resize if needed
                     if img.size != icon_size:
                         img = img.resize(icon_size, Image.Resampling.LANCZOS)
-                    # Convert to 1-bit if needed (or keep as is and convert during paste)
+                    # Convert to grayscale first, then to 1-bit for e-ink display
+                    if img.mode != '1':
+                        img = img.convert('L')  # Convert to grayscale
+                        img = img.point(lambda x: 0 if x < 128 else 255, '1')  # Convert to 1-bit
                     self.icons[app['name']] = img
                     self.logger.info(f"Loaded icon for {app['name']}")
                 else:
