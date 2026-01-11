@@ -24,6 +24,8 @@ from src.ui.navigation import NavigationManager, Screen
 from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen, IPScannerScreen, ToDoScreen
 from src.web.webserver import PiBookWebServer
 from src.utils.progress_manager import ProgressManager
+from src.core.power_manager import PowerManager
+from src.core.settings import SettingsManager
 
 
 class PiBookApp:
@@ -48,8 +50,9 @@ class PiBookApp:
         self.logger.info("PiBook E-Reader starting...")
         self.logger.info("=" * 50)
 
-        # Load user settings
-        self.settings = self._load_settings()
+        # Initialize settings manager
+        self.settings_manager = SettingsManager(logger=self.logger)
+        self.settings = self.settings_manager.get_all()
         self.logger.info(f"User settings loaded: {self.settings}")
 
         # Initialize components
@@ -155,55 +158,26 @@ class PiBookApp:
             battery_monitor=self.battery_monitor
         )
 
+        # Initialize power manager
+        self.power_manager = PowerManager(self.config, self.display, self.logger)
+        self.power_manager.sleep_enabled = self.settings.get('sleep_enabled', True)
+        sleep_status = "enabled" if self.power_manager.sleep_enabled else "disabled"
+        self.logger.info(f"Sleep mode {sleep_status}, timeout set to {self.power_manager.sleep_timeout}s for battery optimization")
+
         # State
         self.running = False
         self.page_turn_count = 0
         self.gc_threshold = self.config.get('performance.gc_threshold', 100)
-        # Inactivity tracking for sleep mode (battery optimization)
-        self.sleep_enabled = self.settings.get('sleep_enabled', True)  # Load from settings
-        self.sleep_timeout = self.config.get('power.sleep_timeout', 120)  # 2 minutes default
-        self.last_activity_time = time.time()
-        self.is_sleeping = False
-        sleep_status = "enabled" if self.sleep_enabled else "disabled"
-        self.logger.info(f"Sleep mode {sleep_status}, timeout set to {self.sleep_timeout}s for battery optimization")
 
         # Track last screen for full refresh on screen change
         self.last_screen = None
 
         # Sync sleep status to library screen now that it's defined
-        self.library_screen.sleep_enabled = self.sleep_enabled
+        self.library_screen.sleep_enabled = self.power_manager.sleep_enabled
 
         # Web server
         self.web_server = None
 
-    def _load_settings(self):
-        """Load user settings from settings.json"""
-        import json
-        settings_file = 'settings.json'
-        default_settings = {
-            'zoom': 1.0,
-            'dpi': 150,
-            'full_refresh_interval': 5,
-            'show_page_numbers': True
-        }
-
-        if os.path.exists(settings_file):
-            try:
-                with open(settings_file, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                if hasattr(self, 'logger'):
-                    self.logger.warning(f"Failed to load settings: {e}. Using defaults.")
-                return default_settings
-        else:
-            # Create default settings file
-            try:
-                with open(settings_file, 'w') as f:
-                    json.dump(default_settings, f, indent=2)
-            except Exception as e:
-                if hasattr(self, 'logger'):
-                    self.logger.warning(f"Failed to create settings file: {e}")
-            return default_settings
 
     def _setup_logging(self):
         """Configure logging"""
@@ -256,68 +230,18 @@ class PiBookApp:
         except Exception as e:
             self.logger.warning(f"Failed to read CPU voltage: {e}")
 
+
     def _set_cpu_cores(self, num_cores: int):
-        """
-        Set number of active CPU cores for power management
-        
-        Args:
-            num_cores: Number of cores to keep online (1-4)
-        """
-        try:
-            # Check if feature is enabled
-            if not self.config.get('power.single_core_reading', True):
-                return
-            
-            # Get total cores
-            with open('/sys/devices/system/cpu/present', 'r') as f:
-                present = f.read().strip()
-                if '-' in present:
-                    total_cores = int(present.split('-')[1]) + 1
-                else:
-                    total_cores = 1
-            
-            # Clamp to valid range
-            num_cores = max(1, min(num_cores, total_cores))
-            
-            # Set cores online/offline
-            for cpu_num in range(1, total_cores):  # cpu0 cannot be disabled
-                target_state = '1' if cpu_num < num_cores else '0'
-                cpu_path = f'/sys/devices/system/cpu/cpu{cpu_num}/online'
-                
-                try:
-                    # Use sudo to write to sysfs
-                    import subprocess
-                    subprocess.run(
-                        ['sudo', 'tee', cpu_path],
-                        input=target_state,
-                        text=True,
-                        capture_output=True,
-                        timeout=2
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Failed to set CPU{cpu_num} state: {e}")
-            
-            self.logger.info(f"CPU cores set to {num_cores}/{total_cores} (power management)")
-            
-        except Exception as e:
-            self.logger.warning(f"Failed to manage CPU cores: {e}")
+        """Delegate to PowerManager"""
+        self.power_manager.set_cpu_cores(num_cores)
 
     def _enable_single_core_mode(self):
-        """Enable single-core mode for power saving during reading"""
-        self._set_cpu_cores(1)
+        """Delegate to PowerManager"""
+        self.power_manager.enable_single_core_mode()
 
     def _restore_all_cores(self):
-        """Restore all CPU cores when not reading"""
-        try:
-            with open('/sys/devices/system/cpu/present', 'r') as f:
-                present = f.read().strip()
-                if '-' in present:
-                    total_cores = int(present.split('-')[1]) + 1
-                else:
-                    total_cores = 1
-            self._set_cpu_cores(total_cores)
-        except:
-            self._set_cpu_cores(4)  # Default to 4 cores if detection fails
+        """Delegate to PowerManager"""
+        self.power_manager.restore_all_cores()
 
     def start(self):
         """Start the application"""
@@ -426,14 +350,14 @@ class PiBookApp:
         while self.running:
             try:
                 # Only enter sleep if sleep mode is enabled
-                if self.sleep_enabled and not self.is_sleeping and (time.time() - self.last_activity_time > self.sleep_timeout):
+                if self.power_manager.should_enter_sleep():
                     self._enter_sleep()
 
                 # Check battery status every 60 seconds on library screen
                 current_time = time.time()
                 if (self.battery_monitor and
                     self.navigation.is_on_screen(Screen.LIBRARY) and
-                    not self.is_sleeping and
+                    not self.power_manager.is_sleeping and
                     current_time - last_battery_check >= 60):
 
                     # Force a fresh battery reading
@@ -486,7 +410,7 @@ class PiBookApp:
                     last_battery_check = current_time
 
                 # Refresh IP scanner screen while scanning AND once when it completes
-                if self.navigation.is_on_screen(Screen.IP_SCANNER) and not self.is_sleeping:
+                if self.navigation.is_on_screen(Screen.IP_SCANNER) and not self.power_manager.is_sleeping:
                     current_scanning = self.ip_scanner_screen.scanning
 
                     # Refresh if currently scanning OR just finished scanning
@@ -508,9 +432,7 @@ class PiBookApp:
 
     def _enter_sleep(self):
         """Enter sleep mode"""
-        self.logger.info("Entering sleep mode (inactive)")
-        
-        # Save reading progress before sleeping
+        # Save reading progress before sleeping (app-specific)
         if self.navigation.is_on_screen(Screen.READER) and self.reader_screen.current_book_path:
             self.progress_manager.save_progress(
                 self.reader_screen.current_book_path,
@@ -519,9 +441,7 @@ class PiBookApp:
             )
             self.logger.info("💾 Saved reading progress before sleep")
         
-        self.is_sleeping = True
-        
-        # Stop web server during sleep (battery optimization)
+        # Stop web server during sleep (app-specific)
         if self.web_server and not self.config.get('web.always_on', False):
             try:
                 self.web_server.stop()
@@ -529,60 +449,18 @@ class PiBookApp:
             except:
                 pass
         
-        # Disable WiFi during sleep (battery optimization)
-        if not self.config.get('web.always_on', False):
-            try:
-                os.system("sudo ifconfig wlan0 down")
-                self.logger.info("📶 WiFi disabled for battery savings")
-            except Exception as e:
-                self.logger.warning(f"Failed to disable WiFi: {e}")
-        
-        # Create sleep image
-        from PIL import Image, ImageDraw, ImageFont
-        image = Image.new('1', (self.display.width, self.display.height), 1)
-        draw = ImageDraw.Draw(image)
-        
-        # Try to load a font
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 48)
-        except:
-            font = ImageFont.load_default()
-        
-        # Load sleep message from settings or use default
-        try:
-            import json
-            with open('settings.json', 'r') as f:
-                settings = json.load(f)
-                text = settings.get('sleep_message', 'Shh I\'m sleeping')
-        except:
-            text = 'Shh I\'m sleeping'
-        try:
-            bbox = draw.textbbox((0, 0), text, font=font)
-            w = bbox[2] - bbox[0]
-            h = bbox[3] - bbox[1]
-            draw.text(((self.display.width - w)//2, (self.display.height - h)//2), text, font=font, fill=0)
-        except:
-            draw.text((100, 100), text, fill=0) # Fallback
-            
-        # Full refresh for sleep screen
-        self.display.display_image(image, use_partial=False)
+        # Delegate to PowerManager for WiFi and display
+        sleep_message = self.settings.get('sleep_message', "Shh I'm sleeping")
+        self.power_manager.disable_wifi()
+        self.power_manager.enter_sleep(sleep_message)
 
     def _wake_from_sleep(self):
         """Wake from sleep mode"""
-        self.logger.info("Waking from sleep")
-        self.is_sleeping = False
+        # Delegate to PowerManager
+        self.power_manager.wake_from_sleep()
+        self.power_manager.enable_wifi()
         
-        # Re-enable WiFi (battery optimization)
-        if not self.config.get('web.always_on', False):
-            try:
-                os.system("sudo ifconfig wlan0 up")
-                self.logger.info("📶 WiFi re-enabled")
-                # Wait a moment for WiFi to come up
-                time.sleep(2)
-            except Exception as e:
-                self.logger.warning(f"Failed to enable WiFi: {e}")
-        
-        # Restart web server if it was stopped (battery optimization)
+        # Restart web server if it was stopped (app-specific)
         if not self.web_server and self.config.get('web.enabled', True):
             try:
                 web_port = self.config.get('web.port', 5000)
@@ -599,7 +477,7 @@ class PiBookApp:
         self._render_current_screen()
 
     def _reset_activity(self):
-        self.last_activity_time = time.time()
+        self.power_manager.reset_activity()
 
     def _handle_next(self):
         """Handle next button press"""
@@ -609,7 +487,7 @@ class PiBookApp:
         self._reset_activity()
         
         # If sleeping, just wake up and consume event
-        if self.is_sleeping:
+        if self.power_manager.is_sleeping:
             self._wake_from_sleep()
             return
 
@@ -658,7 +536,7 @@ class PiBookApp:
         if not self.running: return
         
         self._reset_activity()
-        if self.is_sleeping:
+        if self.power_manager.is_sleeping:
             self._wake_from_sleep()
             return
 
@@ -692,7 +570,7 @@ class PiBookApp:
         if not self.running: return
         
         self._reset_activity()
-        if self.is_sleeping:
+        if self.power_manager.is_sleeping:
             self._wake_from_sleep()
             return
 
@@ -715,7 +593,7 @@ class PiBookApp:
         if not self.running: return
 
         self._reset_activity()
-        if self.is_sleeping:
+        if self.power_manager.is_sleeping:
             self._wake_from_sleep()
             return
 
@@ -739,7 +617,7 @@ class PiBookApp:
         if not self.running: return
 
         self._reset_activity()
-        if self.is_sleeping:
+        if self.power_manager.is_sleeping:
             self._wake_from_sleep()
             return
 
@@ -759,7 +637,7 @@ class PiBookApp:
         if not self.running: return
 
         self._reset_activity()
-        if self.is_sleeping:
+        if self.power_manager.is_sleeping:
             self._wake_from_sleep()
             return
 
