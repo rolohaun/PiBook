@@ -44,6 +44,8 @@ books/*.epub
 
 # Output
 output/
+# Allow assets (icons, etc)
+!assets/**/*.png
 *.png
 
 # Waveshare library (downloaded during install)
