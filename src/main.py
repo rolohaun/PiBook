@@ -324,7 +324,7 @@ class PiBookApp:
         # Short press: Next page (in reader) or move down (in library)
         # Long press: Toggle between library and reader
         self.gpio.register_callback('toggle', self._handle_next, long_press=False)
-        self.gpio.register_callback('toggle', self._handle_menu, long_press=True)  # Long press returns to menu
+        self.gpio.register_callback('toggle', self._handle_gpio5_hold, long_press=True)  # Long press: select app or return to menu
 
         self.logger.info("GPIO callbacks registered (short press: next, long press: toggle)")
 
@@ -632,6 +632,43 @@ class PiBookApp:
 
         self.navigation.navigate_to(Screen.MAIN_MENU)
         self._render_current_screen()
+
+    def _handle_gpio5_hold(self):
+        """Handle GPIO5 long press - select app on main menu, return to menu elsewhere"""
+        if not self.running: return
+
+        self._reset_activity()
+        if self.power_manager.is_sleeping:
+            self._wake_from_sleep()
+            return
+
+        if self.navigation.is_on_screen(Screen.MAIN_MENU):
+            # On main menu - select and launch app
+            app = self.main_menu_screen.get_selected_app()
+            self.logger.info(f"🚀 Action: GPIO5 HOLD - Launching app '{app['name']}'")
+
+            if app['screen'] == 'library':
+                self.navigation.navigate_to(Screen.LIBRARY)
+                self._render_current_screen()
+            elif app['screen'] == 'ip_scanner':
+                self.navigation.navigate_to(Screen.IP_SCANNER)
+                self._render_current_screen()
+            elif app['screen'] == 'todo':
+                self.navigation.navigate_to(Screen.TODO)
+                self._render_current_screen()
+            elif app['screen'] is None:
+                self.logger.info(f"App '{app['name']}' not yet implemented")
+        else:
+            # On any other screen - return to main menu
+            self.logger.info("🏠 Action: GPIO5 HOLD - Returning to main menu")
+            
+            if self.navigation.is_on_screen(Screen.READER):
+                self.reader_screen.close()
+                # Restore all CPU cores when leaving reader
+                self._restore_all_cores()
+            
+            self.navigation.navigate_to(Screen.MAIN_MENU)
+            self._render_current_screen()
 
     def _handle_toggle(self):
         """Handle toggle button press (PiSugar long press)"""
