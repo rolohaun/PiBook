@@ -1750,68 +1750,45 @@ class ToDoScreen:
                     draw.line([(checkbox_x + 4, checkbox_y + 4), (checkbox_x + checkbox_size - 4, checkbox_y + checkbox_size - 4)], fill='black', width=3)
                     draw.line([(checkbox_x + checkbox_size - 4, checkbox_y + 4), (checkbox_x + 4, checkbox_y + checkbox_size - 4)], fill='black', width=3)
 
-                # Draw todo text with word wrap
+                # Draw todo text - ensure it fits within max_width
                 text_x = checkbox_x + checkbox_size + 10
-                # Keep text black even when completed (strikethrough will show it's done)
                 text_color = 'black'
                 max_width = self.width - text_x - 20
                 
-                # Word wrap implementation - improved to handle long words
+                # Get the text and ensure it fits
                 text = todo['text']
-                words = text.split()
-                lines = []
-                current_line = []
                 
-                for word in words:
-                    # Test if adding this word would exceed max width
-                    test_line = ' '.join(current_line + [word])
-                    test_bbox = draw.textbbox((0, 0), test_line, font=self.item_font)
-                    test_width = test_bbox[2] - test_bbox[0]
-                    
-                    if test_width <= max_width:
-                        current_line.append(word)
-                    else:
-                        # Save current line if it has content
-                        if current_line:
-                            lines.append(' '.join(current_line))
-                            current_line = []
+                # Measure the full text
+                text_bbox = draw.textbbox((0, 0), text, font=self.item_font)
+                text_width = text_bbox[2] - text_bbox[0]
+                
+                # If text is too long, truncate it
+                if text_width > max_width:
+                    # Truncate character by character until it fits
+                    display_text = text
+                    while len(display_text) > 0:
+                        test_text = display_text + "..."
+                        test_bbox = draw.textbbox((0, 0), test_text, font=self.item_font)
+                        test_width = test_bbox[2] - test_bbox[0]
                         
-                        # Check if single word is too long
-                        word_bbox = draw.textbbox((0, 0), word, font=self.item_font)
-                        word_width = word_bbox[2] - word_bbox[0]
-                        
-                        if word_width > max_width:
-                            # Truncate long word to fit
-                            truncated = word
-                            while len(truncated) > 0:
-                                test_word = truncated + "..."
-                                test_bbox = draw.textbbox((0, 0), test_word, font=self.item_font)
-                                if test_bbox[2] - test_bbox[0] <= max_width:
-                                    lines.append(test_word)
-                                    break
-                                truncated = truncated[:-1]
-                        else:
-                            current_line = [word]
-                
-                # Add remaining words
-                if current_line:
-                    lines.append(' '.join(current_line))
-                
-                # Draw first line only (to keep items compact)
-                if lines:
-                    line_text = lines[0]
-                    if len(lines) > 1:
-                        line_text += "..."
+                        if test_width <= max_width:
+                            text = test_text
+                            break
+                        display_text = display_text[:-1]
                     
-                    draw.text((text_x, y_offset), line_text, fill=text_color, font=self.item_font)
-                    
-                    # Add thicker strikethrough if completed
-                    if todo['completed']:
-                        text_bbox = draw.textbbox((text_x, y_offset), line_text, font=self.item_font)
-                        text_height = text_bbox[3] - text_bbox[1]
-                        strike_y = y_offset + text_height // 2
-                        # Increased width from 2 to 4 for thicker line
-                        draw.line([(text_x, strike_y), (text_bbox[2], strike_y)], fill='black', width=4)
+                    if len(display_text) == 0:
+                        text = "..."
+                
+                # Draw the text
+                draw.text((text_x, y_offset), text, fill=text_color, font=self.item_font)
+                
+                # Add thicker strikethrough if completed
+                if todo['completed']:
+                    final_bbox = draw.textbbox((text_x, y_offset), text, font=self.item_font)
+                    text_height = final_bbox[3] - final_bbox[1]
+                    strike_y = y_offset + text_height // 2
+                    # Increased width from 2 to 4 for thicker line
+                    draw.line([(text_x, strike_y), (final_bbox[2], strike_y)], fill='black', width=4)
 
                 y_offset += line_height
 
