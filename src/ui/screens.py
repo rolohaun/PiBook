@@ -183,16 +183,17 @@ class MainMenuScreen:
         if is_charging:
             bolt_center_x = battery_x + battery_width // 2
             bolt_center_y = y + battery_height // 2
+            # Larger, more visible lightning bolt
             bolt_points = [
-                (bolt_center_x + 1, bolt_center_y - 5),
-                (bolt_center_x - 1, bolt_center_y - 1),
-                (bolt_center_x + 2, bolt_center_y - 1),
-                (bolt_center_x - 1, bolt_center_y + 5),
-                (bolt_center_x + 1, bolt_center_y + 1),
-                (bolt_center_x - 2, bolt_center_y + 1),
+                (bolt_center_x + 2, bolt_center_y - 6),    # Top tip
+                (bolt_center_x - 2, bolt_center_y - 1),    # Upper left
+                (bolt_center_x + 3, bolt_center_y - 1),    # Upper right
+                (bolt_center_x - 2, bolt_center_y + 6),    # Bottom tip
+                (bolt_center_x + 2, bolt_center_y + 1),    # Lower right
+                (bolt_center_x - 3, bolt_center_y + 1),    # Lower left
             ]
-            bolt_color = 1 if fill_width > battery_width - 6 else 0
-            draw.polygon(bolt_points, fill=bolt_color)
+            # Draw white bolt with black outline for visibility
+            draw.polygon(bolt_points, fill=1, outline=0)
 
         percentage_text = f"{percentage}%"
         try:
@@ -620,9 +621,19 @@ class IPScannerScreen:
 
         # Draw charging indicator (lightning bolt) if charging
         if is_charging:
-            bolt_x = battery_x + battery_width // 2 - 2
-            bolt_y = battery_y + 2
-            draw.text((bolt_x, bolt_y), "⚡", font=self.small_font, fill=0)
+            bolt_center_x = battery_x + battery_width // 2
+            bolt_center_y = battery_y + battery_height // 2
+            # Larger, more visible lightning bolt
+            bolt_points = [
+                (bolt_center_x + 2, bolt_center_y - 6),    # Top tip
+                (bolt_center_x - 2, bolt_center_y - 1),    # Upper left
+                (bolt_center_x + 3, bolt_center_y - 1),    # Upper right
+                (bolt_center_x - 2, bolt_center_y + 6),    # Bottom tip
+                (bolt_center_x + 2, bolt_center_y + 1),    # Lower right
+                (bolt_center_x - 3, bolt_center_y + 1),    # Lower left
+            ]
+            # Draw white bolt with black outline for visibility
+            draw.polygon(bolt_points, fill=1, outline=0)
 
         # Draw percentage text to the left
         percentage_text = f"{percentage}%"
