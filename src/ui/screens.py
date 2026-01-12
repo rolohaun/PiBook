@@ -1571,6 +1571,8 @@ class ToDoScreen:
             percentage: Battery percentage (0-100)
             is_charging: Whether battery is currently charging
         """
+        self.logger.debug(f"Drawing battery icon: {percentage}% charging={is_charging}")
+        
         # Battery dimensions
         battery_width = 30
         battery_height = 14
