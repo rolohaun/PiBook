@@ -1750,47 +1750,74 @@ class ToDoScreen:
                     draw.line([(checkbox_x + 4, checkbox_y + 4), (checkbox_x + checkbox_size - 4, checkbox_y + checkbox_size - 4)], fill='black', width=3)
                     draw.line([(checkbox_x + checkbox_size - 4, checkbox_y + 4), (checkbox_x + 4, checkbox_y + checkbox_size - 4)], fill='black', width=3)
 
-                # Draw todo text - ensure it fits within max_width
+                # Draw todo text - multi-line word wrap
                 text_x = checkbox_x + checkbox_size + 10
                 text_color = 'black'
                 max_width = self.width - text_x - 20
+                max_lines = 3  # Maximum lines per task
                 
-                # Get the text and ensure it fits
+                # Word wrap implementation
                 text = todo['text']
+                words = text.split()
+                lines = []
+                current_line = []
                 
-                # Measure the full text
-                text_bbox = draw.textbbox((0, 0), text, font=self.item_font)
-                text_width = text_bbox[2] - text_bbox[0]
-                
-                # If text is too long, truncate it
-                if text_width > max_width:
-                    # Truncate character by character until it fits
-                    display_text = text
-                    while len(display_text) > 0:
-                        test_text = display_text + "..."
-                        test_bbox = draw.textbbox((0, 0), test_text, font=self.item_font)
-                        test_width = test_bbox[2] - test_bbox[0]
-                        
-                        if test_width <= max_width:
-                            text = test_text
-                            break
-                        display_text = display_text[:-1]
+                for word in words:
+                    # Test if adding this word would exceed max width
+                    test_line = ' '.join(current_line + [word])
+                    test_bbox = draw.textbbox((0, 0), test_line, font=self.item_font)
+                    test_width = test_bbox[2] - test_bbox[0]
                     
-                    if len(display_text) == 0:
-                        text = "..."
+                    if test_width <= max_width:
+                        current_line.append(word)
+                    else:
+                        # Save current line if it has content
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = [word]
+                        else:
+                            # Single word is too long, truncate it
+                            truncated = word
+                            while len(truncated) > 0:
+                                test_word = truncated + "..."
+                                test_bbox = draw.textbbox((0, 0), test_word, font=self.item_font)
+                                if test_bbox[2] - test_bbox[0] <= max_width:
+                                    lines.append(test_word)
+                                    break
+                                truncated = truncated[:-1]
+                            current_line = []
+                        
+                        # Stop if we've reached max lines
+                        if len(lines) >= max_lines:
+                            break
                 
-                # Draw the text
-                draw.text((text_x, y_offset), text, fill=text_color, font=self.item_font)
+                # Add remaining words if we haven't hit max lines
+                if current_line and len(lines) < max_lines:
+                    lines.append(' '.join(current_line))
                 
-                # Add thicker strikethrough if completed
-                if todo['completed']:
-                    final_bbox = draw.textbbox((text_x, y_offset), text, font=self.item_font)
-                    text_height = final_bbox[3] - final_bbox[1]
-                    strike_y = y_offset + text_height // 2
-                    # Increased width from 2 to 4 for thicker line
-                    draw.line([(text_x, strike_y), (final_bbox[2], strike_y)], fill='black', width=4)
+                # Limit to max_lines and add ellipsis if truncated
+                if len(lines) > max_lines:
+                    lines = lines[:max_lines]
+                    lines[-1] = lines[-1] + "..."
+                
+                # Draw each line
+                line_spacing = 36  # Spacing between lines
+                current_y = y_offset
+                
+                for i, line_text in enumerate(lines):
+                    draw.text((text_x, current_y), line_text, fill=text_color, font=self.item_font)
+                    
+                    # Add strikethrough if completed (only on first line for clarity)
+                    if todo['completed'] and i == 0:
+                        text_bbox = draw.textbbox((text_x, current_y), line_text, font=self.item_font)
+                        text_height = text_bbox[3] - text_bbox[1]
+                        strike_y = current_y + text_height // 2
+                        draw.line([(text_x, strike_y), (text_bbox[2], strike_y)], fill='black', width=4)
+                    
+                    current_y += line_spacing
 
-                y_offset += line_height
+                # Adjust y_offset based on number of lines drawn
+                y_offset += max(line_height, len(lines) * line_spacing)
 
             # Draw page indicator if multiple pages
             total_pages = (len(self.todos) + self.items_per_page - 1) // self.items_per_page
