@@ -324,7 +324,7 @@ class PiBookApp:
         # Short press: Next page (in reader) or move down (in library)
         # Long press: Toggle between library and reader
         self.gpio.register_callback('toggle', self._handle_next, long_press=False)
-        self.gpio.register_callback('toggle', self._handle_toggle, long_press=True)
+        self.gpio.register_callback('toggle', self._handle_menu, long_press=True)  # Long press returns to menu
 
         self.logger.info("GPIO callbacks registered (short press: next, long press: toggle)")
 
