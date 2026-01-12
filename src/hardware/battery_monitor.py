@@ -97,14 +97,32 @@ class PiSugar2Backend(BatteryBackend):
 
     def is_charging(self) -> bool:
         """Check if battery is charging from PiSugar2"""
+        # Try multiple methods to detect charging
+        
+        # Method 1: battery_charging command
         response = self._send_command("get battery_charging")
         if response:
             try:
                 # Response format: "battery_charging: true" or "battery_charging: false"
                 charging_str = response.split(":")[-1].strip().lower()
-                return charging_str == "true"
-            except:
-                pass
+                is_charging = charging_str == "true"
+                self.logger.debug(f"Charging status (battery_charging): {is_charging} (response: {response})")
+                return is_charging
+            except Exception as e:
+                self.logger.warning(f"Failed to parse battery_charging: {e}")
+        
+        # Method 2: Try battery_power_plugged (alternative command)
+        response2 = self._send_command("get battery_power_plugged")
+        if response2:
+            try:
+                plugged_str = response2.split(":")[-1].strip().lower()
+                is_plugged = plugged_str == "true"
+                self.logger.debug(f"Charging status (power_plugged): {is_plugged} (response: {response2})")
+                return is_plugged
+            except Exception as e:
+                self.logger.warning(f"Failed to parse battery_power_plugged: {e}")
+        
+        self.logger.debug("No charging status detected, returning False")
         return False
 
     def is_available(self) -> bool:
