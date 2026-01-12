@@ -1807,8 +1807,8 @@ class ToDoScreen:
                 for i, line_text in enumerate(lines):
                     draw.text((text_x, current_y), line_text, fill=text_color, font=self.item_font)
                     
-                    # Add strikethrough if completed (only on first line for clarity)
-                    if todo['completed'] and i == 0:
+                    # Add strikethrough if completed (on all lines)
+                    if todo['completed']:
                         text_bbox = draw.textbbox((text_x, current_y), line_text, font=self.item_font)
                         text_height = text_bbox[3] - text_bbox[1]
                         strike_y = current_y + text_height // 2
