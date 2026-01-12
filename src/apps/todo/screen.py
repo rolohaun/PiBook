@@ -374,7 +374,7 @@ class ToDoScreen:
                 )
 
         # Draw help text at bottom
-        help_text = "Hold GPIO5: Return to Menu"
+        help_text = "HOLD GPIO5: Menu"
         # Use smaller font for help text
         try:
             help_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 18)
