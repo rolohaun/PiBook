@@ -195,17 +195,20 @@ class PiBookWebServer:
         def save_settings():
             """Save user settings"""
             try:
+                # Get JSON data from request
+                data = request.get_json()
+                
                 settings_data = {
-                    'zoom': float(request.form.get('zoom', 1.0)),
-                    'dpi': int(request.form.get('dpi', 150)),
-                    'full_refresh_interval': int(request.form.get('full_refresh_interval', 10)),
-                    'show_page_numbers': request.form.get('show_page_numbers') == 'on',
-                    'wifi_while_reading': request.form.get('wifi_while_reading') == 'on',
-                    'sleep_enabled': request.form.get('sleep_enabled') == 'on',
-                    'sleep_message': request.form.get('sleep_message', 'Shh I\'m sleeping'),
-                    'sleep_timeout': int(request.form.get('sleep_timeout', 120)),
-                    'items_per_page': int(request.form.get('items_per_page', 4)),
-                    'undervolt': int(request.form.get('undervolt', -2))
+                    'zoom': float(data.get('zoom', 1.0)),
+                    'dpi': int(data.get('dpi', 150)),
+                    'full_refresh_interval': int(data.get('full_refresh_interval', 10)),
+                    'show_page_numbers': data.get('show_page_numbers', False),
+                    'wifi_while_reading': data.get('wifi_while_reading', False),
+                    'sleep_enabled': data.get('sleep_enabled', False),
+                    'sleep_message': data.get('sleep_message', 'Shh I\'m sleeping'),
+                    'sleep_timeout': int(data.get('sleep_timeout', 120)),
+                    'items_per_page': int(data.get('items_per_page', 4)),
+                    'undervolt': int(data.get('undervolt', -2))
                 }
 
                 self._save_settings(settings_data)
