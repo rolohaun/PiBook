@@ -293,7 +293,6 @@ class MainMenuScreen:
         return image
 
 
-class IPScannerScreen:
 
 class LibraryScreen:
     """
