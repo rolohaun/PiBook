@@ -21,7 +21,8 @@ from src.display.display_driver import DisplayDriver
 from src.hardware.gpio_handler import GPIOHandler
 from src.hardware.battery_monitor import BatteryMonitor
 from src.ui.navigation import NavigationManager, Screen
-from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen, IPScannerScreen, ToDoScreen
+from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen, IPScannerScreen
+from src.apps.todo import ToDoScreen
 from src.web.webserver import PiBookWebServer
 from src.utils.progress_manager import ProgressManager
 from src.core.power_manager import PowerManager
