@@ -5,10 +5,22 @@ E-ink display screen for scanning and displaying network devices.
 """
 
 import logging
+import socket
 import subprocess
 from typing import List, Dict
 from PIL import Image, ImageDraw, ImageFont
-from src.utils.network import get_ip_address
+
+
+def get_ip_address():
+    """Get the Pi's local IP address"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "No Network"
 
 
 class IPScannerScreen:
