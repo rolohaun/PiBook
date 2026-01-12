@@ -276,7 +276,7 @@ class MainMenuScreen:
                 name_width = len(name_text) * 10
 
             name_x = x - name_width // 2
-            name_y = y + 90
+            name_y = y + 130  # Increased from 90 to add more spacing
             draw.text((name_x, name_y), name_text, font=self.app_font, fill=0)
 
         # Draw instruction text at bottom
