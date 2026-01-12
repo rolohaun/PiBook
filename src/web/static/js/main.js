@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(response => response.json())
                 .then(result => {
                     const messageDiv = document.getElementById('settings-message');
-                    if (result.success) {
+                    if (result.status === 'success') {
                         messageDiv.className = 'message success';
                         messageDiv.innerHTML = '<strong>✓ Settings saved successfully!</strong><br>Changes will take effect on next restart.';
                         messageDiv.style.display = 'block';
