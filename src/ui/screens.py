@@ -1756,13 +1756,14 @@ class ToDoScreen:
                 text_color = 'black'
                 max_width = self.width - text_x - 20
                 
-                # Word wrap implementation
+                # Word wrap implementation - improved to handle long words
                 text = todo['text']
                 words = text.split()
                 lines = []
                 current_line = []
                 
                 for word in words:
+                    # Test if adding this word would exceed max width
                     test_line = ' '.join(current_line + [word])
                     test_bbox = draw.textbbox((0, 0), test_line, font=self.item_font)
                     test_width = test_bbox[2] - test_bbox[0]
@@ -1770,14 +1771,29 @@ class ToDoScreen:
                     if test_width <= max_width:
                         current_line.append(word)
                     else:
+                        # Save current line if it has content
                         if current_line:
                             lines.append(' '.join(current_line))
-                            current_line = [word]
-                        else:
-                            # Word is too long, truncate it
-                            lines.append(word[:20] + "...")
                             current_line = []
+                        
+                        # Check if single word is too long
+                        word_bbox = draw.textbbox((0, 0), word, font=self.item_font)
+                        word_width = word_bbox[2] - word_bbox[0]
+                        
+                        if word_width > max_width:
+                            # Truncate long word to fit
+                            truncated = word
+                            while len(truncated) > 0:
+                                test_word = truncated + "..."
+                                test_bbox = draw.textbbox((0, 0), test_word, font=self.item_font)
+                                if test_bbox[2] - test_bbox[0] <= max_width:
+                                    lines.append(test_word)
+                                    break
+                                truncated = truncated[:-1]
+                        else:
+                            current_line = [word]
                 
+                # Add remaining words
                 if current_line:
                     lines.append(' '.join(current_line))
                 
@@ -1789,12 +1805,13 @@ class ToDoScreen:
                     
                     draw.text((text_x, y_offset), line_text, fill=text_color, font=self.item_font)
                     
-                    # Add strikethrough if completed
+                    # Add thicker strikethrough if completed
                     if todo['completed']:
                         text_bbox = draw.textbbox((text_x, y_offset), line_text, font=self.item_font)
                         text_height = text_bbox[3] - text_bbox[1]
                         strike_y = y_offset + text_height // 2
-                        draw.line([(text_x, strike_y), (text_bbox[2], strike_y)], fill='black', width=2)
+                        # Increased width from 2 to 4 for thicker line
+                        draw.line([(text_x, strike_y), (text_bbox[2], strike_y)], fill='black', width=4)
 
                 y_offset += line_height
 
