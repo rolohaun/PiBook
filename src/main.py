@@ -658,8 +658,22 @@ class PiBookApp:
                 self._render_current_screen()
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
+        elif self.navigation.is_on_screen(Screen.LIBRARY):
+            # On library - open selected book (same as select button)
+            book = self.library_screen.get_selected_book()
+            if book:
+                # Check if Home icon is selected
+                if book['path'] == '__home__':
+                    self.logger.info("🏠 Action: GPIO5 HOLD - Returning to main menu from library")
+                    self.navigation.navigate_to(Screen.MAIN_MENU)
+                    self._render_current_screen()
+                else:
+                    self.logger.info(f"📖 Action: GPIO5 HOLD - Opening book '{book['title']}'")
+                    self._open_book(book)
+            else:
+                self.logger.warning("No book selected to open")
         else:
-            # On any other screen - return to main menu
+            # On any other screen (IP Scanner, To-Do, Reader) - return to main menu
             self.logger.info("🏠 Action: GPIO5 HOLD - Returning to main menu")
             
             if self.navigation.is_on_screen(Screen.READER):
