@@ -511,7 +511,7 @@ class PiBookWebServer:
         settings_file = 'settings.json'
         try:
             with open(settings_file, 'w') as f:
-                json.dump(settings_data, indent=2, fp=f)
+                json.dump(settings_data, f, indent=2)
         except Exception as e:
             self.logger.error(f"Failed to save settings: {e}")
             raise
