@@ -373,21 +373,15 @@ class ToDoScreen:
                     font=self.item_font
                 )
 
-        # Draw help text at bottom
-        help_text = "HOLD GPIO5: Menu"
-        # Use smaller font for help text
+        # Draw help text at bottom (matching MainMenuScreen format)
+        help_text = "Hold: Main Menu"
         try:
-            help_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 18)
+            bbox = draw.textbbox((0, 0), help_text, font=self.font)
+            help_width = bbox[2] - bbox[0]
         except:
-            help_font = self.item_font
-        help_bbox = draw.textbbox((0, 0), help_text, font=help_font)
-        help_width = help_bbox[2] - help_bbox[0]
-        help_height = help_bbox[3] - help_bbox[1]
-        draw.text(
-            ((self.width - help_width) // 2, self.height - help_height - 15),
-            help_text,
-            fill='gray',
-            font=help_font
-        )
+            help_width = len(help_text) * 8
+
+        help_x = (self.width - help_width) // 2
+        draw.text((help_x, self.height - 40), help_text, font=self.font, fill='black')
 
         return image
