@@ -97,27 +97,42 @@ class PiSugar2Backend(BatteryBackend):
 
     def is_charging(self) -> bool:
         """Check if battery is charging from PiSugar2"""
-        # Try multiple methods to detect charging
+        # The battery_charging command is unreliable, use current instead
+        # Positive current = charging, negative = discharging
         
-        # Method 1: battery_charging command
-        response = self._send_command("get battery_charging")
+        # Method 1: Check battery current (most reliable)
+        response = self._send_command("get battery_i")
         if response:
             try:
-                # Response format: "battery_charging: true" or "battery_charging: false"
-                charging_str = response.split(":")[-1].strip().lower()
-                is_charging = charging_str == "true"
-                self.logger.debug(f"Charging status (battery_charging): {is_charging} (response: {response})")
+                # Response format: "battery_i: 0.123456" (in Amps)
+                current_str = response.split(":")[-1].strip()
+                current = float(current_str)
+                # Positive current means charging (threshold: > 0.01A to avoid noise)
+                is_charging = current > 0.01
+                self.logger.debug(f"Charging status (current): {is_charging} (current: {current}A)")
                 return is_charging
             except Exception as e:
-                self.logger.warning(f"Failed to parse battery_charging: {e}")
+                self.logger.warning(f"Failed to parse battery_i: {e}")
         
-        # Method 2: Try battery_power_plugged (alternative command)
-        response2 = self._send_command("get battery_power_plugged")
+        # Method 2: Try battery_current as alternative
+        response2 = self._send_command("get battery_current")
         if response2:
             try:
-                plugged_str = response2.split(":")[-1].strip().lower()
+                current_str = response2.split(":")[-1].strip()
+                current = float(current_str)
+                is_charging = current > 0.01
+                self.logger.debug(f"Charging status (battery_current): {is_charging} (current: {current}A)")
+                return is_charging
+            except Exception as e:
+                self.logger.warning(f"Failed to parse battery_current: {e}")
+        
+        # Method 3: Fallback to battery_power_plugged
+        response3 = self._send_command("get battery_power_plugged")
+        if response3:
+            try:
+                plugged_str = response3.split(":")[-1].strip().lower()
                 is_plugged = plugged_str == "true"
-                self.logger.debug(f"Charging status (power_plugged): {is_plugged} (response: {response2})")
+                self.logger.debug(f"Charging status (power_plugged): {is_plugged}")
                 return is_plugged
             except Exception as e:
                 self.logger.warning(f"Failed to parse battery_power_plugged: {e}")
