@@ -1605,17 +1605,17 @@ class ToDoScreen:
         if is_charging:
             bolt_center_x = battery_x + battery_width // 2
             bolt_center_y = y + battery_height // 2
+            # Larger, more visible lightning bolt
             bolt_points = [
-                (bolt_center_x + 1, bolt_center_y - 5),
-                (bolt_center_x - 1, bolt_center_y - 1),
-                (bolt_center_x + 2, bolt_center_y - 1),
-                (bolt_center_x - 1, bolt_center_y + 5),
-                (bolt_center_x + 1, bolt_center_y + 1),
-                (bolt_center_x - 2, bolt_center_y + 1),
+                (bolt_center_x + 2, bolt_center_y - 6),    # Top tip
+                (bolt_center_x - 2, bolt_center_y - 1),    # Upper left
+                (bolt_center_x + 3, bolt_center_y - 1),    # Upper right
+                (bolt_center_x - 2, bolt_center_y + 6),    # Bottom tip
+                (bolt_center_x + 2, bolt_center_y + 1),    # Lower right
+                (bolt_center_x - 3, bolt_center_y + 1),    # Lower left
             ]
-            # For a white background, bolt should be black
-            bolt_color = 'black'
-            draw.polygon(bolt_points, fill=bolt_color)
+            # Draw white bolt so it's visible against battery fill
+            draw.polygon(bolt_points, fill='white', outline='black')
 
         # Draw percentage text
         percentage_text = f"{percentage}%"
