@@ -155,11 +155,52 @@ class IPScannerScreen:
             self.scanning = False
             self.scan_progress = 100
 
-    def _get_hostname_nmap(self, ip: str) -> str:
-        """Resolve hostname for an IP address using nmap"""
+    def _get_hostname(self, ip: str) -> str:
+        """Resolve hostname for an IP address using multiple methods"""
+
+        # Method 1: Try avahi-resolve for mDNS (.local) names
+        # This is the best way to find Raspberry Pi hostnames like mainsailos.local
         try:
-            # Use nmap with -sL (list scan) for DNS resolution
-            # This does reverse DNS and also checks mDNS/NetBIOS
+            result = subprocess.run(
+                ['avahi-resolve', '-a', ip],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # Output format: "192.168.1.101	mainsailos.local"
+                parts = result.stdout.strip().split('\t')
+                if len(parts) >= 2:
+                    hostname = parts[1].strip()
+                    if hostname:
+                        self.logger.debug(f"avahi-resolve found {hostname} for {ip}")
+                        return hostname
+        except FileNotFoundError:
+            self.logger.debug("avahi-resolve not installed")
+        except Exception as e:
+            self.logger.debug(f"avahi-resolve failed for {ip}: {e}")
+
+        # Method 2: Try getent hosts (uses NSS which includes mDNS if configured)
+        try:
+            result = subprocess.run(
+                ['getent', 'hosts', ip],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # Output format: "192.168.1.101   mainsailos.local"
+                parts = result.stdout.strip().split()
+                if len(parts) >= 2:
+                    hostname = parts[1].strip()
+                    if hostname and hostname != ip:
+                        self.logger.debug(f"getent found {hostname} for {ip}")
+                        return hostname
+        except Exception as e:
+            self.logger.debug(f"getent failed for {ip}: {e}")
+
+        # Method 3: Try nmap with reverse DNS
+        try:
             result = subprocess.run(
                 ['nmap', '-sn', '-R', ip],
                 capture_output=True,
@@ -167,29 +208,29 @@ class IPScannerScreen:
                 timeout=10
             )
             if result.returncode == 0:
-                # Parse nmap output for hostname
-                # Example: "Nmap scan report for mainsailos.local (192.168.1.101)"
-                # or: "Nmap scan report for 192.168.1.101"
                 for line in result.stdout.split('\n'):
                     if 'Nmap scan report for' in line:
                         parts = line.replace('Nmap scan report for ', '').strip()
-                        # Check if there's a hostname before the IP
                         if '(' in parts:
                             hostname = parts.split('(')[0].strip()
                             if hostname and hostname != ip:
+                                self.logger.debug(f"nmap found {hostname} for {ip}")
                                 return hostname
-                        # Sometimes nmap puts hostname without parentheses
                         elif not parts.replace('.', '').isdigit():
+                            self.logger.debug(f"nmap found {parts} for {ip}")
                             return parts
         except Exception as e:
             self.logger.debug(f"nmap hostname lookup failed for {ip}: {e}")
 
-        # Fallback to socket lookup
+        # Method 4: Fallback to socket reverse DNS lookup
         try:
             hostname = socket.gethostbyaddr(ip)[0]
-            return hostname
+            if hostname and hostname != ip:
+                self.logger.debug(f"socket found {hostname} for {ip}")
+                return hostname
         except (socket.herror, socket.gaierror, socket.timeout):
             pass
+
         return ""
 
     def _check_port_80(self, ip: str) -> bool:
@@ -209,12 +250,12 @@ class IPScannerScreen:
 
         def enrich_device(device):
             ip = device['ip']
-            device['hostname'] = self._get_hostname_nmap(ip)
+            device['hostname'] = self._get_hostname(ip)
             device['http'] = self._check_port_80(ip)
             return device
 
-        # Enrich devices in parallel for speed
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # Enrich devices in parallel for speed (limited workers due to subprocess calls)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(enrich_device, device) for device in self.devices]
             concurrent.futures.wait(futures)
 
