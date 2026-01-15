@@ -155,8 +155,36 @@ class IPScannerScreen:
             self.scanning = False
             self.scan_progress = 100
 
-    def _get_hostname(self, ip: str) -> str:
-        """Resolve hostname for an IP address"""
+    def _get_hostname_nmap(self, ip: str) -> str:
+        """Resolve hostname for an IP address using nmap"""
+        try:
+            # Use nmap with -sL (list scan) for DNS resolution
+            # This does reverse DNS and also checks mDNS/NetBIOS
+            result = subprocess.run(
+                ['nmap', '-sn', '-R', ip],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                # Parse nmap output for hostname
+                # Example: "Nmap scan report for mainsailos.local (192.168.1.101)"
+                # or: "Nmap scan report for 192.168.1.101"
+                for line in result.stdout.split('\n'):
+                    if 'Nmap scan report for' in line:
+                        parts = line.replace('Nmap scan report for ', '').strip()
+                        # Check if there's a hostname before the IP
+                        if '(' in parts:
+                            hostname = parts.split('(')[0].strip()
+                            if hostname and hostname != ip:
+                                return hostname
+                        # Sometimes nmap puts hostname without parentheses
+                        elif not parts.replace('.', '').isdigit():
+                            return parts
+        except Exception as e:
+            self.logger.debug(f"nmap hostname lookup failed for {ip}: {e}")
+
+        # Fallback to socket lookup
         try:
             hostname = socket.gethostbyaddr(ip)[0]
             return hostname
@@ -181,12 +209,12 @@ class IPScannerScreen:
 
         def enrich_device(device):
             ip = device['ip']
-            device['hostname'] = self._get_hostname(ip)
+            device['hostname'] = self._get_hostname_nmap(ip)
             device['http'] = self._check_port_80(ip)
             return device
 
         # Enrich devices in parallel for speed
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(enrich_device, device) for device in self.devices]
             concurrent.futures.wait(futures)
 
