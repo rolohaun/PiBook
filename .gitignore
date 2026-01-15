@@ -44,9 +44,10 @@ books/*.epub
 
 # Output
 output/
-# Allow assets (icons, etc)
-!assets/**/*.png
+# Ignore PNG files except for assets
 *.png
+!assets/**/*.png
+!src/web/static/images/*.png
 
 # Waveshare library (downloaded during install)
 lib/e-Paper/
