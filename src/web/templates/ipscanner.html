@@ -123,16 +123,23 @@
             let html = '<table style="width: 100%; border-collapse: collapse;">';
             html += '<thead><tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">';
             html += '<th style="padding: 12px; text-align: left;">IP Address</th>';
+            html += '<th style="padding: 12px; text-align: left;">Hostname</th>';
             html += '<th style="padding: 12px; text-align: left;">MAC Address</th>';
-            html += '<th style="padding: 12px; text-align: left;">Name/Vendor</th>';
+            html += '<th style="padding: 12px; text-align: left;">Vendor</th>';
+            html += '<th style="padding: 12px; text-align: center;">HTTP</th>';
             html += '</tr></thead><tbody>';
 
             data.devices.forEach((device, index) => {
                 const bgColor = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                const hostname = device.hostname || '-';
+                const httpIcon = device.http ? '<a href="http://' + device.ip + '" target="_blank" style="color: #28a745; text-decoration: none;" title="Open in browser">🌐</a>' : '<span style="color: #ccc;">-</span>';
+
                 html += `<tr style="background: ${bgColor}; border-bottom: 1px solid #eee;">`;
                 html += `<td style="padding: 10px; font-family: monospace;">${device.ip}</td>`;
+                html += `<td style="padding: 10px;">${hostname}</td>`;
                 html += `<td style="padding: 10px; font-family: monospace; color: #666;">${device.mac}</td>`;
                 html += `<td style="padding: 10px;">${device.name}</td>`;
+                html += `<td style="padding: 10px; text-align: center;">${httpIcon}</td>`;
                 html += '</tr>';
             });
 

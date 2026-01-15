@@ -155,6 +155,43 @@ class IPScannerScreen:
             self.scanning = False
             self.scan_progress = 100
 
+    def _get_hostname(self, ip: str) -> str:
+        """Resolve hostname for an IP address"""
+        try:
+            hostname = socket.gethostbyaddr(ip)[0]
+            return hostname
+        except (socket.herror, socket.gaierror, socket.timeout):
+            pass
+        return ""
+
+    def _check_port_80(self, ip: str) -> bool:
+        """Check if port 80 is open on the given IP"""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((ip, 80))
+            sock.close()
+            return result == 0
+        except:
+            return False
+
+    def _enrich_devices(self):
+        """Add hostname and port 80 status to all discovered devices"""
+        import concurrent.futures
+
+        def enrich_device(device):
+            ip = device['ip']
+            device['hostname'] = self._get_hostname(ip)
+            device['http'] = self._check_port_80(ip)
+            return device
+
+        # Enrich devices in parallel for speed
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            futures = [executor.submit(enrich_device, device) for device in self.devices]
+            concurrent.futures.wait(futures)
+
+        self.logger.info("Enriched devices with hostname and port 80 status")
+
     def _parse_arp_scan_output(self, output: str):
         """Parse arp-scan output"""
         for line in output.split('\n'):
@@ -176,10 +213,14 @@ class IPScannerScreen:
                 self.devices.append({
                     'ip': ip,
                     'mac': mac,
-                    'name': manufacturer
+                    'name': manufacturer,
+                    'hostname': '',
+                    'http': False
                 })
 
         self.logger.info(f"Found {len(self.devices)} devices via arp-scan")
+        # Enrich with hostname and port 80 check
+        self._enrich_devices()
 
     def _parse_nmap_output(self, output: str):
         """Parse nmap output"""
@@ -199,11 +240,15 @@ class IPScannerScreen:
                 self.devices.append({
                     'ip': current_ip,
                     'mac': mac,
-                    'name': manufacturer
+                    'name': manufacturer,
+                    'hostname': '',
+                    'http': False
                 })
                 current_ip = None
 
         self.logger.info(f"Found {len(self.devices)} devices via nmap")
+        # Enrich with hostname and port 80 check
+        self._enrich_devices()
 
     def _ping_sweep(self, network_prefix: str):
         """Ping sweep fallback method"""
@@ -236,10 +281,14 @@ class IPScannerScreen:
                     self.devices.append({
                         'ip': ip,
                         'mac': 'Unknown',
-                        'name': 'Unknown'
+                        'name': 'Unknown',
+                        'hostname': '',
+                        'http': False
                     })
 
         self.logger.info(f"Found {len(self.devices)} devices via ping sweep")
+        # Enrich with hostname and port 80 check
+        self._enrich_devices()
 
     def next_page(self):
         """Move to next page"""
