@@ -1,0 +1,174 @@
+<h2>🖨️ Klipper Printers</h2>
+<p style="color: #666; margin-bottom: 24px;">Discover and monitor Klipper/MainsailOS 3D printers on your network</p>
+
+<!-- Scan Controls -->
+<div style="display: flex; gap: 12px; margin-bottom: 24px; align-items: center;">
+    <button class="btn" id="klipper-scan-btn" onclick="scanForPrinters()">
+        <span id="klipper-scan-btn-text">Scan Network</span>
+    </button>
+    <span id="klipper-status" style="color: #666;"></span>
+</div>
+
+<!-- Printer List -->
+<h3>Printers Found: <span id="printer-count">0</span></h3>
+<div id="printer-list" style="margin-top: 16px;">
+    <p style="color: #999; text-align: center; padding: 40px;">Click "Scan Network" to discover Klipper printers</p>
+</div>
+
+<script>
+    let klipperScanInterval = null;
+
+    function initKlipper() {
+        // Load any cached printer data
+        fetch('/api/klipper/printers')
+            .then(response => response.json())
+            .then(data => {
+                updatePrinterList(data);
+            })
+            .catch(err => console.error('Failed to get printer list:', err));
+    }
+
+    function scanForPrinters() {
+        const btn = document.getElementById('klipper-scan-btn');
+        const btnText = document.getElementById('klipper-scan-btn-text');
+        const status = document.getElementById('klipper-status');
+
+        btn.disabled = true;
+        btnText.textContent = 'Scanning...';
+        status.textContent = 'Scanning network for Klipper printers...';
+
+        fetch('/api/klipper/scan', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started' || data.status === 'scanning') {
+                    startKlipperPolling();
+                }
+            })
+            .catch(err => {
+                console.error('Failed to start scan:', err);
+                btn.disabled = false;
+                btnText.textContent = 'Scan Network';
+                status.textContent = 'Scan failed';
+            });
+    }
+
+    function startKlipperPolling() {
+        if (klipperScanInterval) clearInterval(klipperScanInterval);
+
+        klipperScanInterval = setInterval(() => {
+            fetch('/api/klipper/printers')
+                .then(response => response.json())
+                .then(data => {
+                    updatePrinterList(data);
+
+                    if (!data.scanning) {
+                        stopKlipperPolling();
+                    }
+                })
+                .catch(err => console.error('Poll error:', err));
+        }, 2000);
+    }
+
+    function stopKlipperPolling() {
+        if (klipperScanInterval) {
+            clearInterval(klipperScanInterval);
+            klipperScanInterval = null;
+        }
+
+        const btn = document.getElementById('klipper-scan-btn');
+        const btnText = document.getElementById('klipper-scan-btn-text');
+        const status = document.getElementById('klipper-status');
+
+        btn.disabled = false;
+        btnText.textContent = 'Scan Network';
+        status.textContent = '';
+    }
+
+    function updatePrinterList(data) {
+        const listContainer = document.getElementById('printer-list');
+        const printers = data.printers || [];
+
+        document.getElementById('printer-count').textContent = printers.length;
+
+        if (data.scanning) {
+            document.getElementById('klipper-status').textContent = 'Scanning...';
+        }
+
+        if (printers.length === 0) {
+            if (data.scanning) {
+                listContainer.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Scanning network for Klipper printers...</p>';
+            } else {
+                listContainer.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No Klipper printers found. Click "Scan Network" to search.</p>';
+            }
+            return;
+        }
+
+        let html = '';
+        printers.forEach(printer => {
+            const statusColor = printer.state === 'ready' ? '#28a745' :
+                               printer.state === 'printing' ? '#007bff' :
+                               printer.state === 'error' ? '#dc3545' : '#666';
+            const statusText = printer.state || 'Unknown';
+
+            html += `
+            <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4 style="margin: 0;">
+                        <a href="http://${printer.ip}" target="_blank" style="color: #333; text-decoration: none;">
+                            🖨️ ${printer.hostname || printer.ip}
+                        </a>
+                    </h4>
+                    <span style="background: ${statusColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px;">
+                        ${statusText}
+                    </span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div>
+                        <strong>IP Address:</strong> ${printer.ip}
+                    </div>
+                    <div>
+                        <strong>Klipper Version:</strong> ${printer.klipper_version || 'N/A'}
+                    </div>
+                </div>`;
+
+            if (printer.extruder_temp !== undefined) {
+                html += `
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #ddd;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                        <div>
+                            <strong>Extruder:</strong> ${printer.extruder_temp.toFixed(1)}°C / ${printer.extruder_target.toFixed(1)}°C
+                        </div>
+                        <div>
+                            <strong>Bed:</strong> ${printer.bed_temp.toFixed(1)}°C / ${printer.bed_target.toFixed(1)}°C
+                        </div>`;
+
+                if (printer.progress !== undefined && printer.state === 'printing') {
+                    html += `
+                        <div>
+                            <strong>Progress:</strong> ${(printer.progress * 100).toFixed(1)}%
+                        </div>`;
+                }
+
+                html += `
+                    </div>
+                </div>`;
+            }
+
+            html += `
+                <div style="margin-top: 12px;">
+                    <a href="http://${printer.ip}" target="_blank" class="btn" style="display: inline-block; padding: 8px 16px; font-size: 14px;">
+                        Open Mainsail
+                    </a>
+                </div>
+            </div>`;
+        });
+
+        listContainer.innerHTML = html;
+    }
+
+    // Initialize when this section loads
+    if (document.getElementById('klipper').classList.contains('active')) {
+        initKlipper();
+    }
+</script>

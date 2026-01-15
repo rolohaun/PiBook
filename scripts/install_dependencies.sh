@@ -41,6 +41,10 @@ echo "Installing optional dependencies..."
 sudo apt-get install -y libmupdf-dev || echo "libmupdf-dev not available, will install via pip"
 sudo apt-get install -y fonts-dejavu fonts-dejavu-core || echo "Fonts already available"
 
+# Install network tools for IP scanner hostname resolution
+echo "Installing network tools..."
+sudo apt-get install -y avahi-utils arp-scan nmap || echo "Some network tools not available"
+
 echo ""
 
 # Enable SPI interface

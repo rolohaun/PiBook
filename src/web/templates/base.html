@@ -36,6 +36,11 @@
             <span class="nav-text">IP Scanner</span>
         </div>
 
+        <div class="nav-item" data-section="klipper" onclick="switchSection('klipper')">
+            <span class="nav-icon">🖨️</span>
+            <span class="nav-text">Klipper</span>
+        </div>
+
         <div class="nav-item" data-section="settings" onclick="switchSection('settings')">
             <span class="nav-icon">⚙️</span>
             <span class="nav-text">Settings</span>
@@ -67,6 +72,11 @@
         <!-- IP Scanner Section -->
         <div id="ipscanner" class="content-section">
             {% include 'ipscanner.html' %}
+        </div>
+
+        <!-- Klipper Section -->
+        <div id="klipper" class="content-section">
+            {% include 'klipper.html' %}
         </div>
 
         <!-- Settings Section -->

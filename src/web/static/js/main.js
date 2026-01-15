@@ -33,6 +33,8 @@ function switchSection(sectionId) {
         openTodoApp();
     } else if (sectionId === 'ipscanner') {
         initIPScanner();
+    } else if (sectionId === 'klipper') {
+        initKlipper();
     }
 }
 

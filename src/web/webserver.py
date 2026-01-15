@@ -205,6 +205,65 @@ class PiBookWebServer:
                 self.logger.error(f"IP scanner start error: {e}")
                 return jsonify({'error': str(e)}), 500
 
+        # Klipper Printer Discovery API
+        # Store discovered printers
+        self.klipper_printers = []
+        self.klipper_scanning = False
+
+        @self.flask_app.route('/api/klipper/printers')
+        def klipper_printers():
+            """Get list of discovered Klipper printers"""
+            return jsonify({
+                'printers': self.klipper_printers,
+                'scanning': self.klipper_scanning
+            })
+
+        @self.flask_app.route('/api/klipper/scan', methods=['POST'])
+        def klipper_scan():
+            """Scan network for Klipper printers"""
+            import threading
+
+            if self.klipper_scanning:
+                return jsonify({'status': 'scanning'})
+
+            def scan_for_klipper():
+                self.klipper_scanning = True
+                self.klipper_printers = []
+
+                try:
+                    # Get devices from IP scanner
+                    scanner = self.app_instance.ip_scanner_screen
+
+                    # If no devices scanned yet, trigger a scan
+                    if not scanner.devices and not scanner.scanning:
+                        scanner.start_scan()
+                        # Wait for scan to complete
+                        import time
+                        while scanner.scanning:
+                            time.sleep(0.5)
+
+                    # Check each device for Klipper (port 80 and 7125)
+                    for device in scanner.devices:
+                        ip = device['ip']
+
+                        # Check if port 7125 (Moonraker API) is open
+                        if self._check_port(ip, 7125):
+                            printer_info = self._get_klipper_info(ip, device.get('hostname', ''))
+                            if printer_info:
+                                self.klipper_printers.append(printer_info)
+
+                    self.logger.info(f"Found {len(self.klipper_printers)} Klipper printers")
+
+                except Exception as e:
+                    self.logger.error(f"Klipper scan error: {e}")
+                finally:
+                    self.klipper_scanning = False
+
+            thread = threading.Thread(target=scan_for_klipper, daemon=True)
+            thread.start()
+
+            return jsonify({'status': 'started'})
+
         @self.flask_app.route('/reboot')
         def reboot():
             """Reboot the Raspberry Pi"""
@@ -498,6 +557,104 @@ class PiBookWebServer:
             except Exception as e:
                 self.logger.error(f"Failed to get system stats: {e}")
                 return jsonify({'error': str(e)}), 500
+
+    def _check_port(self, ip: str, port: int) -> bool:
+        """Check if a port is open on the given IP"""
+        import socket
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((ip, port))
+            sock.close()
+            return result == 0
+        except:
+            return False
+
+    def _get_klipper_info(self, ip: str, hostname: str = '') -> dict:
+        """Get Klipper printer info from Moonraker API"""
+        import urllib.request
+        import json as json_lib
+
+        try:
+            # Get printer info from Moonraker API
+            base_url = f"http://{ip}:7125"
+
+            printer_info = {
+                'ip': ip,
+                'hostname': hostname,
+                'state': 'unknown',
+                'klipper_version': None,
+                'extruder_temp': None,
+                'extruder_target': None,
+                'bed_temp': None,
+                'bed_target': None,
+                'progress': None
+            }
+
+            # Get server info (includes Klipper version)
+            try:
+                req = urllib.request.Request(f"{base_url}/server/info", method='GET')
+                req.add_header('Content-Type', 'application/json')
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    data = json_lib.loads(response.read().decode())
+                    if 'result' in data:
+                        printer_info['klipper_version'] = data['result'].get('klippy_state', 'unknown')
+            except Exception as e:
+                self.logger.debug(f"Failed to get server info from {ip}: {e}")
+
+            # Get printer state
+            try:
+                req = urllib.request.Request(f"{base_url}/printer/info", method='GET')
+                req.add_header('Content-Type', 'application/json')
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    data = json_lib.loads(response.read().decode())
+                    if 'result' in data:
+                        printer_info['state'] = data['result'].get('state', 'unknown')
+            except Exception as e:
+                self.logger.debug(f"Failed to get printer info from {ip}: {e}")
+
+            # Get temperature data
+            try:
+                req = urllib.request.Request(
+                    f"{base_url}/printer/objects/query?extruder&heater_bed&print_stats",
+                    method='GET'
+                )
+                req.add_header('Content-Type', 'application/json')
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    data = json_lib.loads(response.read().decode())
+                    if 'result' in data and 'status' in data['result']:
+                        status = data['result']['status']
+
+                        # Extruder temps
+                        if 'extruder' in status:
+                            printer_info['extruder_temp'] = status['extruder'].get('temperature', 0)
+                            printer_info['extruder_target'] = status['extruder'].get('target', 0)
+
+                        # Bed temps
+                        if 'heater_bed' in status:
+                            printer_info['bed_temp'] = status['heater_bed'].get('temperature', 0)
+                            printer_info['bed_target'] = status['heater_bed'].get('target', 0)
+
+                        # Print progress
+                        if 'print_stats' in status:
+                            print_stats = status['print_stats']
+                            state = print_stats.get('state', '')
+                            if state == 'printing':
+                                printer_info['state'] = 'printing'
+                                printer_info['progress'] = print_stats.get('progress', 0)
+                            elif state == 'complete':
+                                printer_info['state'] = 'complete'
+                            elif state == 'standby':
+                                printer_info['state'] = 'ready'
+
+            except Exception as e:
+                self.logger.debug(f"Failed to get temperature data from {ip}: {e}")
+
+            return printer_info
+
+        except Exception as e:
+            self.logger.error(f"Failed to get Klipper info from {ip}: {e}")
+            return None
 
     def _get_books(self):
         """Get list of EPUB files"""
