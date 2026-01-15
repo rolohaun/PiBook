@@ -31,6 +31,11 @@
             <span class="nav-text">To-Do</span>
         </div>
 
+        <div class="nav-item" data-section="ipscanner" onclick="switchSection('ipscanner')">
+            <span class="nav-icon">🔍</span>
+            <span class="nav-text">IP Scanner</span>
+        </div>
+
         <div class="nav-item" data-section="settings" onclick="switchSection('settings')">
             <span class="nav-icon">⚙️</span>
             <span class="nav-text">Settings</span>
@@ -57,6 +62,11 @@
         <!-- To-Do Section -->
         <div id="todo" class="content-section">
             {% include 'todo.html' %}
+        </div>
+
+        <!-- IP Scanner Section -->
+        <div id="ipscanner" class="content-section">
+            {% include 'ipscanner.html' %}
         </div>
 
         <!-- Settings Section -->

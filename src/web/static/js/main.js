@@ -31,6 +31,8 @@ function switchSection(sectionId) {
     } else if (sectionId === 'todo') {
         loadTodos();
         openTodoApp();
+    } else if (sectionId === 'ipscanner') {
+        initIPScanner();
     }
 }
 

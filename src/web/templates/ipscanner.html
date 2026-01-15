@@ -1,0 +1,159 @@
+<h2>🔍 IP Scanner</h2>
+<p style="color: #666; margin-bottom: 24px;">Scan your local network for connected devices</p>
+
+<!-- Scan Controls -->
+<div style="display: flex; gap: 12px; margin-bottom: 24px; align-items: center;">
+    <button class="btn" id="scan-btn" onclick="startNetworkScan()">
+        <span id="scan-btn-text">Start Scan</span>
+    </button>
+    <span id="local-ip" style="color: #666;"></span>
+</div>
+
+<!-- Progress Bar (hidden by default) -->
+<div id="scan-progress-container" style="display: none; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span id="scan-status">Scanning...</span>
+        <span id="scan-percent">0%</span>
+    </div>
+    <div style="background: #e0e0e0; border-radius: 4px; height: 20px; overflow: hidden;">
+        <div id="scan-progress-bar" style="background: #4a90d9; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+    </div>
+</div>
+
+<!-- Device List -->
+<h3>Devices Found: <span id="device-count">0</span></h3>
+<div id="device-list" style="margin-top: 16px;">
+    <p style="color: #999; text-align: center; padding: 40px;">Click "Start Scan" to discover devices on your network</p>
+</div>
+
+<script>
+    let scanInterval = null;
+
+    // Load initial state when section becomes visible
+    function initIPScanner() {
+        fetch('/api/ipscanner/status')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('local-ip').textContent = 'Your IP: ' + data.local_ip;
+                updateScanUI(data);
+            })
+            .catch(err => console.error('Failed to get IP scanner status:', err));
+    }
+
+    function startNetworkScan() {
+        const btn = document.getElementById('scan-btn');
+        const btnText = document.getElementById('scan-btn-text');
+
+        btn.disabled = true;
+        btnText.textContent = 'Scanning...';
+
+        // Show progress bar
+        document.getElementById('scan-progress-container').style.display = 'block';
+
+        // Start the scan
+        fetch('/api/ipscanner/scan', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started' || data.status === 'already_scanning') {
+                    // Poll for updates
+                    startPolling();
+                }
+            })
+            .catch(err => {
+                console.error('Failed to start scan:', err);
+                btn.disabled = false;
+                btnText.textContent = 'Start Scan';
+            });
+    }
+
+    function startPolling() {
+        if (scanInterval) clearInterval(scanInterval);
+
+        scanInterval = setInterval(() => {
+            fetch('/api/ipscanner/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateScanUI(data);
+
+                    if (!data.scanning) {
+                        stopPolling();
+                    }
+                })
+                .catch(err => console.error('Poll error:', err));
+        }, 1000);
+    }
+
+    function stopPolling() {
+        if (scanInterval) {
+            clearInterval(scanInterval);
+            scanInterval = null;
+        }
+
+        const btn = document.getElementById('scan-btn');
+        const btnText = document.getElementById('scan-btn-text');
+        btn.disabled = false;
+        btnText.textContent = 'Start Scan';
+    }
+
+    function updateScanUI(data) {
+        // Update progress
+        document.getElementById('scan-percent').textContent = data.progress + '%';
+        document.getElementById('scan-progress-bar').style.width = data.progress + '%';
+        document.getElementById('scan-status').textContent = data.scanning ? 'Scanning...' : 'Scan Complete';
+
+        // Show/hide progress bar
+        document.getElementById('scan-progress-container').style.display =
+            (data.scanning || data.progress === 100) ? 'block' : 'none';
+
+        // Update device count
+        document.getElementById('device-count').textContent = data.devices.length;
+
+        // Update device list
+        const listContainer = document.getElementById('device-list');
+
+        if (data.devices.length === 0) {
+            if (data.scanning) {
+                listContainer.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Scanning network...</p>';
+            } else if (data.progress === 0) {
+                listContainer.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Click "Start Scan" to discover devices on your network</p>';
+            } else {
+                listContainer.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No devices found</p>';
+            }
+        } else {
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<thead><tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">';
+            html += '<th style="padding: 12px; text-align: left;">IP Address</th>';
+            html += '<th style="padding: 12px; text-align: left;">MAC Address</th>';
+            html += '<th style="padding: 12px; text-align: left;">Name/Vendor</th>';
+            html += '</tr></thead><tbody>';
+
+            data.devices.forEach((device, index) => {
+                const bgColor = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                html += `<tr style="background: ${bgColor}; border-bottom: 1px solid #eee;">`;
+                html += `<td style="padding: 10px; font-family: monospace;">${device.ip}</td>`;
+                html += `<td style="padding: 10px; font-family: monospace; color: #666;">${device.mac}</td>`;
+                html += `<td style="padding: 10px;">${device.name}</td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            listContainer.innerHTML = html;
+        }
+
+        // Update button state
+        const btn = document.getElementById('scan-btn');
+        const btnText = document.getElementById('scan-btn-text');
+        if (data.scanning) {
+            btn.disabled = true;
+            btnText.textContent = 'Scanning...';
+        } else {
+            btn.disabled = false;
+            btnText.textContent = 'Start Scan';
+        }
+    }
+
+    // Initialize when this section loads
+    if (document.getElementById('ipscanner').classList.contains('active')) {
+        initIPScanner();
+    }
+</script>

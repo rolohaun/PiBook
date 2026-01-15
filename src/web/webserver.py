@@ -172,6 +172,39 @@ class PiBookWebServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
+        # IP Scanner API Routes
+        @self.flask_app.route('/api/ipscanner/status')
+        def ipscanner_status():
+            """Get current IP scanner status"""
+            try:
+                from src.apps.ipscanner.screen import get_ip_address
+
+                scanner = self.app_instance.ip_scanner_screen
+                return jsonify({
+                    'scanning': scanner.scanning,
+                    'progress': scanner.scan_progress,
+                    'devices': scanner.devices,
+                    'local_ip': get_ip_address()
+                })
+            except Exception as e:
+                self.logger.error(f"IP scanner status error: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/ipscanner/scan', methods=['POST'])
+        def ipscanner_start():
+            """Start IP scanner"""
+            try:
+                scanner = self.app_instance.ip_scanner_screen
+
+                if scanner.scanning:
+                    return jsonify({'status': 'already_scanning'})
+
+                scanner.start_scan()
+                return jsonify({'status': 'started'})
+            except Exception as e:
+                self.logger.error(f"IP scanner start error: {e}")
+                return jsonify({'error': str(e)}), 500
+
         @self.flask_app.route('/reboot')
         def reboot():
             """Reboot the Raspberry Pi"""
