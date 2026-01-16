@@ -53,6 +53,12 @@ class PowerManager:
                 else:
                     total_cores = 1
 
+            # Check if CPU hotplug is available (online file must exist)
+            test_path = '/sys/devices/system/cpu/cpu1/online'
+            if not os.path.exists(test_path):
+                self.logger.info("CPU hotplug not available on this kernel - skipping core management")
+                return
+
             # Clamp to valid range
             num_cores = max(1, min(num_cores, total_cores))
 
