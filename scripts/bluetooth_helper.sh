@@ -28,7 +28,7 @@ case "$1" in
         # $2 = MAC address, $3 = PIN (optional)
         echo "Pairing with device $2..."
         if [ -n "$3" ]; then
-            # Pairing with PIN using expect
+            # Pairing with USER-PROVIDED PIN (legacy/simple devices)
             expect -c "
                 set timeout 30
                 spawn bluetoothctl
@@ -58,20 +58,47 @@ case "$1" in
                 send \"quit\r\"
             " 2>&1
         else
-            # Pairing without PIN - use echo piping
-            (
-                echo "agent on"
-                sleep 0.5
-                echo "default-agent"
-                sleep 0.5
-                echo "pair $2"
-                sleep 5
-                echo "trust $2"
-                sleep 0.5
-                echo "connect $2"
-                sleep 2
-                echo "quit"
-            ) | bluetoothctl 2>&1
+            # Pairing WITHOUT user-provided PIN (might generate Passkey)
+            # Use EXPECT to capture passkey
+            expect -c "
+                set timeout 30
+                spawn bluetoothctl
+                expect \"#\"
+                send \"agent on\r\"
+                expect \"#\"
+                send \"default-agent\r\"
+                expect \"#\"
+                send \"pair $2\r\"
+                expect {
+                    -re \"Passkey: ([0-9]+)\" {
+                        set passkey \$expect_out(1,string)
+                        puts \"PASSKEY_REQUIRED:\$passkey\"
+                        # Wait for user to enter code (long timeout)
+                        set timeout 60
+                        expect {
+                            \"Pairing successful\" {
+                                send \"trust $2\r\"
+                                expect \"#\"
+                                send \"connect $2\r\"
+                            }
+                            timeout {
+                                exit 1
+                            }
+                        }
+                    }
+                    \"Pairing successful\" {
+                         send \"trust $2\r\"
+                         expect \"#\"
+                         send \"connect $2\r\"
+                    }
+                    timeout {
+                         send \"quit\r\"
+                         exit 1
+                    }
+                }
+                expect \"#\"
+                send \"quit\r\"
+            " 2>&1
         fi
         echo "Pairing complete"
         ;;

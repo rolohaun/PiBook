@@ -539,8 +539,21 @@ class PiBookWebServer:
                     result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'pair', mac], 
                                           capture_output=True, text=True, timeout=30)
                 
+                if 'PASSKEY_REQUIRED:' in result.stdout:
+                    # Extract the passkey
+                    import re
+                    match = re.search(r'PASSKEY_REQUIRED:(\d+)', result.stdout)
+                    if match:
+                        passkey = match.group(1)
+                        return jsonify({
+                            'success': True,
+                            'status': 'passkey_required',
+                            'passkey': passkey,
+                            'message': f"Please type {passkey} on the device and press Enter"
+                        })
+                
                 if result.returncode == 0 or 'successful' in result.stdout.lower():
-                    return jsonify({'success': True})
+                    return jsonify({'success': True, 'status': 'paired'})
                 else:
                     return jsonify({'error': result.stderr or result.stdout}), 500
             except Exception as e:
