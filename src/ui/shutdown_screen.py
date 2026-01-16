@@ -16,7 +16,7 @@ class ShutdownScreen:
         self.height = height
         try:
             # Use Serif-Bold as it is known to exist from MainMenuScreen
-            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 100)
+            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 120)
         except:
             self.font = ImageFont.load_default()
 
@@ -31,8 +31,11 @@ class ShutdownScreen:
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
 
-        # Draw thick black border (0)
-        draw.rectangle([(10, 10), (self.width-10, self.height-10)], outline=0, width=10)
+        # Draw thick outer black border (20px)
+        draw.rectangle([(0, 0), (self.width-1, self.height-1)], outline=0, width=20)
+        
+        # Draw inner black border (10px) for extra visibility
+        draw.rectangle([(30, 30), (self.width-30, self.height-30)], outline=0, width=10)
 
         text = "SHUTTING\nDOWN"
         try:
@@ -40,8 +43,8 @@ class ShutdownScreen:
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
         except:
-            text_width = len(text) * 50
-            text_height = 100
+            text_width = len(text) * 60
+            text_height = 120
 
         x = (self.width - text_width) // 2
         y = (self.height - text_height) // 2

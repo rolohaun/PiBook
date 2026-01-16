@@ -724,19 +724,40 @@ class PiBookApp:
                 self.navigation.navigate_to(Screen.KLIPPER)
                 self._render_current_screen()
             elif app['screen'] == 'shutdown':
-                self.logger.info("🛑 Action: SHUT DOWN")
+                self.logger.info("🛑 Action: SHUT DOWN - Starting shutdown sequence")
                 
-                # Show shutdown screen
+                # Show shutdown screen with comprehensive logging
                 try:
+                    self.logger.info("Step 1: Creating shutdown screen instance")
                     from src.ui.shutdown_screen import ShutdownScreen
                     shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
-                    # Use full refresh for clean "OFF" screen
-                    self.display.display_image(shutdown_screen.render(), use_partial=False)
-                    time.sleep(4)  # Wait for display to update (4s for safety)
+                    
+                    self.logger.info("Step 2: Rendering shutdown screen image")
+                    shutdown_image = shutdown_screen.render()
+                    self.logger.info(f"Step 2 complete: Image size={shutdown_image.size}, mode={shutdown_image.mode}")
+                    
+                    # Re-initialize display to ensure it's in a known state
+                    self.logger.info("Step 3: Re-initializing display driver")
+                    if self.display.hardware_available and self.display.epd:
+                        self.display.epd.init()
+                        self.logger.info("Step 3 complete: Display re-initialized")
+                    else:
+                        self.logger.warning("Step 3 skipped: No hardware available (mock mode)")
+                    
+                    self.logger.info("Step 4: Displaying shutdown screen with full refresh")
+                    self.display.display_image(shutdown_image, use_partial=False)
+                    self.logger.info("Step 4 complete: Display update called")
+                    
+                    self.logger.info("Step 5: Waiting 6 seconds for E-Ink refresh to complete")
+                    time.sleep(6)  # Increased to 6 seconds for full E-Ink refresh cycle
+                    self.logger.info("Step 5 complete: Wait finished")
+                    
                 except Exception as e:
-                    self.logger.error(f"Failed to show shutdown screen: {e}")
+                    self.logger.error(f"Failed to show shutdown screen: {e}", exc_info=True)
                 
+                self.logger.info("Step 6: Calling self.stop() to gracefully shutdown app")
                 self.stop()
+                self.logger.info("Step 7: Executing system shutdown command")
                 os.system("sudo shutdown -h now")
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
@@ -795,19 +816,40 @@ class PiBookApp:
                 self.navigation.navigate_to(Screen.KLIPPER)
                 self._render_current_screen()
             elif app['screen'] == 'shutdown':
-                self.logger.info("🛑 Action: SHUT DOWN")
+                self.logger.info("🛑 Action: SHUT DOWN - Starting shutdown sequence")
                 
-                # Show shutdown screen
+                # Show shutdown screen with comprehensive logging
                 try:
+                    self.logger.info("Step 1: Creating shutdown screen instance")
                     from src.ui.shutdown_screen import ShutdownScreen
                     shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
-                    # Use full refresh for clean "OFF" screen
-                    self.display.display_image(shutdown_screen.render(), use_partial=False)
-                    time.sleep(4)  # Wait for display to update (4s for safety)
+                    
+                    self.logger.info("Step 2: Rendering shutdown screen image")
+                    shutdown_image = shutdown_screen.render()
+                    self.logger.info(f"Step 2 complete: Image size={shutdown_image.size}, mode={shutdown_image.mode}")
+                    
+                    # Re-initialize display to ensure it's in a known state
+                    self.logger.info("Step 3: Re-initializing display driver")
+                    if self.display.hardware_available and self.display.epd:
+                        self.display.epd.init()
+                        self.logger.info("Step 3 complete: Display re-initialized")
+                    else:
+                        self.logger.warning("Step 3 skipped: No hardware available (mock mode)")
+                    
+                    self.logger.info("Step 4: Displaying shutdown screen with full refresh")
+                    self.display.display_image(shutdown_image, use_partial=False)
+                    self.logger.info("Step 4 complete: Display update called")
+                    
+                    self.logger.info("Step 5: Waiting 6 seconds for E-Ink refresh to complete")
+                    time.sleep(6)  # Increased to 6 seconds for full E-Ink refresh cycle
+                    self.logger.info("Step 5 complete: Wait finished")
+                    
                 except Exception as e:
-                    self.logger.error(f"Failed to show shutdown screen: {e}")
+                    self.logger.error(f"Failed to show shutdown screen: {e}", exc_info=True)
                 
+                self.logger.info("Step 6: Calling self.stop() to gracefully shutdown app")
                 self.stop()
+                self.logger.info("Step 7: Executing system shutdown command")
                 os.system("sudo shutdown -h now")
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
