@@ -723,6 +723,10 @@ class PiBookApp:
             elif app['screen'] == 'klipper':
                 self.navigation.navigate_to(Screen.KLIPPER)
                 self._render_current_screen()
+            elif app['screen'] == 'shutdown':
+                self.logger.info("🛑 Action: SHUT DOWN")
+                self.stop()
+                os.system("sudo shutdown -h now")
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
         elif self.navigation.is_on_screen(Screen.LIBRARY):
@@ -779,6 +783,10 @@ class PiBookApp:
             elif app['screen'] == 'klipper':
                 self.navigation.navigate_to(Screen.KLIPPER)
                 self._render_current_screen()
+            elif app['screen'] == 'shutdown':
+                self.logger.info("🛑 Action: SHUT DOWN")
+                self.stop()
+                os.system("sudo shutdown -h now")
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
         elif self.navigation.is_on_screen(Screen.LIBRARY):

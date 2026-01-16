@@ -117,6 +117,12 @@ class MainMenuScreen:
                 'icon_filename': 'klipper.png',
                 'description': 'Monitor 3D printers',
                 'screen': 'klipper'
+            },
+            {
+                'name': 'Shutdown',
+                'icon_filename': 'shutdown.png',
+                'description': 'Power off device',
+                'screen': 'shutdown'
             }
         ]
 
