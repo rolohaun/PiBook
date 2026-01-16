@@ -299,6 +299,7 @@ class PiBookWebServer:
                     'sleep_enabled': data.get('sleep_enabled', False),
                     'sleep_message': data.get('sleep_message', 'Shh I\'m sleeping'),
                     'sleep_timeout': int(data.get('sleep_timeout', 120)),
+                    'shutdown_message': data.get('shutdown_message', 'OFF'),
                     'items_per_page': int(data.get('items_per_page', 4)),
                     'undervolt': int(data.get('undervolt', -2)),
                     'boot_cores': int(data.get('boot_cores', 4))
