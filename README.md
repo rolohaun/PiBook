@@ -118,9 +118,57 @@ power:
   sleep_timeout: 120  # 2 minutes
   cpu_scaling: true
   wifi_power_save: true
+  undervolt: -2       # CPU voltage reduction (0 to -8)
+  boot_cores: 4       # CPU cores at boot (1-4)
 ```
 
 Edit `config/gpio_mapping.yaml` to change button pins.
+
+## Power Management
+
+PiBook includes extensive power optimization for maximum battery life on Pi Zero 2 W.
+
+### Web Interface Settings
+
+Access settings at `http://<pibook-ip>:5000/settings`:
+
+- **CPU Cores at Boot**: Limit active cores (1-4) via kernel `maxcpus` parameter
+  - 4 cores: ~2W (default)
+  - 2 cores: ~1.5W
+  - 1 core: ~1W (maximum battery)
+- **Undervolt Level**: Reduce CPU voltage (0 to -8, each step = -25mV)
+  - 0: No reduction
+  - -2: 50mV reduction (safe starting point)
+  - -4: 100mV reduction
+  - -8: 200mV reduction (maximum, may cause instability)
+
+Both settings require a reboot to take effect.
+
+### Setup Scripts
+
+For initial power optimization setup:
+
+```bash
+# Apply boot-level optimizations (HDMI off, Bluetooth off, LEDs off, etc.)
+sudo ./scripts/setup_power_optimization.sh
+
+# Enable sudo permissions for web interface power controls
+sudo cp scripts/pibook-sudoers /etc/sudoers.d/pibook
+sudo chmod 0440 /etc/sudoers.d/pibook
+```
+
+### Power Savings Reference
+
+Based on [Jeff Geerling's testing](https://www.jeffgeerling.com/blog/2021/disabling-cores-reduce-pi-zero-2-ws-power-consumption-half):
+
+| Optimization | Savings |
+|--------------|---------|
+| Disable HDMI | ~14mA |
+| Disable Bluetooth | ~25mA |
+| Disable Audio | ~8mA |
+| Disable LEDs | ~3mA |
+| 2 cores instead of 4 | ~25% power reduction |
+| Undervolt -4 | ~10-20% power reduction |
 
 ## Running as a Service
 
@@ -201,6 +249,10 @@ PiBook/
 ├── scripts/
 │   ├── install_dependencies.sh    # Installation script
 │   ├── setup_zram.sh              # ZRAM setup (Pi Zero 2 W)
+│   ├── setup_power_optimization.sh # Boot-level power optimizations
+│   ├── apply_undervolt.sh         # Undervolt helper (web interface)
+│   ├── apply_cpu_cores.sh         # CPU cores helper (web interface)
+│   ├── pibook-sudoers             # Sudoers config for power scripts
 │   └── pibook.service             # Systemd service
 ├── books/                          # Place EPUB files here
 ├── logs/                           # Application logs
@@ -253,6 +305,10 @@ logging:
 - [x] Short/long press button detection
 - [x] Partial refresh for e-ink display
 - [x] WiFi and Bluetooth status indicators
+- [x] Web interface for settings and book management
+- [x] CPU core limiting at boot (1-4 cores via maxcpus)
+- [x] CPU undervolting for power savings
+- [x] Sleep mode with configurable timeout
 
 ## Future Enhancements
 

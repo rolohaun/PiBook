@@ -755,7 +755,7 @@ class PiBookWebServer:
             raise
 
     def _apply_boot_cores(self, num_cores):
-        """Apply boot CPU cores setting to /boot/firmware/config.txt using sudo helper script"""
+        """Apply boot CPU cores setting via maxcpus in /boot/firmware/cmdline.txt using sudo helper script"""
         try:
             import subprocess
             script_path = '/home/pi/PiBook/scripts/apply_cpu_cores.sh'
