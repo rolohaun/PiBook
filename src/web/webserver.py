@@ -457,6 +457,7 @@ class PiBookWebServer:
         def bluetooth_power():
             """Toggle Bluetooth power"""
             try:
+                import subprocess
                 data = request.get_json()
                 power_on = data.get('power', False)
                 action = 'power_on' if power_on else 'power_off'
@@ -476,6 +477,7 @@ class PiBookWebServer:
         def bluetooth_scan():
             """Start/stop Bluetooth scanning"""
             try:
+                import subprocess
                 data = request.get_json()
                 scan_on = data.get('scan', False)
                 action = 'scan_on' if scan_on else 'scan_off'
@@ -492,6 +494,7 @@ class PiBookWebServer:
         def bluetooth_devices():
             """Get discovered Bluetooth devices"""
             try:
+                import subprocess
                 result = subprocess.run(['bluetoothctl', 'devices'], capture_output=True, text=True, timeout=5)
                 devices = []
                 for line in result.stdout.strip().split('\n'):
@@ -509,6 +512,7 @@ class PiBookWebServer:
         def bluetooth_pair():
             """Pair with a Bluetooth device"""
             try:
+                import subprocess
                 data = request.get_json()
                 mac = data.get('mac')
                 pin = data.get('pin', '')
@@ -536,6 +540,7 @@ class PiBookWebServer:
         def bluetooth_remove():
             """Remove a paired Bluetooth device"""
             try:
+                import subprocess
                 data = request.get_json()
                 mac = data.get('mac')
                 
