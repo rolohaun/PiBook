@@ -26,15 +26,13 @@ case "$1" in
         ;;
     pair)
         # $2 = MAC address, $3 = PIN (optional)
+    pair)
+        # $2 = MAC address, $3 = PIN (optional)
         echo "Pairing with device $2..." >> /tmp/bt_pair_debug.log
         
-        # Force scan off
-        timeout 2 bash -c "echo 'scan off' | bluetoothctl" >> /tmp/bt_pair_debug.log 2>&1
-        
-        # Force remove 
-        echo "Removing device to ensure fresh state..." >> /tmp/bt_pair_debug.log
-        timeout 5 bash -c "echo 'remove $2' | bluetoothctl" >> /tmp/bt_pair_debug.log 2>&1
-        sleep 2
+        # NOTE: Do NOT force lock/remove here. It causes "Device not available" error.
+        # We assume the user has just scanned and the device is known to BlueZ.
+        # Attempts to clean up state aggressively are backfiring.
         
         if [ -n "$3" ]; then
             # Pairing with USER-PROVIDED PIN (legacy/simple devices)
