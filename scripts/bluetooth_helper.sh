@@ -2,28 +2,26 @@
 # Bluetooth Helper Script for PiBook
 # Provides sudo access for Bluetooth operations
 
-# Enable error output
-set -e
-
 case "$1" in
     power_on)
         echo "Powering on Bluetooth..."
-        bluetoothctl power on 2>&1
+        rfkill unblock bluetooth 2>&1
         echo "Bluetooth powered on"
         ;;
     power_off)
         echo "Powering off Bluetooth..."
-        bluetoothctl power off 2>&1
+        rfkill block bluetooth 2>&1
         echo "Bluetooth powered off"
         ;;
     scan_on)
         echo "Starting Bluetooth scan..."
-        timeout 1 bluetoothctl scan on 2>&1 &
+        # Use timeout to prevent hanging
+        timeout 2 bash -c "echo 'scan on' | bluetoothctl" 2>&1 &
         echo "Scan started"
         ;;
     scan_off)
         echo "Stopping Bluetooth scan..."
-        bluetoothctl scan off 2>&1
+        timeout 2 bash -c "echo 'scan off' | bluetoothctl" 2>&1
         echo "Scan stopped"
         ;;
     pair)
@@ -60,26 +58,34 @@ case "$1" in
                 send \"quit\r\"
             " 2>&1
         else
-            # Pairing without PIN
-            echo "agent on" | bluetoothctl
-            echo "default-agent" | bluetoothctl
-            echo "pair $2" | bluetoothctl
-            echo "trust $2" | bluetoothctl
-            echo "connect $2" | bluetoothctl
+            # Pairing without PIN - use echo piping
+            (
+                echo "agent on"
+                sleep 0.5
+                echo "default-agent"
+                sleep 0.5
+                echo "pair $2"
+                sleep 5
+                echo "trust $2"
+                sleep 0.5
+                echo "connect $2"
+                sleep 2
+                echo "quit"
+            ) | bluetoothctl 2>&1
         fi
         echo "Pairing complete"
         ;;
     remove)
         # $2 = MAC address
         echo "Removing device $2..."
-        bluetoothctl remove "$2" 2>&1
+        timeout 5 bash -c "echo 'remove $2' | bluetoothctl" 2>&1
         echo "Device removed"
         ;;
     devices)
-        bluetoothctl devices 2>&1
+        timeout 5 bluetoothctl devices 2>&1
         ;;
     paired_devices)
-        bluetoothctl paired-devices 2>&1
+        timeout 5 bluetoothctl paired-devices 2>&1
         ;;
     *)
         echo "Usage: $0 {power_on|power_off|scan_on|scan_off|pair|remove|devices|paired_devices}"
