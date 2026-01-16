@@ -62,7 +62,7 @@ class MainMenuScreen:
     Users can navigate with single button: press=next app, hold=select app
     """
 
-    def __init__(self, width: int = 800, height: int = 480, font_size: int = 24, battery_monitor=None):
+    def __init__(self, width: int = 800, height: int = 480, font_size: int = 24, battery_monitor=None, web_port: int = 5000):
         """
         Initialize main menu screen
 
@@ -71,11 +71,13 @@ class MainMenuScreen:
             height: Screen height
             font_size: Base font size
             battery_monitor: Optional BatteryMonitor instance
+            web_port: Web server port number
         """
         self.width = width
         self.height = height
         self.font_size = font_size
         self.battery_monitor = battery_monitor
+        self.web_port = web_port
         self.logger = logging.getLogger(__name__)
 
         # Load fonts
@@ -83,10 +85,12 @@ class MainMenuScreen:
             self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", font_size)
             self.title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 36)
             self.app_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 20)
+            self.small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 16)
         except:
             self.font = ImageFont.load_default()
             self.title_font = ImageFont.load_default()
             self.app_font = ImageFont.load_default()
+            self.small_font = ImageFont.load_default()
 
         # Define available apps
         self.apps = [
@@ -294,7 +298,19 @@ class MainMenuScreen:
             instr_width = len(instruction) * 8
 
         instr_x = (self.width - instr_width) // 2
-        draw.text((instr_x, self.height - 40), instruction, font=self.app_font, fill=0)
+        draw.text((instr_x, self.height - 55), instruction, font=self.app_font, fill=0)
+
+        # Draw web interface IP address at very bottom
+        ip_address = get_ip_address()
+        ip_text = f"Web: {ip_address}:{self.web_port}"
+        try:
+            bbox = draw.textbbox((0, 0), ip_text, font=self.small_font)
+            ip_width = bbox[2] - bbox[0]
+        except:
+            ip_width = len(ip_text) * 8
+
+        ip_x = (self.width - ip_width) // 2
+        draw.text((ip_x, self.height - 25), ip_text, font=self.small_font, fill=0)
 
         return image
 

@@ -125,7 +125,8 @@ class PiBookApp:
             width=display_width,
             height=display_height,
             font_size=self.config.get('main_menu.font_size', 24),
-            battery_monitor=self.battery_monitor
+            battery_monitor=self.battery_monitor,
+            web_port=web_port
         )
 
         self.library_screen = LibraryScreen(
