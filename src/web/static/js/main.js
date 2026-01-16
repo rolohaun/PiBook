@@ -742,7 +742,6 @@ let currentPairingMac = null;
 
 function pairDevice(mac, name) {
     // Try pairing without PIN first (Works for SSP devices including keyboards)
-    if (!confirm(`Pair with ${name}?`)) return;
 
     currentPairingMac = mac;
 
