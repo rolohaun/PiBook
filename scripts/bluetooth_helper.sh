@@ -16,33 +16,47 @@ case "$1" in
     scan_on)
         echo "Starting Bluetooth scan..."
         # Kill any existing scan processes first
-        pkill -f "bt_scan_loop" 2>/dev/null || true
-        pkill -f "bluetoothctl" 2>/dev/null || true
+        pkill -f "bt_scan_session" 2>/dev/null || true
         sleep 0.5
 
-        # Create a temporary script to run the scan
-        cat > /tmp/bt_scan_loop.sh << 'SCANSCRIPT'
+        # Create a script that keeps bluetoothctl running with scan active
+        cat > /tmp/bt_scan_session.sh << 'SCANSCRIPT'
 #!/bin/bash
-# Keep sending scan on command to bluetoothctl
-for i in {1..15}; do
-    echo "scan on" | bluetoothctl 2>/dev/null
-    sleep 3
-done
-echo "scan off" | bluetoothctl 2>/dev/null
-SCANSCRIPT
-        chmod +x /tmp/bt_scan_loop.sh
+# Keep bluetoothctl running with scan on for extended discovery
+# Use a FIFO to keep the process alive
+FIFO=/tmp/bt_scan_fifo
+rm -f $FIFO
+mkfifo $FIFO
 
-        # Run the scan loop in background
-        nohup /tmp/bt_scan_loop.sh >/dev/null 2>&1 &
-        echo "Scan started (will run for ~45 seconds)"
+# Start bluetoothctl with scan on, reading from FIFO to keep it alive
+(
+    echo "power on"
+    sleep 1
+    echo "agent on"
+    sleep 0.5
+    echo "scan on"
+    # Keep alive for 60 seconds
+    sleep 60
+    echo "scan off"
+    echo "quit"
+) | bluetoothctl 2>/dev/null
+
+rm -f $FIFO
+SCANSCRIPT
+        chmod +x /tmp/bt_scan_session.sh
+
+        # Run in background
+        nohup /tmp/bt_scan_session.sh >/dev/null 2>&1 &
+        echo "Scan started (will run for ~60 seconds)"
         ;;
     scan_off)
         echo "Stopping Bluetooth scan..."
-        # Kill the scan loop and bluetoothctl
-        pkill -f "bt_scan_loop" 2>/dev/null || true
+        # Kill the scan session
+        pkill -f "bt_scan_session" 2>/dev/null || true
         pkill -f "bluetoothctl" 2>/dev/null || true
+        sleep 0.5
         # Send scan off command
-        echo "scan off" | bluetoothctl 2>/dev/null || true
+        echo -e "scan off\nquit" | bluetoothctl 2>/dev/null || true
         echo "Scan stopped"
         ;;
     pair)
