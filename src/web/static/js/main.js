@@ -715,6 +715,28 @@ function toggleBluetoothScan() {
         });
 }
 
+function pollBluetoothDevices() {
+    if (!bluetoothScanning) return;
+
+    fetch('/api/bluetooth/devices')
+        .then(response => response.json())
+        .then(data => {
+            if (data.devices) {
+                updateAvailableDevices(data.devices);
+            }
+            if (bluetoothScanning) {
+                setTimeout(pollBluetoothDevices, 2000);
+            }
+        })
+        .catch(error => {
+            console.error('Device polling failed:', error);
+            // Don't stop scanning on poll failure, just retry
+            if (bluetoothScanning) {
+                setTimeout(pollBluetoothDevices, 2000);
+            }
+        });
+}
+
 function updateAvailableDevices(devices) {
     const container = document.getElementById('available-devices');
 
