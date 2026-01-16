@@ -791,7 +791,23 @@ function updatePairedDevices(devices) {
 let currentPairingMac = null;
 
 function pairDevice(mac, name) {
-    // Try pairing without PIN first (Works for SSP devices including keyboards)
+    // Show loading state
+    const btn = document.activeElement;
+    let originalText = 'Pair';
+    if (btn && btn.tagName === 'BUTTON') {
+        originalText = btn.textContent;
+        btn.textContent = 'Pairing...';
+        btn.disabled = true;
+    }
+
+    // Stop scanning to ensure stable pairing
+    if (bluetoothScanning) {
+        fetch('/api/bluetooth/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scan: false })
+        }).catch(e => console.error('Failed to stop scan:', e));
+    }
 
     currentPairingMac = mac;
 
@@ -802,8 +818,12 @@ function pairDevice(mac, name) {
     })
         .then(response => response.json())
         .then(data => {
-            // Restore button state (though we might close modal or change UI)
-            // But if we fallback to PIN modal, we should probably keep it clean
+            // Restore button provided it still exists
+            const currentBtn = document.querySelector(`button[onclick*="${mac}"]`);
+            if (currentBtn) {
+                currentBtn.disabled = false;
+                currentBtn.textContent = 'Pair';
+            }
 
             if (data.success) {
                 if (data.status === 'passkey_required') {
@@ -819,6 +839,11 @@ function pairDevice(mac, name) {
         })
         .catch(error => {
             console.error('Pairing failed:', error);
+            const currentBtn = document.querySelector(`button[onclick*="${mac}"]`);
+            if (currentBtn) {
+                currentBtn.disabled = false;
+                currentBtn.textContent = 'Pair';
+            }
             alert('Pairing request failed. You can try manual PIN entry.');
             showPinInputModal(name);
         });
