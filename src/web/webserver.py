@@ -442,7 +442,9 @@ class PiBookWebServer:
                 
                 # Check if Bluetooth is powered on using rfkill (much faster than bluetoothctl)
                 result = subprocess.run(['rfkill', 'list', 'bluetooth'], capture_output=True, text=True, timeout=2)
-                powered = 'Soft blocked: no' in result.stdout and 'Hard blocked: no' in result.stdout
+                # Bluetooth is on if it's not soft-blocked (hard block is physical switch)
+                powered = 'Soft blocked: no' in result.stdout
+                self.logger.debug(f"Bluetooth status check: powered={powered}, rfkill output: {result.stdout[:100]}")
                 
                 # Get paired devices
                 result = subprocess.run(['timeout', '3', 'bluetoothctl', 'paired-devices'], capture_output=True, text=True, timeout=5)
@@ -452,6 +454,7 @@ class PiBookWebServer:
                         parts = line.split(' ', 2)
                         if len(parts) >= 3:
                             paired_devices.append({'mac': parts[1], 'name': parts[2]})
+                
                 
                 return jsonify({'powered': powered, 'paired_devices': paired_devices})
             except Exception as e:
