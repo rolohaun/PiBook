@@ -667,14 +667,27 @@ let discoveredDevices = new Map();
 function toggleBluetoothScan() {
     bluetoothScanning = !bluetoothScanning;
     const btn = document.getElementById('scan-btn');
-    const resultsDiv = document.getElementById('scan-results');
+    const modal = document.getElementById('scan-modal');
 
-    btn.textContent = bluetoothScanning ? 'Stop Scanning' : 'Scan for Devices';
-    resultsDiv.style.display = bluetoothScanning ? 'block' : 'none';
-
-    if (!bluetoothScanning) {
-        // Clear list when stopped manually
+    if (bluetoothScanning) {
+        // Start Scanning
+        btn.textContent = 'Scanning...';
+        modal.style.display = 'block';
         discoveredDevices.clear();
+        updateAvailableDevices([]); // Clear UI
+    } else {
+        // Stop Scanning
+        btn.textContent = 'Scan for Devices';
+        modal.style.display = 'none';
+
+        // Also call backend to stop scan
+        fetch('/api/bluetooth/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scan: false })
+        }).catch(e => console.error(e));
+
+        return;
     }
 
     fetch('/api/bluetooth/scan', {
@@ -689,7 +702,12 @@ function toggleBluetoothScan() {
                 pollBluetoothDevices();
             }
         })
-        .catch(error => console.error('Bluetooth scan toggle failed:', error));
+        .catch(error => {
+            console.error('Bluetooth scan toggle failed:', error);
+            bluetoothScanning = false;
+            modal.style.display = 'none';
+            btn.textContent = 'Scan for Devices';
+        });
 }
 
 function updateAvailableDevices(devices) {
