@@ -26,11 +26,14 @@ case "$1" in
         ;;
     pair)
         # $2 = MAC address, $3 = PIN (optional)
-        echo "Pairing with device $2..."
-        # Force scan off to ensure bluetoothctl is free and resources are available
-        timeout 2 bash -c "echo 'scan off' | bluetoothctl" > /dev/null 2>&1
-        # Force remove to clean up any stale matching/bonding state
-        timeout 2 bash -c "echo 'remove $2' | bluetoothctl" > /dev/null 2>&1
+        echo "Pairing with device $2..." >> /tmp/bt_pair_debug.log
+        
+        # Force scan off
+        timeout 2 bash -c "echo 'scan off' | bluetoothctl" >> /tmp/bt_pair_debug.log 2>&1
+        
+        # Force remove 
+        echo "Removing device to ensure fresh state..." >> /tmp/bt_pair_debug.log
+        timeout 5 bash -c "echo 'remove $2' | bluetoothctl" >> /tmp/bt_pair_debug.log 2>&1
         sleep 2
         
         if [ -n "$3" ]; then
@@ -67,7 +70,7 @@ case "$1" in
             # Pairing WITHOUT user-provided PIN (might generate Passkey)
             # Use EXPECT to capture passkey
             expect -c "
-                log_file /tmp/bt_pair_debug.log
+                log_file -a /tmp/bt_pair_debug.log
                 set timeout 45
                 spawn bluetoothctl
                 expect -re \"\\[bluetoothctl\\].*[#>]\"
@@ -80,22 +83,25 @@ case "$1" in
                     -re \"Passkey: ([0-9]+)\" {
                         set passkey \$expect_out(1,string)
                         puts \"PASSKEY_REQUIRED:\$passkey\"
+                        send_user \"DBG: Matched Passkey: \$passkey\n\"
+                        
                         # Now wait for success (user typing PIN)
                         set timeout 120
                         expect {
                             \"Pairing successful\" {
+                                send_user \"DBG: Pairing successful after Passkey\n\"
                                 send \"trust $2\r\"
                                 expect -re \"\\[bluetoothctl\\].*[#>]\"
                                 send \"connect $2\r\"
                             }
                             timeout {
+                                send_user \"DBG: Timeout waiting for PIN entry\n\"
                                 exit 1
                             }
                         }
                     }
                     \"Enter PIN code:\" {
-                        # Legacy pairing where we must provide the PIN
-                        # Generate a predictable PIN for the user to type
+                        send_user \"DBG: Matched Enter PIN code\n\"
                         set passkey \"123456\"
                         send \"\$passkey\r\"
                         puts \"PASSKEY_REQUIRED:\$passkey\"
@@ -103,21 +109,36 @@ case "$1" in
                         set timeout 120
                         expect {
                             \"Pairing successful\" {
+                                send_user \"DBG: Pairing successful after PIN\n\"
                                 send \"trust $2\r\"
                                 expect -re \"\\[bluetoothctl\\].*[#>]\"
                                 send \"connect $2\r\"
                             }
                             timeout {
+                                send_user \"DBG: Timeout waiting for PIN entry\n\"
                                 exit 1
                             }
                         }
                     }
                     \"Pairing successful\" {
+                         send_user \"DBG: Matched Immediate Pairing successful\n\"
                          send \"trust $2\r\"
                          expect -re \"\\[bluetoothctl\\].*[#>]\"
                          send \"connect $2\r\"
+                         expect {
+                             \"Connection successful\" {
+                                 send_user \"DBG: Connection successful\n\"
+                             }
+                             \"Failed to connect\" {
+                                 send_user \"DBG: Failed to connect\n\"
+                             }
+                             timeout {
+                                 send_user \"DBG: Timeout waiting for connection\n\"
+                             }
+                         }
                     }
                     timeout {
+                         send_user \"DBG: Timeout waiting for pair response\n\"
                          send \"quit\r\"
                          exit 1
                     }
