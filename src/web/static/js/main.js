@@ -290,6 +290,34 @@ function refreshSystemStats() {
                 voltageEl.textContent = data.cpu_voltage;
             }
 
+            // Update CPU Speed
+            const speedEl = document.getElementById('cpu-speed');
+            if (speedEl && data.cpu_speed) {
+                speedEl.textContent = data.cpu_speed;
+            }
+
+            // Update WiFi Status
+            const wifiEl = document.getElementById('wifi-status');
+            if (wifiEl && data.wifi_status) {
+                wifiEl.textContent = data.wifi_status;
+                if (data.wifi_status === 'On') {
+                    wifiEl.style.color = '#4CAF50';
+                } else if (data.wifi_status === 'Off') {
+                    wifiEl.style.color = '#f44336';
+                }
+            }
+
+            // Update Bluetooth Status
+            const btEl = document.getElementById('bluetooth-status');
+            if (btEl && data.bluetooth_status) {
+                btEl.textContent = data.bluetooth_status;
+                if (data.bluetooth_status.startsWith('On')) {
+                    btEl.style.color = '#4CAF50';
+                } else if (data.bluetooth_status === 'Off') {
+                    btEl.style.color = '#f44336';
+                }
+            }
+
             // Update Undervolt Setting
             const undervoltEl = document.getElementById('undervolt-setting');
             if (undervoltEl) {

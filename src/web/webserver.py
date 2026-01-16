@@ -441,7 +441,51 @@ class PiBookWebServer:
                         stats['cpu_temp'] = 'N/A'
                 except:
                     stats['cpu_temp'] = 'N/A'
-                
+
+                # CPU Speed
+                try:
+                    with open('/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq', 'r') as f:
+                        freq_khz = int(f.read().strip())
+                        freq_mhz = freq_khz / 1000
+                        stats['cpu_speed'] = f"{freq_mhz:.0f} MHz"
+                except:
+                    # Fallback to vcgencmd if file not found
+                    try:
+                        result = subprocess.run(['vcgencmd', 'measure_clock', 'arm'], capture_output=True, text=True, timeout=2)
+                        if result.returncode == 0:
+                            # Output format: frequency(48)=600000000
+                            freq_hz = int(result.stdout.strip().split('=')[1])
+                            freq_mhz = freq_hz / 1000000
+                            stats['cpu_speed'] = f"{freq_mhz:.0f} MHz"
+                        else:
+                            stats['cpu_speed'] = 'N/A'
+                    except:
+                        stats['cpu_speed'] = 'N/A'
+
+                # WiFi Status
+                try:
+                    result = subprocess.run(['ip', 'link', 'show', 'wlan0'], capture_output=True, text=True, timeout=2)
+                    if result.returncode == 0 and ('state UP' in result.stdout or 'UP' in result.stdout):
+                        stats['wifi_status'] = 'On'
+                    else:
+                        stats['wifi_status'] = 'Off'
+                except:
+                    stats['wifi_status'] = 'Unknown'
+
+                # Bluetooth Status
+                try:
+                    result = subprocess.run(['systemctl', 'is-active', 'bluetooth'], capture_output=True, text=True, timeout=2)
+                    if result.returncode == 0 and result.stdout.strip() == 'active':
+                        hci_result = subprocess.run(['hciconfig', 'hci0'], capture_output=True, text=True, timeout=2)
+                        if hci_result.returncode == 0 and 'UP RUNNING' in hci_result.stdout:
+                            stats['bluetooth_status'] = 'On'
+                        else:
+                            stats['bluetooth_status'] = 'On (No Device)'
+                    else:
+                        stats['bluetooth_status'] = 'Off'
+                except:
+                    stats['bluetooth_status'] = 'Unknown'
+
                 # CPU Voltage
                 try:
                     result = subprocess.run(['vcgencmd', 'measure_volts'], capture_output=True, text=True, timeout=2)
