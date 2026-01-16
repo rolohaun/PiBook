@@ -661,6 +661,9 @@ function toggleBluetoothPower(powerOn) {
         });
 }
 
+// Keep track of all devices found during this scan session
+let discoveredDevices = new Map();
+
 function toggleBluetoothScan() {
     bluetoothScanning = !bluetoothScanning;
     const btn = document.getElementById('scan-btn');
@@ -668,6 +671,11 @@ function toggleBluetoothScan() {
 
     btn.textContent = bluetoothScanning ? 'Stop Scanning' : 'Scan for Devices';
     resultsDiv.style.display = bluetoothScanning ? 'block' : 'none';
+
+    if (!bluetoothScanning) {
+        // Clear list when stopped manually
+        discoveredDevices.clear();
+    }
 
     fetch('/api/bluetooth/scan', {
         method: 'POST',
@@ -684,38 +692,35 @@ function toggleBluetoothScan() {
         .catch(error => console.error('Bluetooth scan toggle failed:', error));
 }
 
-function pollBluetoothDevices() {
-    if (!bluetoothScanning) return;
-
-    fetch('/api/bluetooth/devices')
-        .then(response => response.json())
-        .then(data => {
-            updateAvailableDevices(data.devices);
-            if (bluetoothScanning) {
-                setTimeout(pollBluetoothDevices, 2000);
-            }
-        })
-        .catch(error => console.error('Device polling failed:', error));
-}
-
 function updateAvailableDevices(devices) {
     const container = document.getElementById('available-devices');
-    container.innerHTML = '';
 
-    if (devices.length === 0) {
-        container.innerHTML = '<p style="color: #666;">No devices found. Make sure device is in pairing mode.</p>';
+    // Add/Update new devices
+    devices.forEach(device => {
+        discoveredDevices.set(device.mac, device);
+    });
+
+    if (discoveredDevices.size === 0) {
+        container.innerHTML = '<p style="color: #666;">Scanning...</p>';
         return;
     }
 
-    devices.forEach(device => {
-        const div = document.createElement('div');
-        div.style.cssText = 'padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
-        div.innerHTML = `
-            <span><strong>${device.name}</strong><br><small>${device.mac}</small></span>
-            <button class="btn" style="padding: 4px 12px;" onclick="pairDevice('${device.mac}', '${device.name}')">Pair</button>
-        `;
-        container.appendChild(div);
-    });
+    // Re-render full list (sorted by name)
+    container.innerHTML = '';
+    Array.from(discoveredDevices.values())
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .forEach(device => {
+            const div = document.createElement('div');
+            div.style.cssText = 'padding: 12px; margin: 6px 0; border: 1px solid #eee; background: #f9f9f9; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;';
+            div.innerHTML = `
+                <div>
+                    <strong style="font-size: 1.1em;">${device.name}</strong>
+                    <div style="font-size: 0.9em; color: #666; margin-top: 2px;">${device.mac}</div>
+                </div>
+                <button class="btn" style="padding: 8px 16px;" onclick="pairDevice('${device.mac}', '${device.name}')">Pair</button>
+            `;
+            container.appendChild(div);
+        });
 }
 
 function updatePairedDevices(devices) {
