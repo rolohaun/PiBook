@@ -61,7 +61,7 @@ case "$1" in
             # Pairing WITHOUT user-provided PIN (might generate Passkey)
             # Use EXPECT to capture passkey
             expect -c "
-                set timeout 30
+                set timeout 45
                 spawn bluetoothctl
                 expect \"#\"
                 send \"agent on\r\"
@@ -73,8 +73,8 @@ case "$1" in
                     -re \"Passkey: ([0-9]+)\" {
                         set passkey \$expect_out(1,string)
                         puts \"PASSKEY_REQUIRED:\$passkey\"
-                        # Wait for user to enter code (long timeout)
-                        set timeout 60
+                        # Now wait for success (user typing PIN)
+                        set timeout 120
                         expect {
                             \"Pairing successful\" {
                                 send \"trust $2\r\"
@@ -85,6 +85,10 @@ case "$1" in
                                 exit 1
                             }
                         }
+                    }
+                    \"Enter PIN code:\" {
+                         # Legacy PIN request
+                         exit 1
                     }
                     \"Pairing successful\" {
                          send \"trust $2\r\"
