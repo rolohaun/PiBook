@@ -541,38 +541,93 @@ class PiBookWebServer:
             """Pair with a Bluetooth device"""
             try:
                 import subprocess
+                import threading
+                import time
                 data = request.get_json()
                 mac = data.get('mac')
                 pin = data.get('pin', '')
-                
+
                 if not mac:
                     return jsonify({'error': 'MAC address required'}), 400
-                
-                # Run pairing command with optional PIN
+
+                # For PIN-based pairing, use synchronous call
                 if pin:
-                    result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'pair', mac, pin], 
-                                          capture_output=True, text=True, timeout=30)
-                else:
-                    result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'pair', mac], 
-                                          capture_output=True, text=True, timeout=30)
-                
-                if 'PASSKEY_REQUIRED:' in result.stdout:
-                    # Extract the passkey
-                    import re
-                    match = re.search(r'PASSKEY_REQUIRED:(\d+)', result.stdout)
-                    if match:
-                        passkey = match.group(1)
-                        return jsonify({
-                            'success': True,
-                            'status': 'passkey_required',
-                            'passkey': passkey,
-                            'message': f"Please type {passkey} on the device and press Enter"
-                        })
-                
-                if result.returncode == 0 or 'successful' in result.stdout.lower():
+                    result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'pair', mac, pin],
+                                          capture_output=True, text=True, timeout=60)
+                    if result.returncode == 0 or 'successful' in result.stdout.lower():
+                        return jsonify({'success': True, 'status': 'paired'})
+                    else:
+                        return jsonify({'error': result.stderr or result.stdout}), 500
+
+                # For passkey-based pairing (keyboards), start process and read output incrementally
+                # to capture passkey early
+                process = subprocess.Popen(
+                    ['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'pair', mac],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+
+                # Read output with timeout, looking for passkey
+                import select
+                import re
+                output_lines = []
+                passkey = None
+                start_time = time.time()
+
+                # Wait up to 15 seconds for passkey to appear, then return response
+                while time.time() - start_time < 15:
+                    # Check if process has output
+                    if process.poll() is not None:
+                        # Process finished
+                        remaining = process.stdout.read()
+                        if remaining:
+                            output_lines.append(remaining)
+                        break
+
+                    try:
+                        line = process.stdout.readline()
+                        if line:
+                            output_lines.append(line)
+                            self.logger.info(f"BT pair output: {line.strip()}")
+
+                            # Check for passkey
+                            match = re.search(r'PASSKEY_REQUIRED:(\d+)', line)
+                            if match:
+                                passkey = match.group(1)
+                                self.logger.info(f"Found passkey: {passkey}")
+                                # Return immediately with passkey, let process continue in background
+                                return jsonify({
+                                    'success': True,
+                                    'status': 'passkey_required',
+                                    'passkey': passkey,
+                                    'message': f"Type {passkey} on the keyboard and press Enter"
+                                })
+                    except Exception as e:
+                        self.logger.warning(f"Error reading BT output: {e}")
+                        break
+
+                    time.sleep(0.1)
+
+                # Check final output
+                full_output = ''.join(output_lines)
+
+                # Check if pairing succeeded without passkey
+                if 'successful' in full_output.lower():
                     return jsonify({'success': True, 'status': 'paired'})
-                else:
-                    return jsonify({'error': result.stderr or result.stdout}), 500
+
+                # If we got here without passkey, check if process is still running
+                if process.poll() is None:
+                    # Process still running, might be waiting for passkey
+                    # Return a message to try manual PIN entry
+                    return jsonify({
+                        'success': False,
+                        'error': 'Pairing initiated but no passkey detected. Try manual PIN entry (0000 or 1234).'
+                    }), 200
+
+                return jsonify({'success': True, 'status': 'paired'})
+            except subprocess.TimeoutExpired:
+                return jsonify({'error': 'Pairing timed out'}), 500
             except Exception as e:
                 self.logger.error(f"Bluetooth pairing failed: {e}")
                 return jsonify({'error': str(e)}), 500

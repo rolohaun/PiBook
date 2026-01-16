@@ -62,11 +62,11 @@ SCANSCRIPT
     pair)
         # $2 = MAC address, $3 = PIN (optional)
         echo "Pairing with device $2..." >> /tmp/bt_pair_debug.log
-        
+
         # NOTE: Do NOT force lock/remove here. It causes "Device not available" error.
         # We assume the user has just scanned and the device is known to BlueZ.
         # Attempts to clean up state aggressively are backfiring.
-        
+
         if [ -n "$3" ]; then
             # Pairing with USER-PROVIDED PIN (legacy/simple devices)
             expect -c "
@@ -99,12 +99,12 @@ SCANSCRIPT
             " 2>&1
         else
             # Pairing WITHOUT user-provided PIN (might generate Passkey)
-            # Use EXPECT to capture passkey
+            # Use EXPECT to capture passkey - handles Apple keyboards and similar devices
             expect -c "
                 log_file -a /tmp/bt_pair_debug.log
                 set timeout 45
                 spawn bluetoothctl
-                
+
                 # Match any prompt ending in # or > (handling ANSI codes and prefixes)
                 # Use braces {} for regex to prevent Tcl command substitution on []
                 expect -re {.*[#>]}
@@ -117,9 +117,10 @@ SCANSCRIPT
                     -re {Passkey: ([0-9]+)} {
                         set passkey \$expect_out(1,string)
                         puts \"PASSKEY_REQUIRED:\$passkey\"
+                        flush stdout
                         send_user \"DBG: Matched Passkey: \$passkey\n\"
-                        
-                        # Now wait for success (user typing PIN)
+
+                        # Now wait for success (user typing PIN on device)
                         set timeout 120
                         expect {
                             \"Pairing successful\" {
@@ -134,12 +135,38 @@ SCANSCRIPT
                             }
                         }
                     }
+                    -re {Confirm passkey ([0-9]+)} {
+                        # Apple keyboard style - shows passkey to type on device
+                        set passkey \$expect_out(1,string)
+                        puts \"PASSKEY_REQUIRED:\$passkey\"
+                        flush stdout
+                        send_user \"DBG: Matched Confirm passkey: \$passkey\n\"
+
+                        # Auto-confirm on our side
+                        send \"yes\r\"
+
+                        # Wait for pairing to complete (user types code on keyboard)
+                        set timeout 120
+                        expect {
+                            \"Pairing successful\" {
+                                send_user \"DBG: Pairing successful after Confirm passkey\n\"
+                                send \"trust $2\r\"
+                                expect -re {.*[#>]}
+                                send \"connect $2\r\"
+                            }
+                            timeout {
+                                send_user \"DBG: Timeout waiting for user to type passkey\n\"
+                                exit 1
+                            }
+                        }
+                    }
                     \"Enter PIN code:\" {
                         send_user \"DBG: Matched Enter PIN code\n\"
                         set passkey \"123456\"
                         send \"\$passkey\r\"
                         puts \"PASSKEY_REQUIRED:\$passkey\"
-                        
+                        flush stdout
+
                         set timeout 120
                         expect {
                             \"Pairing successful\" {
