@@ -39,13 +39,7 @@ class ShutdownScreen:
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
 
-        # Draw thick outer black border (20px)
-        draw.rectangle([(0, 0), (self.width-1, self.height-1)], outline=0, width=20)
-        
-        # Draw inner black border (10px) for extra visibility
-        draw.rectangle([(30, 30), (self.width-30, self.height-30)], outline=0, width=10)
-
-        text = "SHUTTING\nDOWN"
+        text = "OFF"
         try:
             bbox = draw.textbbox((0, 0), text, font=self.font)
             text_width = bbox[2] - bbox[0]
@@ -58,6 +52,6 @@ class ShutdownScreen:
         y = (self.height - text_height) // 2
 
         # Draw text in BLACK (0)
-        draw.multiline_text((x, y), text, font=self.font, fill=0, align="center")
+        draw.text((x, y), text, font=self.font, fill=0)
 
         return image
