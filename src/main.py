@@ -725,6 +725,16 @@ class PiBookApp:
                 self._render_current_screen()
             elif app['screen'] == 'shutdown':
                 self.logger.info("🛑 Action: SHUT DOWN")
+                
+                # Show shutdown screen
+                try:
+                    from src.ui.shutdown_screen import ShutdownScreen
+                    shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
+                    self.display.update(shutdown_screen.render())
+                    time.sleep(2)  # Wait for display to update
+                except Exception as e:
+                    self.logger.error(f"Failed to show shutdown screen: {e}")
+                
                 self.stop()
                 os.system("sudo shutdown -h now")
             elif app['screen'] is None:
@@ -785,6 +795,16 @@ class PiBookApp:
                 self._render_current_screen()
             elif app['screen'] == 'shutdown':
                 self.logger.info("🛑 Action: SHUT DOWN")
+                
+                # Show shutdown screen
+                try:
+                    from src.ui.shutdown_screen import ShutdownScreen
+                    shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
+                    self.display.update(shutdown_screen.render())
+                    time.sleep(2)  # Wait for display to update
+                except Exception as e:
+                    self.logger.error(f"Failed to show shutdown screen: {e}")
+                
                 self.stop()
                 os.system("sudo shutdown -h now")
             elif app['screen'] is None:
