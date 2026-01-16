@@ -67,11 +67,11 @@ case "$1" in
                 log_file /tmp/bt_pair_debug.log
                 set timeout 45
                 spawn bluetoothctl
-                expect \"#\"
+                expect -re \"\\[bluetoothctl\\].*[#>]\"
                 send \"agent on\r\"
-                expect \"#\"
+                expect -re \"\\[bluetoothctl\\].*[#>]\"
                 send \"default-agent\r\"
-                expect \"#\"
+                expect -re \"\\[bluetoothctl\\].*[#>]\"
                 send \"pair $2\r\"
                 expect {
                     -re \"Passkey: ([0-9]+)\" {
@@ -82,7 +82,7 @@ case "$1" in
                         expect {
                             \"Pairing successful\" {
                                 send \"trust $2\r\"
-                                expect \"#\"
+                                expect -re \"\\[bluetoothctl\\].*[#>]\"
                                 send \"connect $2\r\"
                             }
                             timeout {
@@ -101,7 +101,7 @@ case "$1" in
                         expect {
                             \"Pairing successful\" {
                                 send \"trust $2\r\"
-                                expect \"#\"
+                                expect -re \"\\[bluetoothctl\\].*[#>]\"
                                 send \"connect $2\r\"
                             }
                             timeout {
@@ -111,7 +111,7 @@ case "$1" in
                     }
                     \"Pairing successful\" {
                          send \"trust $2\r\"
-                         expect \"#\"
+                         expect -re \"\\[bluetoothctl\\].*[#>]\"
                          send \"connect $2\r\"
                     }
                     timeout {
@@ -119,7 +119,7 @@ case "$1" in
                          exit 1
                     }
                 }
-                expect \"#\"
+                expect -re \"\\[bluetoothctl\\].*[#>]\"
                 send \"quit\r\"
             " 2>&1
          fi
