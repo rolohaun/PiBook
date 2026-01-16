@@ -307,9 +307,10 @@ class PiBookWebServer:
 
                 self._save_settings(settings_data)
                 
-                # Reload settings in the app instance so changes take effect immediately
+                # Force SettingsManager to reload from file so changes take effect immediately
+                self.app_instance.settings_manager.settings = self.app_instance.settings_manager.load()
                 self.app_instance.settings = self.app_instance.settings_manager.get_all()
-                self.logger.info("Settings reloaded in app instance")
+                self.logger.info("Settings reloaded in app instance from file")
 
                 # Apply settings to display driver
                 self.app_instance.display.set_full_refresh_interval(settings_data['full_refresh_interval'])
