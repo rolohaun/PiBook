@@ -732,7 +732,7 @@ class PiBookApp:
                     shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
                     # Use full refresh for clean "OFF" screen
                     self.display.display_image(shutdown_screen.render(), use_partial=False)
-                    time.sleep(2)  # Wait for display to update
+                    time.sleep(4)  # Wait for display to update (4s for safety)
                 except Exception as e:
                     self.logger.error(f"Failed to show shutdown screen: {e}")
                 
@@ -803,7 +803,7 @@ class PiBookApp:
                     shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
                     # Use full refresh for clean "OFF" screen
                     self.display.display_image(shutdown_screen.render(), use_partial=False)
-                    time.sleep(2)  # Wait for display to update
+                    time.sleep(4)  # Wait for display to update (4s for safety)
                 except Exception as e:
                     self.logger.error(f"Failed to show shutdown screen: {e}")
                 
