@@ -704,9 +704,14 @@ function toggleBluetoothScan() {
         })
         .catch(error => {
             console.error('Bluetooth scan toggle failed:', error);
-            bluetoothScanning = false;
-            modal.style.display = 'none';
+            // Do NOT close the modal on error, let user see it
+            // bluetoothScanning = false;
+            // modal.style.display = 'none';
             btn.textContent = 'Scan for Devices';
+
+            // Show error in modal
+            document.getElementById('available-devices').innerHTML =
+                `<p style="color: red; text-align: center;">Scan failed: ${error.message || 'Unknown error'}</p>`;
         });
 }
 
