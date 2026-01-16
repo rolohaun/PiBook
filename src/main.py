@@ -253,6 +253,31 @@ class PiBookApp:
         """Delegate to PowerManager"""
         self.power_manager.restore_all_cores()
 
+    def _enable_wifi_after_reader(self):
+        """Re-enable WiFi and restart web server after leaving reader"""
+        if not self.config.get('web.always_on', False):
+            try:
+                os.system("sudo ifconfig wlan0 up")
+                self.logger.info("📶 WiFi re-enabled (leaving reader)")
+                # Wait a moment for WiFi to come up
+                time.sleep(2)
+            except Exception as e:
+                self.logger.warning(f"Failed to enable WiFi: {e}")
+
+        # Restart web server if needed
+        if not self.web_server and self.config.get('web.enabled', True):
+            try:
+                web_port = self.config.get('web.port', 5000)
+                self.web_server = PiBookWebServer(
+                    self.library_screen,
+                    port=web_port,
+                    books_dir=self.config.get('library.books_directory')
+                )
+                self.web_server.start()
+                self.logger.info("🔌 Web server restarted (leaving reader)")
+            except Exception as e:
+                self.logger.warning(f"Failed to restart web server: {e}")
+
     def start(self):
         """Start the application"""
         try:
@@ -665,6 +690,8 @@ class PiBookApp:
             self.reader_screen.close()
             # Restore all CPU cores when leaving reader
             self._restore_all_cores()
+            # Re-enable WiFi when leaving reader
+            self._enable_wifi_after_reader()
 
         self.navigation.navigate_to(Screen.MAIN_MENU)
         self._render_current_screen()
@@ -714,12 +741,14 @@ class PiBookApp:
         else:
             # On any other screen (IP Scanner, To-Do, Reader) - return to main menu
             self.logger.info("🏠 Action: GPIO5 HOLD - Returning to main menu")
-            
+
             if self.navigation.is_on_screen(Screen.READER):
                 self.reader_screen.close()
                 # Restore all CPU cores when leaving reader
                 self._restore_all_cores()
-            
+                # Re-enable WiFi when leaving reader
+                self._enable_wifi_after_reader()
+
             self.navigation.navigate_to(Screen.MAIN_MENU)
             self._render_current_screen()
 
@@ -768,7 +797,7 @@ class PiBookApp:
         elif self.navigation.is_on_screen(Screen.READER):
             # On reader - return to library
             self.logger.info("🔄 Action: TOGGLE - Returning to library from reader")
-            
+
             # Save progress before leaving reader
             if self.reader_screen.current_book_path:
                 self.progress_manager.save_progress(
@@ -776,36 +805,14 @@ class PiBookApp:
                     self.reader_screen.current_page,
                     self.reader_screen.renderer.get_page_count()
                 )
-            
+
             self.reader_screen.close()
             # Restore all CPU cores when leaving reader
             self._restore_all_cores()
-            self.navigation.navigate_to(Screen.LIBRARY)
-            
-            # Re-enable WiFi when returning to library (battery optimization)
-            if not self.config.get('web.always_on', False):
-                try:
-                    os.system("sudo ifconfig wlan0 up")
-                    self.logger.info("📶 WiFi re-enabled (returning to library)")
-                    # Wait a moment for WiFi to come up
-                    time.sleep(2)
-                except Exception as e:
-                    self.logger.warning(f"Failed to enable WiFi: {e}")
-            
-            # Restart web server when returning to library (battery optimization)
-            if not self.web_server and self.config.get('web.enabled', True):
-                try:
-                    web_port = self.config.get('web.port', 5000)
-                    self.web_server = PiBookWebServer(
-                        self.library_screen,
-                        port=web_port,
-                        books_dir=self.config.get('library.books_directory')
-                    )
-                    self.web_server.start()
-                    self.logger.info("🔌 Web server restarted (returning to library)")
-                except:
-                    pass
+            # Re-enable WiFi and restart web server
+            self._enable_wifi_after_reader()
 
+            self.navigation.navigate_to(Screen.LIBRARY)
             self._render_current_screen()
         elif self.navigation.is_on_screen(Screen.IP_SCANNER):
             # On IP scanner - return to main menu
