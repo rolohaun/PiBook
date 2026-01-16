@@ -29,6 +29,9 @@ case "$1" in
         echo "Pairing with device $2..."
         # Force scan off to ensure bluetoothctl is free and resources are available
         timeout 2 bash -c "echo 'scan off' | bluetoothctl" > /dev/null 2>&1
+        # Force remove to clean up any stale matching/bonding state
+        timeout 2 bash -c "echo 'remove $2' | bluetoothctl" > /dev/null 2>&1
+        sleep 2
         
         if [ -n "$3" ]; then
             # Pairing with USER-PROVIDED PIN (legacy/simple devices)
