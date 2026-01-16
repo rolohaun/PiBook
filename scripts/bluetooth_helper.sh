@@ -15,17 +15,36 @@ case "$1" in
         ;;
     scan_on)
         echo "Starting Bluetooth scan..."
-        # Start scan in background with longer timeout
-        (echo "scan on"; sleep 15) | bluetoothctl > /dev/null 2>&1 &
-        echo "Scan started"
+        # Kill any existing scan processes first
+        pkill -f "bt_scan_loop" 2>/dev/null || true
+        pkill -f "bluetoothctl" 2>/dev/null || true
+        sleep 0.5
+
+        # Create a temporary script to run the scan
+        cat > /tmp/bt_scan_loop.sh << 'SCANSCRIPT'
+#!/bin/bash
+# Keep sending scan on command to bluetoothctl
+for i in {1..15}; do
+    echo "scan on" | bluetoothctl 2>/dev/null
+    sleep 3
+done
+echo "scan off" | bluetoothctl 2>/dev/null
+SCANSCRIPT
+        chmod +x /tmp/bt_scan_loop.sh
+
+        # Run the scan loop in background
+        nohup /tmp/bt_scan_loop.sh >/dev/null 2>&1 &
+        echo "Scan started (will run for ~45 seconds)"
         ;;
     scan_off)
         echo "Stopping Bluetooth scan..."
-        timeout 2 bash -c "echo 'scan off' | bluetoothctl" 2>&1
+        # Kill the scan loop and bluetoothctl
+        pkill -f "bt_scan_loop" 2>/dev/null || true
+        pkill -f "bluetoothctl" 2>/dev/null || true
+        # Send scan off command
+        echo "scan off" | bluetoothctl 2>/dev/null || true
         echo "Scan stopped"
         ;;
-    pair)
-        # $2 = MAC address, $3 = PIN (optional)
     pair)
         # $2 = MAC address, $3 = PIN (optional)
         echo "Pairing with device $2..." >> /tmp/bt_pair_debug.log

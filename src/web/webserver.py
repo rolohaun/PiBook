@@ -503,17 +503,34 @@ class PiBookWebServer:
             """Get discovered Bluetooth devices"""
             try:
                 import subprocess
-                result = subprocess.run(['bluetoothctl', 'devices'], capture_output=True, text=True, timeout=5)
                 devices = []
+                seen_macs = set()
+
+                # Get all known devices (includes recently discovered ones)
+                result = subprocess.run(['bluetoothctl', 'devices'], capture_output=True, text=True, timeout=5)
                 for line in result.stdout.strip().split('\n'):
                     if line.startswith('Device '):
                         parts = line.split(' ', 2)
-                        if len(parts) >= 3:
-                            devices.append({'mac': parts[1], 'name': parts[2]})
-                        elif len(parts) == 2:
-                            # If name is missing, use MAC as name
-                            devices.append({'mac': parts[1], 'name': parts[1]})
-                
+                        if len(parts) >= 2:
+                            mac = parts[1]
+                            name = parts[2] if len(parts) >= 3 else mac
+                            if mac not in seen_macs:
+                                seen_macs.add(mac)
+                                devices.append({'mac': mac, 'name': name})
+
+                # Also get paired devices to mark them
+                paired_result = subprocess.run(['bluetoothctl', 'paired-devices'], capture_output=True, text=True, timeout=5)
+                paired_macs = set()
+                for line in paired_result.stdout.strip().split('\n'):
+                    if line.startswith('Device '):
+                        parts = line.split(' ', 2)
+                        if len(parts) >= 2:
+                            paired_macs.add(parts[1])
+
+                # Mark paired devices
+                for device in devices:
+                    device['paired'] = device['mac'] in paired_macs
+
                 return jsonify({'devices': devices})
             except Exception as e:
                 self.logger.error(f"Bluetooth device list failed: {e}")
