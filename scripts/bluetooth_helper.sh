@@ -64,6 +64,7 @@ case "$1" in
             # Pairing WITHOUT user-provided PIN (might generate Passkey)
             # Use EXPECT to capture passkey
             expect -c "
+                log_file /tmp/bt_pair_debug.log
                 set timeout 45
                 spawn bluetoothctl
                 expect \"#\"
@@ -90,8 +91,23 @@ case "$1" in
                         }
                     }
                     \"Enter PIN code:\" {
-                         # Legacy PIN request
-                         exit 1
+                        # Legacy pairing where we must provide the PIN
+                        # Generate a predictable PIN for the user to type
+                        set passkey \"123456\"
+                        send \"\$passkey\r\"
+                        puts \"PASSKEY_REQUIRED:\$passkey\"
+                        
+                        set timeout 120
+                        expect {
+                            \"Pairing successful\" {
+                                send \"trust $2\r\"
+                                expect \"#\"
+                                send \"connect $2\r\"
+                            }
+                            timeout {
+                                exit 1
+                            }
+                        }
                     }
                     \"Pairing successful\" {
                          send \"trust $2\r\"
@@ -106,9 +122,9 @@ case "$1" in
                 expect \"#\"
                 send \"quit\r\"
             " 2>&1
-        fi
-        echo "Pairing complete"
-        ;;
+         fi
+         echo "Pairing complete"
+         ;;
     remove)
         # $2 = MAC address
         echo "Removing device $2..."
