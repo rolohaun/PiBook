@@ -12,16 +12,18 @@ class ShutdownScreen:
     Displays a large "OFF" message before system shutdown
     """
 
-    def __init__(self, width: int = 800, height: int = 480):
+    def __init__(self, width: int = 800, height: int = 480, message: str = "OFF"):
         """
         Initialize shutdown screen
 
         Args:
             width: Screen width
             height: Screen height
+            message: Custom shutdown message to display
         """
         self.width = width
         self.height = height
+        self.message = message
         try:
             # Use Serif-Bold as it is known to exist from MainMenuScreen
             self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 120)
@@ -39,7 +41,7 @@ class ShutdownScreen:
         image = Image.new('1', (self.width, self.height), 1)
         draw = ImageDraw.Draw(image)
 
-        text = "OFF"
+        text = self.message
         try:
             bbox = draw.textbbox((0, 0), text, font=self.font)
             text_width = bbox[2] - bbox[0]

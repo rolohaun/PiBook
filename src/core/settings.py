@@ -19,6 +19,7 @@ class SettingsManager:
         'sleep_enabled': True,
         'sleep_message': "Shh I'm sleeping",
         'sleep_timeout': 120,
+        'shutdown_message': 'OFF',
         'wifi_while_reading': False,
         'items_per_page': 4,
         'undervolt': -2

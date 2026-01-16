@@ -730,7 +730,8 @@ class PiBookApp:
                 try:
                     self.logger.info("Step 1: Creating shutdown screen instance")
                     from src.ui.shutdown_screen import ShutdownScreen
-                    shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
+                    shutdown_message = self.settings.get('shutdown_message', 'OFF')
+                    shutdown_screen = ShutdownScreen(self.display.width, self.display.height, shutdown_message)
                     
                     self.logger.info("Step 2: Rendering shutdown screen image")
                     shutdown_image = shutdown_screen.render()
@@ -822,7 +823,8 @@ class PiBookApp:
                 try:
                     self.logger.info("Step 1: Creating shutdown screen instance")
                     from src.ui.shutdown_screen import ShutdownScreen
-                    shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
+                    shutdown_message = self.settings.get('shutdown_message', 'OFF')
+                    shutdown_screen = ShutdownScreen(self.display.width, self.display.height, shutdown_message)
                     
                     self.logger.info("Step 2: Rendering shutdown screen image")
                     shutdown_image = shutdown_screen.render()
