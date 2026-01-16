@@ -110,6 +110,20 @@ class PiBookApp:
                 self.logger.warning(f"Failed to initialize PiSugar button handler: {e}")
                 self.pisugar_button = None
 
+        # Initialize Bluetooth keyboard handler
+        self.keyboard_handler = None
+        if self.config.get('keyboard.enabled', True):
+            try:
+                from src.hardware.keyboard_handler import KeyboardHandler
+                self.keyboard_handler = KeyboardHandler(
+                    device_pattern=self.config.get('keyboard.device_pattern', None),
+                    logger=self.logger
+                )
+                self.logger.info("Bluetooth keyboard handler initialized")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize keyboard handler: {e}")
+                self.keyboard_handler = None
+
         # Initialize reading progress manager
         progress_file = self.config.get('reading_progress.progress_file', 'data/reading_progress.json')
         self.progress_manager = ProgressManager(progress_file)
@@ -356,6 +370,9 @@ class PiBookApp:
         if self.pisugar_button:
             self.pisugar_button.stop()
 
+        if self.keyboard_handler:
+            self.keyboard_handler.stop()
+
         self.logger.info("PiBook stopped")
 
     def _register_gpio_callbacks(self):
@@ -377,6 +394,16 @@ class PiBookApp:
             self.pisugar_button.register_callback('toggle', self._handle_toggle)  # Long press toggles
             self.pisugar_button.start()
             self.logger.info("PiSugar button callbacks registered")
+
+        # Register Bluetooth keyboard callbacks (if available)
+        if self.keyboard_handler:
+            self.keyboard_handler.register_callback('next', self._handle_next)
+            self.keyboard_handler.register_callback('prev', self._handle_prev)
+            self.keyboard_handler.register_callback('select', self._handle_gpio5_hold)  # Enter = select/open
+            self.keyboard_handler.register_callback('back', self._handle_back)
+            self.keyboard_handler.register_callback('home', self._handle_go_home)
+            self.keyboard_handler.start()
+            self.logger.info("Bluetooth keyboard callbacks registered")
 
     def _monitor_inactivity(self):
         """Background thread to check for inactivity and battery status"""
@@ -678,6 +705,27 @@ class PiBookApp:
         elif self.navigation.is_on_screen(Screen.LIBRARY):
             # Return to main menu
             self.logger.info("🏠 Action: BACK - Returning to main menu")
+            self.navigation.navigate_to(Screen.MAIN_MENU)
+            self._render_current_screen()
+
+    def _handle_go_home(self):
+        """Handle home key press - go directly to main menu"""
+        if not self.running: return
+
+        self._reset_activity()
+        if self.power_manager.is_sleeping:
+            self._wake_from_sleep()
+            return
+
+        self.logger.info("Keyboard: Home - Going to main menu")
+
+        # Close reader if open
+        if self.navigation.is_on_screen(Screen.READER):
+            self.reader_screen.close()
+            self._restore_all_cores()
+
+        # Go to main menu from any screen
+        if not self.navigation.is_on_screen(Screen.MAIN_MENU):
             self.navigation.navigate_to(Screen.MAIN_MENU)
             self._render_current_screen()
 
