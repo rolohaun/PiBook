@@ -510,6 +510,9 @@ class PiBookWebServer:
                         parts = line.split(' ', 2)
                         if len(parts) >= 3:
                             devices.append({'mac': parts[1], 'name': parts[2]})
+                        elif len(parts) == 2:
+                            # If name is missing, use MAC as name
+                            devices.append({'mac': parts[1], 'name': parts[1]})
                 
                 return jsonify({'devices': devices})
             except Exception as e:

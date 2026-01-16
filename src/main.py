@@ -58,6 +58,14 @@ class PiBookApp:
         self.settings = self.settings_manager.get_all()
         self.logger.info(f"User settings loaded: {self.settings}")
 
+        # Turn off Bluetooth on startup to save battery
+        try:
+            import subprocess
+            subprocess.run(['rfkill', 'block', 'bluetooth'], capture_output=True)
+            self.logger.info("Bluetooth disabled on startup to save battery")
+        except Exception as e:
+            self.logger.warning(f"Failed to disable Bluetooth on startup: {e}")
+
         # Initialize components
         display_width = self.config.get('display.width', 800)
         display_height = self.config.get('display.height', 480)
