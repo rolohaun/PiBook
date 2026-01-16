@@ -823,15 +823,7 @@ function submitPin() {
             closePinModal();
         });
 }
-            }
-currentPairDevice = null;
-        })
-        .catch (error => {
-    console.error('Pairing failed:', error);
-    alert('Pairing failed');
-    currentPairDevice = null;
-});
-}
+
 
 function removeDevice(mac) {
     if (!confirm('Remove this device?')) return;
