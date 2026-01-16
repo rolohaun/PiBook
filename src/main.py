@@ -24,6 +24,7 @@ from src.ui.navigation import NavigationManager, Screen
 from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen
 from src.apps.todo import ToDoScreen
 from src.apps.ipscanner import IPScannerScreen
+from src.apps.klipper import KlipperScreen
 from src.web.webserver import PiBookWebServer
 from src.utils.progress_manager import ProgressManager
 from src.core.power_manager import PowerManager
@@ -157,6 +158,13 @@ class PiBookApp:
             width=display_width,
             height=display_height,
             font_size=self.config.get('todo.font_size', 18),
+            battery_monitor=self.battery_monitor
+        )
+
+        self.klipper_screen = KlipperScreen(
+            width=display_width,
+            height=display_height,
+            font_size=self.config.get('klipper.font_size', 18),
             battery_monitor=self.battery_monitor
         )
 
@@ -348,6 +356,8 @@ class PiBookApp:
         pending_charging_state = None
         # Track IP scanner state for final refresh
         last_scanning_state = False
+        # Track Klipper scanner state for final refresh
+        last_klipper_scanning_state = False
 
         while self.running:
             try:
@@ -426,7 +436,23 @@ class PiBookApp:
 
                     last_scanning_state = current_scanning
 
-                time.sleep(1)  # Check more frequently for IP scanner updates
+                # Refresh Klipper screen while scanning AND once when it completes
+                if self.navigation.is_on_screen(Screen.KLIPPER) and not self.power_manager.is_sleeping:
+                    current_klipper_scanning = self.klipper_screen.scanning
+
+                    # Refresh if currently scanning OR just finished scanning
+                    if current_klipper_scanning or (last_klipper_scanning_state and not current_klipper_scanning):
+                        try:
+                            # Force partial refresh during scanning (no full refresh needed)
+                            self._render_current_screen(force_partial=True)
+                            if not current_klipper_scanning and last_klipper_scanning_state:
+                                self.logger.info("Klipper scan completed - final refresh done")
+                        except Exception as scan_error:
+                            self.logger.error(f"Error refreshing Klipper screen: {scan_error}", exc_info=True)
+
+                    last_klipper_scanning_state = current_klipper_scanning
+
+                time.sleep(1)  # Check more frequently for scanner updates
             except Exception as e:
                 self.logger.error(f"Error in monitor thread: {e}", exc_info=True)
                 time.sleep(1)  # Continue monitoring even if error occurs
@@ -513,6 +539,16 @@ class PiBookApp:
         elif self.navigation.is_on_screen(Screen.TODO):
             self.logger.info("✓ Action: NEXT (To Do - Move down)")
             self.todo_screen.next_item()
+        elif self.navigation.is_on_screen(Screen.KLIPPER):
+            # Start scan if no results yet, otherwise scroll pages
+            if len(self.klipper_screen.printers) == 0 and not self.klipper_screen.scanning:
+                self.logger.info("🖨️ Action: NEXT - Starting Klipper scan")
+                self.klipper_screen.start_scan()
+            elif not self.klipper_screen.scanning and len(self.klipper_screen.printers) > 0:
+                self.logger.info("🖨️ Action: NEXT (Klipper - Next page)")
+                self.klipper_screen.next_page()
+            else:
+                self.logger.info("🖨️ Action: NEXT - Scan in progress, waiting...")
         elif self.navigation.is_on_screen(Screen.READER):
             self.logger.info("📄 Action: NEXT PAGE (Reader)")
             self.reader_screen.next_page()
@@ -656,6 +692,9 @@ class PiBookApp:
             elif app['screen'] == 'todo':
                 self.navigation.navigate_to(Screen.TODO)
                 self._render_current_screen()
+            elif app['screen'] == 'klipper':
+                self.navigation.navigate_to(Screen.KLIPPER)
+                self._render_current_screen()
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
         elif self.navigation.is_on_screen(Screen.LIBRARY):
@@ -706,6 +745,9 @@ class PiBookApp:
                 self._render_current_screen()
             elif app['screen'] == 'todo':
                 self.navigation.navigate_to(Screen.TODO)
+                self._render_current_screen()
+            elif app['screen'] == 'klipper':
+                self.navigation.navigate_to(Screen.KLIPPER)
                 self._render_current_screen()
             elif app['screen'] is None:
                 self.logger.info(f"App '{app['name']}' not yet implemented")
@@ -774,6 +816,11 @@ class PiBookApp:
             # On To Do - toggle completion status of current item
             self.logger.info("✓ Action: TOGGLE - Toggle todo completion")
             self.todo_screen.toggle_todo()
+            self._render_current_screen()
+        elif self.navigation.is_on_screen(Screen.KLIPPER):
+            # On Klipper - return to main menu
+            self.logger.info("🏠 Action: TOGGLE - Returning to main menu from Klipper")
+            self.navigation.navigate_to(Screen.MAIN_MENU)
             self._render_current_screen()
 
     def _open_book(self, book: dict):
@@ -876,6 +923,8 @@ class PiBookApp:
                 image = self.ip_scanner_screen.render()
             elif self.navigation.is_on_screen(Screen.TODO):
                 image = self.todo_screen.render()
+            elif self.navigation.is_on_screen(Screen.KLIPPER):
+                image = self.klipper_screen.render()
             elif self.navigation.is_on_screen(Screen.READER):
                 image = self.reader_screen.get_current_image()
 

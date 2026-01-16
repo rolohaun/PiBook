@@ -107,6 +107,12 @@ class MainMenuScreen:
                 'icon_filename': 'todo.png',
                 'description': 'Manage tasks',
                 'screen': 'todo'
+            },
+            {
+                'name': 'Klipper',
+                'icon_filename': 'klipper.png',
+                'description': 'Monitor 3D printers',
+                'screen': 'klipper'
             }
         ]
 
