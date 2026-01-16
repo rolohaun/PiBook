@@ -602,3 +602,204 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+
+// Bluetooth Management Functions
+let bluetoothScanning = false;
+let currentPairDevice = null;
+
+// Load Bluetooth status on page load
+document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('bluetooth_enabled')) {
+        refreshBluetoothStatus();
+
+        // Toggle Bluetooth power
+        document.getElementById('bluetooth_enabled').addEventListener('change', function () {
+            toggleBluetoothPower(this.checked);
+        });
+    }
+});
+
+function refreshBluetoothStatus() {
+    fetch('/api/bluetooth/status')
+        .then(response => response.json())
+        .then(data => {
+            const checkbox = document.getElementById('bluetooth_enabled');
+            const controls = document.getElementById('bluetooth-controls');
+
+            checkbox.checked = data.powered;
+            controls.style.display = data.powered ? 'block' : 'none';
+
+            if (data.powered) {
+                updatePairedDevices(data.paired_devices);
+            }
+        })
+        .catch(error => console.error('Bluetooth status check failed:', error));
+}
+
+function toggleBluetoothPower(powerOn) {
+    fetch('/api/bluetooth/power', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ power: powerOn })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('bluetooth-controls').style.display = powerOn ? 'block' : 'none';
+                if (powerOn) {
+                    refreshBluetoothStatus();
+                }
+            } else {
+                alert('Failed to toggle Bluetooth: ' + (data.error || 'Unknown error'));
+                document.getElementById('bluetooth_enabled').checked = !powerOn;
+            }
+        })
+        .catch(error => {
+            console.error('Bluetooth power toggle failed:', error);
+            alert('Failed to toggle Bluetooth');
+            document.getElementById('bluetooth_enabled').checked = !powerOn;
+        });
+}
+
+function toggleBluetoothScan() {
+    bluetoothScanning = !bluetoothScanning;
+    const btn = document.getElementById('scan-btn');
+    const resultsDiv = document.getElementById('scan-results');
+
+    btn.textContent = bluetoothScanning ? 'Stop Scanning' : 'Scan for Devices';
+    resultsDiv.style.display = bluetoothScanning ? 'block' : 'none';
+
+    fetch('/api/bluetooth/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scan: bluetoothScanning })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (bluetoothScanning) {
+                // Poll for devices every 2 seconds
+                pollBluetoothDevices();
+            }
+        })
+        .catch(error => console.error('Bluetooth scan toggle failed:', error));
+}
+
+function pollBluetoothDevices() {
+    if (!bluetoothScanning) return;
+
+    fetch('/api/bluetooth/devices')
+        .then(response => response.json())
+        .then(data => {
+            updateAvailableDevices(data.devices);
+            if (bluetoothScanning) {
+                setTimeout(pollBluetoothDevices, 2000);
+            }
+        })
+        .catch(error => console.error('Device polling failed:', error));
+}
+
+function updateAvailableDevices(devices) {
+    const container = document.getElementById('available-devices');
+    container.innerHTML = '';
+
+    if (devices.length === 0) {
+        container.innerHTML = '<p style="color: #666;">No devices found. Make sure device is in pairing mode.</p>';
+        return;
+    }
+
+    devices.forEach(device => {
+        const div = document.createElement('div');
+        div.style.cssText = 'padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
+        div.innerHTML = `
+            <span><strong>${device.name}</strong><br><small>${device.mac}</small></span>
+            <button class="btn" style="padding: 4px 12px;" onclick="pairDevice('${device.mac}', '${device.name}')">Pair</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function updatePairedDevices(devices) {
+    const container = document.getElementById('paired-devices');
+    container.innerHTML = '';
+
+    if (devices.length === 0) {
+        container.innerHTML = '<p style="color: #666;">No paired devices</p>';
+        return;
+    }
+
+    devices.forEach(device => {
+        const div = document.createElement('div');
+        div.style.cssText = 'padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
+        div.innerHTML = `
+            <span><strong>${device.name}</strong><br><small>${device.mac}</small></span>
+            <button class="btn" style="padding: 4px 12px; background: #d32f2f;" onclick="removeDevice('${device.mac}')">Remove</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function pairDevice(mac, name) {
+    currentPairDevice = { mac, name };
+    document.getElementById('pin-device-name').textContent = `Pairing with: ${name}`;
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-modal').style.display = 'block';
+}
+
+function closePinModal() {
+    document.getElementById('pin-modal').style.display = 'none';
+    currentPairDevice = null;
+}
+
+function submitPin() {
+    const pin = document.getElementById('pin-input').value.trim();
+
+    if (!currentPairDevice) return;
+
+    document.getElementById('pin-modal').style.display = 'none';
+
+    fetch('/api/bluetooth/pair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac: currentPairDevice.mac, pin: pin })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Successfully paired with ${currentPairDevice.name}`);
+                refreshBluetoothStatus();
+                bluetoothScanning = false;
+                document.getElementById('scan-btn').textContent = 'Scan for Devices';
+                document.getElementById('scan-results').style.display = 'none';
+            } else {
+                alert('Pairing failed: ' + (data.error || 'Unknown error'));
+            }
+            currentPairDevice = null;
+        })
+        .catch(error => {
+            console.error('Pairing failed:', error);
+            alert('Pairing failed');
+            currentPairDevice = null;
+        });
+}
+
+function removeDevice(mac) {
+    if (!confirm('Remove this device?')) return;
+
+    fetch('/api/bluetooth/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac: mac })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                refreshBluetoothStatus();
+            } else {
+                alert('Failed to remove device: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Device removal failed:', error);
+            alert('Failed to remove device');
+        });
+}

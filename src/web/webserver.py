@@ -428,6 +428,131 @@ class PiBookWebServer:
                 self.logger.error(f"Terminal command failed: {e}")
                 return jsonify({'error': str(e)}), 500
 
+        # Bluetooth Management APIs
+        @self.flask_app.route('/api/bluetooth/status')
+        def bluetooth_status():
+            """Get Bluetooth status and paired devices"""
+            try:
+                import subprocess
+                
+                # Check if Bluetooth is powered on
+                result = subprocess.run(['bluetoothctl', 'show'], capture_output=True, text=True, timeout=5)
+                powered = 'Powered: yes' in result.stdout
+                
+                # Get paired devices
+                result = subprocess.run(['bluetoothctl', 'paired-devices'], capture_output=True, text=True, timeout=5)
+                paired_devices = []
+                for line in result.stdout.strip().split('\n'):
+                    if line.startswith('Device '):
+                        parts = line.split(' ', 2)
+                        if len(parts) >= 3:
+                            paired_devices.append({'mac': parts[1], 'name': parts[2]})
+                
+                return jsonify({'powered': powered, 'paired_devices': paired_devices})
+            except Exception as e:
+                self.logger.error(f"Bluetooth status check failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/bluetooth/power', methods=['POST'])
+        def bluetooth_power():
+            """Toggle Bluetooth power"""
+            try:
+                data = request.get_json()
+                power_on = data.get('power', False)
+                action = 'power_on' if power_on else 'power_off'
+                
+                result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', action], 
+                                      capture_output=True, text=True, timeout=10)
+                
+                if result.returncode == 0:
+                    return jsonify({'success': True, 'powered': power_on})
+                else:
+                    return jsonify({'error': result.stderr}), 500
+            except Exception as e:
+                self.logger.error(f"Bluetooth power toggle failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/bluetooth/scan', methods=['POST'])
+        def bluetooth_scan():
+            """Start/stop Bluetooth scanning"""
+            try:
+                data = request.get_json()
+                scan_on = data.get('scan', False)
+                action = 'scan_on' if scan_on else 'scan_off'
+                
+                result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', action], 
+                                      capture_output=True, text=True, timeout=10)
+                
+                return jsonify({'success': True, 'scanning': scan_on})
+            except Exception as e:
+                self.logger.error(f"Bluetooth scan toggle failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/bluetooth/devices')
+        def bluetooth_devices():
+            """Get discovered Bluetooth devices"""
+            try:
+                result = subprocess.run(['bluetoothctl', 'devices'], capture_output=True, text=True, timeout=5)
+                devices = []
+                for line in result.stdout.strip().split('\n'):
+                    if line.startswith('Device '):
+                        parts = line.split(' ', 2)
+                        if len(parts) >= 3:
+                            devices.append({'mac': parts[1], 'name': parts[2]})
+                
+                return jsonify({'devices': devices})
+            except Exception as e:
+                self.logger.error(f"Bluetooth device list failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/bluetooth/pair', methods=['POST'])
+        def bluetooth_pair():
+            """Pair with a Bluetooth device"""
+            try:
+                data = request.get_json()
+                mac = data.get('mac')
+                pin = data.get('pin', '')
+                
+                if not mac:
+                    return jsonify({'error': 'MAC address required'}), 400
+                
+                # Run pairing command with optional PIN
+                if pin:
+                    result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'pair', mac, pin], 
+                                          capture_output=True, text=True, timeout=30)
+                else:
+                    result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'pair', mac], 
+                                          capture_output=True, text=True, timeout=30)
+                
+                if result.returncode == 0 or 'successful' in result.stdout.lower():
+                    return jsonify({'success': True})
+                else:
+                    return jsonify({'error': result.stderr or result.stdout}), 500
+            except Exception as e:
+                self.logger.error(f"Bluetooth pairing failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/bluetooth/remove', methods=['POST'])
+        def bluetooth_remove():
+            """Remove a paired Bluetooth device"""
+            try:
+                data = request.get_json()
+                mac = data.get('mac')
+                
+                if not mac:
+                    return jsonify({'error': 'MAC address required'}), 400
+                
+                result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'remove', mac], 
+                                      capture_output=True, text=True, timeout=10)
+                
+                if result.returncode == 0:
+                    return jsonify({'success': True})
+                else:
+                    return jsonify({'error': result.stderr}), 500
+            except Exception as e:
+                self.logger.error(f"Bluetooth device removal failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
         @self.flask_app.route('/api/system_stats')
         def system_stats():
             """Get comprehensive system statistics"""
