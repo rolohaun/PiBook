@@ -730,7 +730,8 @@ class PiBookApp:
                 try:
                     from src.ui.shutdown_screen import ShutdownScreen
                     shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
-                    self.display.update(shutdown_screen.render())
+                    # Use full refresh for clean "OFF" screen
+                    self.display.display_image(shutdown_screen.render(), use_partial=False)
                     time.sleep(2)  # Wait for display to update
                 except Exception as e:
                     self.logger.error(f"Failed to show shutdown screen: {e}")
@@ -800,7 +801,8 @@ class PiBookApp:
                 try:
                     from src.ui.shutdown_screen import ShutdownScreen
                     shutdown_screen = ShutdownScreen(self.display.width, self.display.height)
-                    self.display.update(shutdown_screen.render())
+                    # Use full refresh for clean "OFF" screen
+                    self.display.display_image(shutdown_screen.render(), use_partial=False)
                     time.sleep(2)  # Wait for display to update
                 except Exception as e:
                     self.logger.error(f"Failed to show shutdown screen: {e}")
