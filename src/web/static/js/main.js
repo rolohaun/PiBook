@@ -802,9 +802,11 @@ function pairDevice(mac, name) {
     })
         .then(response => response.json())
         .then(data => {
+            // Restore button state (though we might close modal or change UI)
+            // But if we fallback to PIN modal, we should probably keep it clean
+
             if (data.success) {
                 if (data.status === 'passkey_required') {
-                    // Show passkey modal
                     showPasskeyModal(data.passkey, data.message);
                 } else {
                     alert('Pairing successful!');
