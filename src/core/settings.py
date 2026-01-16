@@ -13,7 +13,6 @@ class SettingsManager:
     
     DEFAULT_SETTINGS = {
         'zoom': 1.0,
-        'dpi': 150,
         'full_refresh_interval': 5,
         'show_page_numbers': True,
         'sleep_enabled': True,

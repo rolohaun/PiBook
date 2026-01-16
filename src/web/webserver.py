@@ -292,7 +292,6 @@ class PiBookWebServer:
                 
                 settings_data = {
                     'zoom': float(data.get('zoom', 1.0)),
-                    'dpi': int(data.get('dpi', 150)),
                     'full_refresh_interval': int(data.get('full_refresh_interval', 10)),
                     'show_page_numbers': data.get('show_page_numbers', False),
                     'wifi_while_reading': data.get('wifi_while_reading', False),
