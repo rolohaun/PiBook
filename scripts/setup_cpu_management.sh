@@ -10,7 +10,11 @@ SUDOERS_FILE="/etc/sudoers.d/pibook-cpu-management"
 # Create sudoers entry
 cat > /tmp/pibook-sudoers << 'HEREDOC'
 # Allow pi user to manage CPU cores for power optimization
-pi ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu*/online
+# Using explicit paths since wildcards can be tricky in sudoers
+pi ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu0/online
+pi ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu1/online
+pi ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu2/online
+pi ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu3/online
 HEREDOC
 
 # Move to sudoers directory with sudo

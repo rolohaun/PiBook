@@ -59,23 +59,43 @@ class PowerManager:
             for cpu_num in range(1, total_cores):  # cpu0 cannot be disabled
                 target_state = '1' if cpu_num < num_cores else '0'
                 cpu_path = f'/sys/devices/system/cpu/cpu{cpu_num}/online'
-                
+
                 try:
-                    # Use sudo to write to sysfs
-                    subprocess.run(
-                        ['sudo', 'tee', cpu_path],
-                        input=target_state,
-                        text=True,
+                    # Use shell command with echo pipe to tee for reliable sysfs writing
+                    result = subprocess.run(
+                        f'echo {target_state} | sudo tee {cpu_path}',
+                        shell=True,
                         capture_output=True,
+                        text=True,
                         timeout=2
                     )
+                    if result.returncode != 0:
+                        self.logger.warning(f"Failed to set CPU{cpu_num} to {target_state}: {result.stderr}")
+                    else:
+                        self.logger.debug(f"CPU{cpu_num} set to {'online' if target_state == '1' else 'offline'}")
                 except Exception as e:
                     self.logger.warning(f"Failed to set CPU{cpu_num} state: {e}")
             
-            self.logger.info(f"CPU cores set to {num_cores}/{total_cores} (power management)")
-            
+            # Verify the change by reading back the states
+            online_cores = self._count_online_cores()
+            self.logger.info(f"CPU cores set to {num_cores}/{total_cores} (verified: {online_cores} online)")
+
         except Exception as e:
             self.logger.warning(f"Failed to manage CPU cores: {e}")
+
+    def _count_online_cores(self) -> int:
+        """Count the number of online CPU cores"""
+        try:
+            online = 1  # cpu0 is always online
+            for cpu_num in range(1, 4):
+                cpu_path = f'/sys/devices/system/cpu/cpu{cpu_num}/online'
+                if os.path.exists(cpu_path):
+                    with open(cpu_path, 'r') as f:
+                        if f.read().strip() == '1':
+                            online += 1
+            return online
+        except Exception:
+            return -1  # Unknown
 
     def enable_single_core_mode(self):
         """Enable single-core mode for power saving during reading"""
