@@ -611,9 +611,31 @@ class PiBookWebServer:
 
                 # Check final output
                 full_output = ''.join(output_lines)
+                self.logger.info(f"BT pair full output: {full_output[:500]}")
 
-                # Check if pairing succeeded without passkey
-                if 'successful' in full_output.lower():
+                # Check for explicit failure messages
+                if 'PAIRING_FAILED' in full_output or 'Failed to pair' in full_output:
+                    error_msg = 'Pairing failed. Make sure the keyboard is in pairing mode (hold power button until light blinks).'
+                    if 'ConnectionAttemptFailed' in full_output:
+                        error_msg = 'Could not connect to keyboard. Press the power button to wake it up, then try again immediately.'
+                    elif 'not available' in full_output.lower():
+                        error_msg = 'Device not found. Make sure Bluetooth is scanning and the keyboard is discoverable.'
+                    return jsonify({'success': False, 'error': error_msg}), 200
+
+                if 'DEVICE_NOT_AVAILABLE' in full_output:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Device not found. Run a new scan and try pairing again while the keyboard light is blinking.'
+                    }), 200
+
+                if 'PAIRING_TIMEOUT' in full_output:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Pairing timed out. Wake up the keyboard and try again.'
+                    }), 200
+
+                # Check if pairing succeeded
+                if 'PAIRING_SUCCESS' in full_output or 'Pairing successful' in full_output:
                     return jsonify({'success': True, 'status': 'paired'})
 
                 # If we got here without passkey, check if process is still running
@@ -625,7 +647,14 @@ class PiBookWebServer:
                         'error': 'Pairing initiated but no passkey detected. Try manual PIN entry (0000 or 1234).'
                     }), 200
 
-                return jsonify({'success': True, 'status': 'paired'})
+                # Default - check for any success indicator
+                if 'successful' in full_output.lower():
+                    return jsonify({'success': True, 'status': 'paired'})
+
+                return jsonify({
+                    'success': False,
+                    'error': 'Pairing result unknown. Check if the device appears in paired devices list.'
+                }), 200
             except subprocess.TimeoutExpired:
                 return jsonify({'error': 'Pairing timed out'}), 500
             except Exception as e:
