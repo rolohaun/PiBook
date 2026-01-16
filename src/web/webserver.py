@@ -440,12 +440,12 @@ class PiBookWebServer:
             try:
                 import subprocess
                 
-                # Check if Bluetooth is powered on
-                result = subprocess.run(['bluetoothctl', 'show'], capture_output=True, text=True, timeout=5)
-                powered = 'Powered: yes' in result.stdout
+                # Check if Bluetooth is powered on using rfkill (much faster than bluetoothctl)
+                result = subprocess.run(['rfkill', 'list', 'bluetooth'], capture_output=True, text=True, timeout=2)
+                powered = 'Soft blocked: no' in result.stdout and 'Hard blocked: no' in result.stdout
                 
                 # Get paired devices
-                result = subprocess.run(['bluetoothctl', 'paired-devices'], capture_output=True, text=True, timeout=5)
+                result = subprocess.run(['timeout', '3', 'bluetoothctl', 'paired-devices'], capture_output=True, text=True, timeout=5)
                 paired_devices = []
                 for line in result.stdout.strip().split('\n'):
                     if line.startswith('Device '):
