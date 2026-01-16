@@ -24,9 +24,22 @@ class ShutdownScreen:
         self.width = width
         self.height = height
         self.message = message
+        
+        # Calculate font size based on message length
+        # Shorter messages get bigger fonts, longer messages get smaller fonts
+        msg_len = len(message)
+        if msg_len <= 3:
+            font_size = 120  # Very short like "OFF"
+        elif msg_len <= 8:
+            font_size = 100  # Short like "Goodbye!"
+        elif msg_len <= 15:
+            font_size = 80   # Medium like "I'll be back"
+        else:
+            font_size = 60   # Long messages
+        
         try:
             # Use Serif-Bold as it is known to exist from MainMenuScreen
-            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 120)
+            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", font_size)
         except:
             self.font = ImageFont.load_default()
 
