@@ -403,6 +403,11 @@ class PiBookWebServer:
                 # Log the command
                 self.logger.info(f"Terminal command: {command}")
                 
+                # Intercept 'git pull' to use safe update script
+                if command.strip() == 'git pull':
+                    command = 'bash /home/pi/PiBook/scripts/safe_update.sh'
+                    self.logger.info("Intercepted git pull, using safe update script")
+                
                 # Execute command with timeout
                 import subprocess
                 result = subprocess.run(
