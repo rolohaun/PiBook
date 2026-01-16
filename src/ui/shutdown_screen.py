@@ -1,3 +1,11 @@
+"""
+Shutdown screen for PiBook
+Displays a shutdown message before system poweroff
+"""
+
+from PIL import Image, ImageDraw, ImageFont
+
+
 class ShutdownScreen:
     """
     Shutdown confirmation screen
