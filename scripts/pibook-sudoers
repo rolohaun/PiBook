@@ -1,4 +1,5 @@
-# Allow pi user to run PiBook undervolt script without password
+# Allow pi user to run PiBook power management scripts without password
 # Install with: sudo cp scripts/pibook-sudoers /etc/sudoers.d/pibook
 # Validate with: sudo visudo -c
 pi ALL=(ALL) NOPASSWD: /home/pi/PiBook/scripts/apply_undervolt.sh
+pi ALL=(ALL) NOPASSWD: /home/pi/PiBook/scripts/apply_cpu_cores.sh

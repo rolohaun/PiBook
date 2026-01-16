@@ -300,7 +300,8 @@ class PiBookWebServer:
                     'sleep_message': data.get('sleep_message', 'Shh I\'m sleeping'),
                     'sleep_timeout': int(data.get('sleep_timeout', 120)),
                     'items_per_page': int(data.get('items_per_page', 4)),
-                    'undervolt': int(data.get('undervolt', -2))
+                    'undervolt': int(data.get('undervolt', -2)),
+                    'boot_cores': int(data.get('boot_cores', 4))
                 }
 
                 self._save_settings(settings_data)
@@ -355,6 +356,19 @@ class PiBookWebServer:
                         self.logger.error(f"Failed to apply undervolt to boot config: {e}")
                         undervolt_error = str(e)
 
+                # Update /boot/firmware/config.txt if boot_cores changed
+                boot_cores_error = None
+                old_boot_cores = self.app_instance.config.get('power.boot_cores', 4)
+                new_boot_cores = settings_data['boot_cores']
+                self.app_instance.config.set('power.boot_cores', new_boot_cores)
+                if old_boot_cores != new_boot_cores:
+                    try:
+                        self._apply_boot_cores(new_boot_cores)
+                        self.logger.info(f"Boot cores changed from {old_boot_cores} to {new_boot_cores} - reboot required")
+                    except Exception as e:
+                        self.logger.error(f"Failed to apply boot_cores to boot config: {e}")
+                        boot_cores_error = str(e)
+
                 self.logger.info(f"Settings saved: {settings_data}")
 
                 # Return JSON for AJAX requests, redirect for normal form submission
@@ -362,6 +376,8 @@ class PiBookWebServer:
                     result = {'status': 'success', 'message': 'Settings saved successfully'}
                     if undervolt_error:
                         result['undervolt_warning'] = f'Settings saved but undervolt update failed: {undervolt_error}'
+                    if boot_cores_error:
+                        result['boot_cores_warning'] = f'Settings saved but boot_cores update failed: {boot_cores_error}'
                     return jsonify(result)
                 else:
                     return redirect(url_for('settings'))
@@ -684,7 +700,8 @@ class PiBookWebServer:
             'sleep_message': 'Shh I\'m sleeping',
             'sleep_timeout': self.app_instance.config.get('power.sleep_timeout', 120),
             'items_per_page': self.app_instance.config.get('library.items_per_page', 4),
-            'undervolt': self.app_instance.config.get('power.undervolt', -2)
+            'undervolt': self.app_instance.config.get('power.undervolt', -2),
+            'boot_cores': self.app_instance.config.get('power.boot_cores', 4)
         }
 
         # Override with saved settings if they exist
@@ -735,6 +752,34 @@ class PiBookWebServer:
             raise
         except Exception as e:
             self.logger.error(f"Failed to apply undervolt: {e}")
+            raise
+
+    def _apply_boot_cores(self, num_cores):
+        """Apply boot CPU cores setting to /boot/firmware/config.txt using sudo helper script"""
+        try:
+            import subprocess
+            script_path = '/home/pi/PiBook/scripts/apply_cpu_cores.sh'
+
+            # Use sudo to run the helper script
+            result = subprocess.run(
+                ['sudo', script_path, str(num_cores)],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode == 0:
+                self.logger.info(f"Successfully applied boot_cores={num_cores} via helper script")
+                self.logger.info(result.stdout.strip())
+            else:
+                self.logger.error(f"Failed to apply boot_cores: {result.stderr}")
+                raise Exception(f"Helper script failed: {result.stderr}")
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("Timeout applying boot_cores setting")
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to apply boot_cores: {e}")
             raise
 
     def run(self):
