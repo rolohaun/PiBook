@@ -35,15 +35,16 @@ class PowerManager:
     def set_cpu_cores(self, num_cores: int):
         """
         Set number of active CPU cores for power management
-        
+
         Args:
             num_cores: Number of cores to keep online (1-4)
         """
         try:
             # Check if feature is enabled
             if not self.config.get('power.single_core_reading', True):
+                self.logger.info("CPU core management disabled in config")
                 return
-            
+
             # Get total cores
             with open('/sys/devices/system/cpu/present', 'r') as f:
                 present = f.read().strip()
@@ -51,10 +52,12 @@ class PowerManager:
                     total_cores = int(present.split('-')[1]) + 1
                 else:
                     total_cores = 1
-            
+
             # Clamp to valid range
             num_cores = max(1, min(num_cores, total_cores))
-            
+
+            self.logger.info(f"Setting CPU cores to {num_cores} (of {total_cores} total)")
+
             # Set cores online/offline
             for cpu_num in range(1, total_cores):  # cpu0 cannot be disabled
                 target_state = '1' if cpu_num < num_cores else '0'
@@ -62,23 +65,29 @@ class PowerManager:
 
                 try:
                     # Use shell command with echo pipe to tee for reliable sysfs writing
+                    cmd = f'echo {target_state} | sudo tee {cpu_path}'
                     result = subprocess.run(
-                        f'echo {target_state} | sudo tee {cpu_path}',
+                        cmd,
                         shell=True,
                         capture_output=True,
                         text=True,
-                        timeout=2
+                        timeout=5
                     )
                     if result.returncode != 0:
-                        self.logger.warning(f"Failed to set CPU{cpu_num} to {target_state}: {result.stderr}")
+                        self.logger.warning(f"Failed to set CPU{cpu_num} to {target_state}: cmd='{cmd}', stderr='{result.stderr.strip()}', stdout='{result.stdout.strip()}'")
                     else:
-                        self.logger.debug(f"CPU{cpu_num} set to {'online' if target_state == '1' else 'offline'}")
+                        self.logger.info(f"CPU{cpu_num} set to {'online' if target_state == '1' else 'offline'}")
+                except subprocess.TimeoutExpired:
+                    self.logger.error(f"Timeout setting CPU{cpu_num} state - sudo may be prompting for password")
                 except Exception as e:
                     self.logger.warning(f"Failed to set CPU{cpu_num} state: {e}")
-            
+
             # Verify the change by reading back the states
             online_cores = self._count_online_cores()
-            self.logger.info(f"CPU cores set to {num_cores}/{total_cores} (verified: {online_cores} online)")
+            if online_cores == num_cores:
+                self.logger.info(f"✓ CPU cores successfully set to {num_cores}/{total_cores}")
+            else:
+                self.logger.warning(f"⚠ CPU cores mismatch: requested {num_cores}, but {online_cores} are online. Check sudoers config.")
 
         except Exception as e:
             self.logger.warning(f"Failed to manage CPU cores: {e}")

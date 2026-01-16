@@ -58,6 +58,7 @@ power:
   sleep_timeout: 120          # Seconds of inactivity before sleep (2 minutes)
   cpu_scaling: true           # Enable CPU frequency scaling
   wifi_power_save: true       # Enable WiFi power management
+  single_core_reading: true   # Disable 3 CPU cores during reading for battery savings
   # CPU Undervolting (EXPERIMENTAL - reduces power consumption)
   # WARNING: Setting too low may prevent boot! Have SD card reader ready for recovery.
   # Range: 0 to -8 (each step = -25mV)
