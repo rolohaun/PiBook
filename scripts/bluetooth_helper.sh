@@ -100,6 +100,13 @@ SCANSCRIPT
         else
             # Pairing WITHOUT user-provided PIN (might generate Passkey)
             # Use EXPECT to capture passkey - handles Apple keyboards and similar devices
+            # For legacy keyboards (A1255 etc), BlueZ generates a PIN that user types on keyboard
+
+            # First remove any existing pairing to force fresh pairing
+            echo "Removing existing pairing for $2..." >> /tmp/bt_pair_debug.log
+            timeout 3 bash -c "echo -e 'remove $2\nquit' | bluetoothctl" 2>/dev/null || true
+            sleep 1
+
             expect -c "
                 log_file -a /tmp/bt_pair_debug.log
                 set timeout 45
@@ -108,13 +115,17 @@ SCANSCRIPT
                 # Match any prompt ending in # or > (handling ANSI codes and prefixes)
                 # Use braces {} for regex to prevent Tcl command substitution on []
                 expect -re {.*[#>]}
-                send \"agent on\r\"
+                send \"power on\r\"
+                expect -re {.*[#>]}
+                # Use KeyboardDisplay agent - this forces PIN/passkey prompts
+                send \"agent KeyboardDisplay\r\"
                 expect -re {.*[#>]}
                 send \"default-agent\r\"
                 expect -re {.*[#>]}
                 send \"pair $2\r\"
                 expect {
                     -re {Passkey: ([0-9]+)} {
+                        # Modern device showing passkey for user to type
                         set passkey \$expect_out(1,string)
                         puts \"PASSKEY_REQUIRED:\$passkey\"
                         flush stdout
@@ -136,7 +147,7 @@ SCANSCRIPT
                         }
                     }
                     -re {Confirm passkey ([0-9]+)} {
-                        # Apple keyboard style - shows passkey to type on device
+                        # SSP passkey confirmation - user types code on keyboard
                         set passkey \$expect_out(1,string)
                         puts \"PASSKEY_REQUIRED:\$passkey\"
                         flush stdout
@@ -160,9 +171,32 @@ SCANSCRIPT
                             }
                         }
                     }
-                    \"Enter PIN code:\" {
-                        send_user \"DBG: Matched Enter PIN code\n\"
+                    -re {Request passkey|Enter passkey} {
+                        # Device requesting a passkey - generate one for user to type on keyboard
+                        send_user \"DBG: Matched Request/Enter passkey\n\"
                         set passkey \"123456\"
+                        send \"\$passkey\r\"
+                        puts \"PASSKEY_REQUIRED:\$passkey\"
+                        flush stdout
+
+                        set timeout 120
+                        expect {
+                            \"Pairing successful\" {
+                                send_user \"DBG: Pairing successful after passkey entry\n\"
+                                send \"trust $2\r\"
+                                expect -re {.*[#>]}
+                                send \"connect $2\r\"
+                            }
+                            timeout {
+                                send_user \"DBG: Timeout waiting for passkey entry\n\"
+                                exit 1
+                            }
+                        }
+                    }
+                    -re {Request PIN code|Enter PIN code} {
+                        # Legacy PIN pairing - generate PIN for user to type on keyboard
+                        send_user \"DBG: Matched Request/Enter PIN code\n\"
+                        set passkey \"0000\"
                         send \"\$passkey\r\"
                         puts \"PASSKEY_REQUIRED:\$passkey\"
                         flush stdout
@@ -181,8 +215,22 @@ SCANSCRIPT
                             }
                         }
                     }
-                    \"Pairing successful\" {
-                         send_user \"DBG: Matched Immediate Pairing successful\n\"
+                    -re {Attempting to pair|Pairing successful} {
+                         # Immediate pairing without PIN/passkey
+                         send_user \"DBG: Matched Attempting/Pairing - no PIN required\n\"
+                         # Check if it was just \"Attempting\" - wait for result
+                         expect {
+                             \"Pairing successful\" {
+                                 send_user \"DBG: Pairing completed successfully\n\"
+                             }
+                             \"Failed to pair\" {
+                                 send_user \"DBG: Pairing failed\n\"
+                                 exit 1
+                             }
+                             timeout {
+                                 send_user \"DBG: Pairing timeout\n\"
+                             }
+                         }
                          send \"trust $2\r\"
                          expect -re {.*[#>]}
                          send \"connect $2\r\"
