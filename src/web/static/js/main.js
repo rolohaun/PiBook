@@ -762,7 +762,7 @@ function updateAvailableDevices(devices) {
                     <strong style="font-size: 1.1em;">${device.name}</strong>
                     <div style="font-size: 0.9em; color: #666; margin-top: 2px;">${device.mac}</div>
                 </div>
-                <button class="btn" style="padding: 8px 16px;" onclick="pairDevice('${device.mac}', '${device.name}')">Pair</button>
+                <button type="button" class="btn" style="padding: 8px 16px;" onclick="pairDevice('${device.mac}', '${device.name}')">Pair</button>
             `;
             container.appendChild(div);
         });

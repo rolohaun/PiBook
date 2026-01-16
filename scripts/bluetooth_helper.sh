@@ -27,6 +27,9 @@ case "$1" in
     pair)
         # $2 = MAC address, $3 = PIN (optional)
         echo "Pairing with device $2..."
+        # Force scan off to ensure bluetoothctl is free and resources are available
+        timeout 2 bash -c "echo 'scan off' | bluetoothctl" > /dev/null 2>&1
+        
         if [ -n "$3" ]; then
             # Pairing with USER-PROVIDED PIN (legacy/simple devices)
             expect -c "
