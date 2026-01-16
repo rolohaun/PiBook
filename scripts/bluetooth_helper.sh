@@ -75,14 +75,15 @@ case "$1" in
                 spawn bluetoothctl
                 
                 # Match any prompt ending in # or > (handling ANSI codes and prefixes)
-                expect -re \".*[#>] \"
+                # Use braces {} for regex to prevent Tcl command substitution on []
+                expect -re {.*[#>]}
                 send \"agent on\r\"
-                expect -re \".*[#>] \"
+                expect -re {.*[#>]}
                 send \"default-agent\r\"
-                expect -re \".*[#>] \"
+                expect -re {.*[#>]}
                 send \"pair $2\r\"
                 expect {
-                    -re \"Passkey: ([0-9]+)\" {
+                    -re {Passkey: ([0-9]+)} {
                         set passkey \$expect_out(1,string)
                         puts \"PASSKEY_REQUIRED:\$passkey\"
                         send_user \"DBG: Matched Passkey: \$passkey\n\"
@@ -93,7 +94,7 @@ case "$1" in
                             \"Pairing successful\" {
                                 send_user \"DBG: Pairing successful after Passkey\n\"
                                 send \"trust $2\r\"
-                                expect -re \".*[#>] \"
+                                expect -re {.*[#>]}
                                 send \"connect $2\r\"
                             }
                             timeout {
@@ -113,7 +114,7 @@ case "$1" in
                             \"Pairing successful\" {
                                 send_user \"DBG: Pairing successful after PIN\n\"
                                 send \"trust $2\r\"
-                                expect -re \".*[#>] \"
+                                expect -re {.*[#>]}
                                 send \"connect $2\r\"
                             }
                             timeout {
@@ -125,7 +126,7 @@ case "$1" in
                     \"Pairing successful\" {
                          send_user \"DBG: Matched Immediate Pairing successful\n\"
                          send \"trust $2\r\"
-                         expect -re \".*[#>] \"
+                         expect -re {.*[#>]}
                          send \"connect $2\r\"
                          expect {
                              \"Connection successful\" {
@@ -145,7 +146,7 @@ case "$1" in
                          exit 1
                     }
                 }
-                expect -re \".*[#>] \"
+                expect -re {.*[#>]}
                 send \"quit\r\"
             " 2>&1
          fi
