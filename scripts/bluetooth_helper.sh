@@ -15,8 +15,8 @@ case "$1" in
         ;;
     scan_on)
         echo "Starting Bluetooth scan..."
-        # Use timeout to prevent hanging
-        timeout 2 bash -c "echo 'scan on' | bluetoothctl" 2>&1 &
+        # Start scan in background with longer timeout
+        (echo "scan on"; sleep 15) | bluetoothctl > /dev/null 2>&1 &
         echo "Scan started"
         ;;
     scan_off)
