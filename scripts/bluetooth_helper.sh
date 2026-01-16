@@ -73,11 +73,13 @@ case "$1" in
                 log_file -a /tmp/bt_pair_debug.log
                 set timeout 45
                 spawn bluetoothctl
-                expect -re \"\\[bluetoothctl\\].*[#>]\"
+                
+                # Match any prompt ending in # or > (handling ANSI codes and prefixes)
+                expect -re \".*[#>] \"
                 send \"agent on\r\"
-                expect -re \"\\[bluetoothctl\\].*[#>]\"
+                expect -re \".*[#>] \"
                 send \"default-agent\r\"
-                expect -re \"\\[bluetoothctl\\].*[#>]\"
+                expect -re \".*[#>] \"
                 send \"pair $2\r\"
                 expect {
                     -re \"Passkey: ([0-9]+)\" {
@@ -91,7 +93,7 @@ case "$1" in
                             \"Pairing successful\" {
                                 send_user \"DBG: Pairing successful after Passkey\n\"
                                 send \"trust $2\r\"
-                                expect -re \"\\[bluetoothctl\\].*[#>]\"
+                                expect -re \".*[#>] \"
                                 send \"connect $2\r\"
                             }
                             timeout {
@@ -111,7 +113,7 @@ case "$1" in
                             \"Pairing successful\" {
                                 send_user \"DBG: Pairing successful after PIN\n\"
                                 send \"trust $2\r\"
-                                expect -re \"\\[bluetoothctl\\].*[#>]\"
+                                expect -re \".*[#>] \"
                                 send \"connect $2\r\"
                             }
                             timeout {
@@ -123,7 +125,7 @@ case "$1" in
                     \"Pairing successful\" {
                          send_user \"DBG: Matched Immediate Pairing successful\n\"
                          send \"trust $2\r\"
-                         expect -re \"\\[bluetoothctl\\].*[#>]\"
+                         expect -re \".*[#>] \"
                          send \"connect $2\r\"
                          expect {
                              \"Connection successful\" {
@@ -143,7 +145,7 @@ case "$1" in
                          exit 1
                     }
                 }
-                expect -re \"\\[bluetoothctl\\].*[#>]\"
+                expect -re \".*[#>] \"
                 send \"quit\r\"
             " 2>&1
          fi
