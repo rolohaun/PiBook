@@ -738,48 +738,99 @@ function updatePairedDevices(devices) {
     });
 }
 
+let currentPairingMac = null;
+
 function pairDevice(mac, name) {
-    currentPairDevice = { mac, name };
-    document.getElementById('pin-device-name').textContent = `Pairing with: ${name}`;
+    // Try pairing without PIN first (Works for SSP devices including keyboards)
+    if (!confirm(`Pair with ${name}?`)) return;
+
+    currentPairingMac = mac;
+
+    fetch('/api/bluetooth/pair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac: mac })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.status === 'passkey_required') {
+                    // Show passkey modal
+                    showPasskeyModal(data.passkey, data.message);
+                } else {
+                    alert('Pairing successful!');
+                    refreshBluetoothStatus();
+                }
+            } else {
+                // Return to legacy PIN input behavior on failure
+                showPinInputModal(name);
+            }
+        })
+        .catch(error => {
+            console.error('Pairing failed:', error);
+            alert('Pairing request failed. You can try manual PIN entry.');
+            showPinInputModal(name);
+        });
+}
+
+function showPinInputModal(name) {
+    document.getElementById('modal-title').innerText = 'Enter PIN';
+    document.getElementById('modal-message').innerText = name ? `Enter PIN for ${name}:` : 'Enter PIN for device:';
+    document.getElementById('pin-input-container').style.display = 'block';
+    document.getElementById('passkey-display-container').style.display = 'none';
+    document.getElementById('modal-submit-btn').style.display = 'block';
     document.getElementById('pin-input').value = '';
+    document.getElementById('pin-modal').style.display = 'block';
+}
+
+function showPasskeyModal(passkey, message) {
+    document.getElementById('modal-title').innerText = 'Pairing Code';
+    document.getElementById('modal-message').innerText = message;
+    document.getElementById('pin-input-container').style.display = 'none';
+    document.getElementById('passkey-display-container').style.display = 'block';
+    document.getElementById('passkey-display').innerText = passkey;
+    document.getElementById('modal-submit-btn').style.display = 'none';
     document.getElementById('pin-modal').style.display = 'block';
 }
 
 function closePinModal() {
     document.getElementById('pin-modal').style.display = 'none';
-    currentPairDevice = null;
+    currentPairingMac = null;
 }
 
 function submitPin() {
-    const pin = document.getElementById('pin-input').value.trim();
-
-    if (!currentPairDevice) return;
-
-    document.getElementById('pin-modal').style.display = 'none';
+    const pin = document.getElementById('pin-input').value;
+    if (!pin) return;
 
     fetch('/api/bluetooth/pair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac: currentPairDevice.mac, pin: pin })
+        body: JSON.stringify({ mac: currentPairingMac, pin: pin })
     })
         .then(response => response.json())
         .then(data => {
+            closePinModal();
             if (data.success) {
-                alert(`Successfully paired with ${currentPairDevice.name}`);
+                alert('Pairing successful!');
                 refreshBluetoothStatus();
-                bluetoothScanning = false;
-                document.getElementById('scan-btn').textContent = 'Scan for Devices';
-                document.getElementById('scan-results').style.display = 'none';
             } else {
                 alert('Pairing failed: ' + (data.error || 'Unknown error'));
             }
-            currentPairDevice = null;
         })
         .catch(error => {
             console.error('Pairing failed:', error);
             alert('Pairing failed');
-            currentPairDevice = null;
+            closePinModal();
         });
+}
+            }
+currentPairDevice = null;
+        })
+        .catch (error => {
+    console.error('Pairing failed:', error);
+    alert('Pairing failed');
+    currentPairDevice = null;
+});
 }
 
 function removeDevice(mac) {
