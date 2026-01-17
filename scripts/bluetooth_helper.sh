@@ -115,6 +115,15 @@ send_user "DBG: Sent pair command\n"
 # Now wait for various pairing prompts
 set timeout 45
 expect {
+    -re "\\\[agent\\\] PIN code: (\[0-9\]+)" {
+        # System generated PIN - user must type this on the keyboard
+        set passkey $expect_out(1,string)
+        send_user "DBG: System generated PIN: $passkey\n"
+        puts "PASSKEY_REQUIRED:$passkey"
+        flush stdout
+        set timeout 120
+        exp_continue
+    }
     -re "Passkey: (\[0-9\]+)" {
         set passkey $expect_out(1,string)
         send_user "DBG: Got Passkey: $passkey\n"
