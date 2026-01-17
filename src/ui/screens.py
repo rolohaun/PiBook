@@ -119,9 +119,9 @@ class MainMenuScreen:
                 'screen': 'klipper'
             },
             {
-                'name': 'Typewriter',
-                'icon_filename': 'typewriter.png',
-                'description': 'Terminal & Word Processor',
+                'name': 'Terminal',
+                'icon_filename': 'terminal.png',
+                'description': 'Terminal console',
                 'screen': 'typewriter'
             },
             {
