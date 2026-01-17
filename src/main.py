@@ -217,11 +217,6 @@ class PiBookApp:
         # Web server
         self.web_server = None
 
-        # Typewriter debounce for faster typing response
-        self._typewriter_render_pending = False
-        self._typewriter_render_timer = None
-        self._typewriter_debounce_ms = 50  # Batch keystrokes within 50ms (very short)
-
 
     def _setup_logging(self):
         """Configure logging"""
@@ -999,63 +994,31 @@ class PiBookApp:
             self._render_current_screen()
 
     def _handle_typewriter_key(self, key_code: int, char: str, modifiers: dict):
-        """Handle keyboard input for typewriter app with debouncing for fast typing"""
+        """Handle keyboard input for typewriter app - render every keystroke"""
         try:
             from evdev import ecodes
 
-            # Alt key switches tabs - render immediately
+            # Alt key switches tabs
             if modifiers.get('alt'):
                 self.typewriter_screen.toggle_mode()
-                self._typewriter_render_now()
+                self._render_current_screen()
                 return
 
-            # Escape key returns to main menu - render immediately
+            # Escape key returns to main menu
             if key_code == ecodes.KEY_ESC:
                 self.logger.info("🏠 Action: ESC - Returning to main menu from Typewriter")
                 if self.keyboard_handler:
                     self.keyboard_handler.raw_key_callback = None
-                # Cancel any pending render
-                if self._typewriter_render_timer:
-                    self._typewriter_render_timer.cancel()
-                    self._typewriter_render_timer = None
                 self.navigation.navigate_to(Screen.MAIN_MENU)
                 self._render_current_screen()
                 return
 
-            # Enter key executes command - render immediately after
-            if key_code == ecodes.KEY_ENTER:
-                self.typewriter_screen.handle_key(key_code, char, modifiers)
-                self._typewriter_render_now()
-                return
-
-            # For regular typing, use debouncing to batch keystrokes
+            # Pass key to typewriter screen and render immediately
             self.typewriter_screen.handle_key(key_code, char, modifiers)
-            self._typewriter_schedule_render()
+            self._render_current_screen()
 
         except Exception as e:
             self.logger.error(f"Error handling typewriter key: {e}")
-
-    def _typewriter_schedule_render(self):
-        """Schedule a debounced render for typewriter screen"""
-        # Cancel existing timer
-        if self._typewriter_render_timer:
-            self._typewriter_render_timer.cancel()
-
-        # Schedule new render after debounce delay
-        self._typewriter_render_timer = threading.Timer(
-            self._typewriter_debounce_ms / 1000.0,
-            self._typewriter_render_now
-        )
-        self._typewriter_render_timer.start()
-
-    def _typewriter_render_now(self):
-        """Render typewriter screen immediately"""
-        if self._typewriter_render_timer:
-            self._typewriter_render_timer.cancel()
-            self._typewriter_render_timer = None
-        # Only render if still on typewriter screen
-        if self.navigation.is_on_screen(Screen.TYPEWRITER):
-            self._render_current_screen()
 
     def _open_book(self, book: dict):
         """
