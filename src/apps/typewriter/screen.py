@@ -384,7 +384,7 @@ class TypewriterScreen:
     # ==================== Rendering ====================
 
     def _draw_battery_icon(self, draw: ImageDraw.Draw, x: int, y: int, percentage: int, is_charging: bool = False):
-        """Draw battery icon with percentage"""
+        """Draw battery icon with percentage (1-bit: 0=black, 1=white)"""
         battery_width = 30
         battery_height = 14
         terminal_width = 2
@@ -393,21 +393,21 @@ class TypewriterScreen:
         battery_x = x - battery_width
         draw.rectangle(
             [(battery_x, y), (battery_x + battery_width, y + battery_height)],
-            outline='black', width=1
+            outline=0, width=1
         )
 
         terminal_x = battery_x + battery_width
         terminal_y = y + (battery_height - terminal_height) // 2
         draw.rectangle(
             [(terminal_x, terminal_y), (terminal_x + terminal_width, terminal_y + terminal_height)],
-            fill='black'
+            fill=0
         )
 
         fill_width = int((battery_width - 4) * (percentage / 100))
         if fill_width > 0:
             draw.rectangle(
                 [(battery_x + 2, y + 2), (battery_x + 2 + fill_width, y + battery_height - 2)],
-                fill='black'
+                fill=0
             )
 
         if is_charging:
@@ -421,7 +421,7 @@ class TypewriterScreen:
                 (bolt_center_x + 2, bolt_center_y + 1),
                 (bolt_center_x - 3, bolt_center_y + 1),
             ]
-            draw.polygon(bolt_points, fill='white', outline='black')
+            draw.polygon(bolt_points, fill=1, outline=0)
 
         percentage_text = f"{percentage}%"
         try:
@@ -431,12 +431,12 @@ class TypewriterScreen:
             text_width = len(percentage_text) * 8
 
         text_x = battery_x - text_width - 5
-        draw.text((text_x, y), percentage_text, font=self.small_font, fill='black')
+        draw.text((text_x, y), percentage_text, font=self.small_font, fill=0)
 
     def _render_header(self, draw: ImageDraw.Draw):
         """Render header with tabs and battery"""
-        # Draw tab bar background
-        draw.rectangle([(0, 0), (self.width, self.header_height - 5)], fill='lightgray')
+        # Draw tab bar background (1-bit: 0=black, 1=white)
+        draw.rectangle([(0, 0), (self.width, self.header_height - 5)], fill=1)
 
         # Draw tabs
         tab_width = 150
@@ -447,23 +447,21 @@ class TypewriterScreen:
         term_x = 20
         if self.current_mode == self.MODE_TERMINAL:
             draw.rectangle([(term_x, tab_y), (term_x + tab_width, tab_y + tab_height)],
-                          fill='white', outline='black', width=2)
+                          fill=1, outline=0, width=2)
         else:
             draw.rectangle([(term_x, tab_y), (term_x + tab_width, tab_y + tab_height)],
-                          fill='gray', outline='black', width=1)
-        draw.text((term_x + 30, tab_y + 8), "Terminal", font=self.title_font,
-                 fill='black' if self.current_mode == self.MODE_TERMINAL else 'darkgray')
+                          fill=1, outline=0, width=1)
+        draw.text((term_x + 30, tab_y + 8), "Terminal", font=self.title_font, fill=0)
 
         # Word Processor tab
         wp_x = term_x + tab_width + 10
         if self.current_mode == self.MODE_WORDPROC:
             draw.rectangle([(wp_x, tab_y), (wp_x + tab_width, tab_y + tab_height)],
-                          fill='white', outline='black', width=2)
+                          fill=1, outline=0, width=2)
         else:
             draw.rectangle([(wp_x, tab_y), (wp_x + tab_width, tab_y + tab_height)],
-                          fill='gray', outline='black', width=1)
-        draw.text((wp_x + 15, tab_y + 8), "Word Proc", font=self.title_font,
-                 fill='black' if self.current_mode == self.MODE_WORDPROC else 'darkgray')
+                          fill=1, outline=0, width=1)
+        draw.text((wp_x + 15, tab_y + 8), "Word Proc", font=self.title_font, fill=0)
 
         # Battery icon
         if self.battery_monitor:
@@ -476,22 +474,22 @@ class TypewriterScreen:
 
         # Separator line
         draw.line([(0, self.header_height - 1), (self.width, self.header_height - 1)],
-                 fill='black', width=1)
+                 fill=0, width=1)
 
     def _render_footer(self, draw: ImageDraw.Draw):
         """Render footer with help text"""
         footer_y = self.height - self.footer_height
 
         # Separator line
-        draw.line([(0, footer_y), (self.width, footer_y)], fill='black', width=1)
+        draw.line([(0, footer_y), (self.width, footer_y)], fill=0, width=1)
 
         if self.current_mode == self.MODE_TERMINAL:
-            help_text = "Alt: Switch Tab | Enter: Execute | Hold: Main Menu"
+            help_text = "Alt: Switch Tab | Enter: Execute | Esc: Main Menu"
         else:
             word_count = self.wp_get_word_count()
-            help_text = f"Alt: Switch Tab | Ctrl+S: Save | Words: {word_count} | Hold: Main Menu"
+            help_text = f"Alt: Switch Tab | Ctrl+S: Save | Words: {word_count} | Esc: Menu"
 
-        draw.text((self.margin, footer_y + 8), help_text, font=self.small_font, fill='gray')
+        draw.text((self.margin, footer_y + 8), help_text, font=self.small_font, fill=0)
 
     def _render_terminal(self, draw: ImageDraw.Draw):
         """Render terminal content"""
@@ -524,11 +522,11 @@ class TypewriterScreen:
             line_type, text = all_lines[i]
 
             if line_type == 'prompt':
-                draw.text((self.margin, y), text, font=self.mono_bold, fill='black')
+                draw.text((self.margin, y), text, font=self.mono_bold, fill=0)
             elif line_type == 'input':
-                draw.text((self.margin, y), text, font=self.mono_bold, fill='black')
+                draw.text((self.margin, y), text, font=self.mono_bold, fill=0)
             else:
-                draw.text((self.margin, y), text, font=self.mono_font, fill='gray')
+                draw.text((self.margin, y), text, font=self.mono_font, fill=0)
 
             y += self.char_height
 
@@ -547,9 +545,9 @@ class TypewriterScreen:
             if i == self.cursor_line:
                 # Insert cursor character
                 display_line = line[:self.cursor_col] + "|" + line[self.cursor_col:]
-                draw.text((self.margin, y), display_line, font=self.mono_font, fill='black')
+                draw.text((self.margin, y), display_line, font=self.mono_font, fill=0)
             else:
-                draw.text((self.margin, y), line if line else " ", font=self.mono_font, fill='black')
+                draw.text((self.margin, y), line if line else " ", font=self.mono_font, fill=0)
 
             y += self.char_height
 
@@ -562,17 +560,17 @@ class TypewriterScreen:
             except:
                 text_width = len(doc_text) * 8
             draw.text((self.width - text_width - self.margin, self.header_height + 5),
-                     doc_text, font=self.small_font, fill='gray')
+                     doc_text, font=self.small_font, fill=0)
 
     def render(self) -> Image.Image:
         """
         Render the typewriter screen
 
         Returns:
-            PIL Image of the screen
+            PIL Image of the screen (1-bit for fast partial refresh)
         """
-        # Create grayscale image
-        image = Image.new('L', (self.width, self.height), 255)
+        # Create 1-bit image for fast partial refresh on e-ink
+        image = Image.new('1', (self.width, self.height), 1)  # 1 = white
         draw = ImageDraw.Draw(image)
 
         # Render components

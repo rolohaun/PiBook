@@ -19,7 +19,12 @@
       "Bash(ssh pi@pibook.local:*)",
       "Bash(ssh:*)",
       "Bash(sshpass -p raspberry ssh pi@pibook.local \"sudo journalctl -u pibook -n 100 --no-pager | grep -i undervolt\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git update-index:*)",
+      "Bash(bluetoothctl:*)",
+      "Bash(rfkill list:*)",
+      "Bash(git status:*)"
     ]
   }
 }
