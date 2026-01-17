@@ -220,7 +220,7 @@ class PiBookApp:
         # Typewriter debounce for faster typing response
         self._typewriter_render_pending = False
         self._typewriter_render_timer = None
-        self._typewriter_debounce_ms = 150  # Batch keystrokes within 150ms
+        self._typewriter_debounce_ms = 50  # Batch keystrokes within 50ms (very short)
 
 
     def _setup_logging(self):
