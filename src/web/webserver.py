@@ -446,14 +446,17 @@ class PiBookWebServer:
                 powered = 'Soft blocked: no' in result.stdout
                 self.logger.debug(f"Bluetooth status check: powered={powered}, rfkill output: {result.stdout[:100]}")
                 
-                # Get paired devices
-                result = subprocess.run(['timeout', '3', 'bluetoothctl', 'paired-devices'], capture_output=True, text=True, timeout=5)
+                # Get paired devices using helper script for consistency
+                result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'paired_devices'],
+                                      capture_output=True, text=True, timeout=10)
                 paired_devices = []
                 for line in result.stdout.strip().split('\n'):
                     if line.startswith('Device '):
                         parts = line.split(' ', 2)
                         if len(parts) >= 3:
                             paired_devices.append({'mac': parts[1], 'name': parts[2]})
+
+                self.logger.debug(f"Paired devices raw output: {result.stdout}")
                 
                 
                 return jsonify({'powered': powered, 'paired_devices': paired_devices})
@@ -506,8 +509,9 @@ class PiBookWebServer:
                 devices = []
                 seen_macs = set()
 
-                # Get all known devices (includes recently discovered ones)
-                result = subprocess.run(['bluetoothctl', 'devices'], capture_output=True, text=True, timeout=5)
+                # Get all known devices using helper script (includes recently discovered ones)
+                result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'devices'],
+                                      capture_output=True, text=True, timeout=10)
                 for line in result.stdout.strip().split('\n'):
                     if line.startswith('Device '):
                         parts = line.split(' ', 2)
@@ -519,7 +523,8 @@ class PiBookWebServer:
                                 devices.append({'mac': mac, 'name': name})
 
                 # Also get paired devices to mark them
-                paired_result = subprocess.run(['bluetoothctl', 'paired-devices'], capture_output=True, text=True, timeout=5)
+                paired_result = subprocess.run(['sudo', '/home/pi/PiBook/scripts/bluetooth_helper.sh', 'paired_devices'],
+                                             capture_output=True, text=True, timeout=10)
                 paired_macs = set()
                 for line in paired_result.stdout.strip().split('\n'):
                     if line.startswith('Device '):
