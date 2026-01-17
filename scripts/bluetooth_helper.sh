@@ -251,7 +251,10 @@ EXPECTSCRIPT
         timeout 5 bluetoothctl devices 2>&1
         ;;
     paired_devices)
-        timeout 5 bluetoothctl paired-devices 2>&1
+        # Use 'devices Paired' for newer bluetoothctl, fallback to 'paired-devices' for older
+        output=$(echo "devices Paired" | timeout 5 bluetoothctl 2>&1)
+        # Extract just the Device lines
+        echo "$output" | grep "^Device "
         ;;
     *)
         echo "Usage: $0 {power_on|power_off|scan_on|scan_off|pair|remove|devices|paired_devices}"
