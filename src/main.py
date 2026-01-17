@@ -25,6 +25,7 @@ from src.ui.screens import MainMenuScreen, LibraryScreen, ReaderScreen
 from src.apps.todo import ToDoScreen
 from src.apps.ipscanner import IPScannerScreen
 from src.apps.klipper import KlipperScreen
+from src.apps.typewriter import TypewriterScreen
 from src.web.webserver import PiBookWebServer
 from src.utils.progress_manager import ProgressManager
 from src.core.power_manager import PowerManager
@@ -186,6 +187,13 @@ class PiBookApp:
             width=display_width,
             height=display_height,
             font_size=self.config.get('klipper.font_size', 18),
+            battery_monitor=self.battery_monitor
+        )
+
+        self.typewriter_screen = TypewriterScreen(
+            width=display_width,
+            height=display_height,
+            font_size=self.config.get('typewriter.font_size', 16),
             battery_monitor=self.battery_monitor
         )
 
@@ -777,6 +785,12 @@ class PiBookApp:
             elif app['screen'] == 'klipper':
                 self.navigation.navigate_to(Screen.KLIPPER)
                 self._render_current_screen()
+            elif app['screen'] == 'typewriter':
+                self.navigation.navigate_to(Screen.TYPEWRITER)
+                # Enable raw key mode for typewriter
+                if self.keyboard_handler:
+                    self.keyboard_handler.raw_key_callback = self._handle_typewriter_key
+                self._render_current_screen()
             elif app['screen'] == 'shutdown':
                 self.logger.info("🛑 Action: SHUT DOWN - Starting shutdown sequence")
                 
@@ -832,7 +846,7 @@ class PiBookApp:
             else:
                 self.logger.warning("No book selected to open")
         else:
-            # On any other screen (IP Scanner, To-Do, Reader) - return to main menu
+            # On any other screen (IP Scanner, To-Do, Reader, Typewriter) - return to main menu
             self.logger.info("🏠 Action: GPIO5 HOLD - Returning to main menu")
 
             if self.navigation.is_on_screen(Screen.READER):
@@ -841,6 +855,11 @@ class PiBookApp:
                 self._restore_all_cores()
                 # Re-enable WiFi when leaving reader
                 self._enable_wifi_after_reader()
+
+            if self.navigation.is_on_screen(Screen.TYPEWRITER):
+                # Disable raw key mode when leaving typewriter
+                if self.keyboard_handler:
+                    self.keyboard_handler.raw_key_callback = None
 
             self.navigation.navigate_to(Screen.MAIN_MENU)
             self._render_current_screen()
@@ -871,9 +890,15 @@ class PiBookApp:
             elif app['screen'] == 'klipper':
                 self.navigation.navigate_to(Screen.KLIPPER)
                 self._render_current_screen()
+            elif app['screen'] == 'typewriter':
+                self.navigation.navigate_to(Screen.TYPEWRITER)
+                # Enable raw key mode for typewriter
+                if self.keyboard_handler:
+                    self.keyboard_handler.raw_key_callback = self._handle_typewriter_key
+                self._render_current_screen()
             elif app['screen'] == 'shutdown':
                 self.logger.info("🛑 Action: SHUT DOWN - Starting shutdown sequence")
-                
+
                 # Show shutdown screen with comprehensive logging
                 try:
                     self.logger.info("Step 1: Creating shutdown screen instance")
@@ -960,6 +985,40 @@ class PiBookApp:
             self.logger.info("🏠 Action: TOGGLE - Returning to main menu from Klipper")
             self.navigation.navigate_to(Screen.MAIN_MENU)
             self._render_current_screen()
+        elif self.navigation.is_on_screen(Screen.TYPEWRITER):
+            # On Typewriter - return to main menu and disable raw key mode
+            self.logger.info("🏠 Action: TOGGLE - Returning to main menu from Typewriter")
+            if self.keyboard_handler:
+                self.keyboard_handler.raw_key_callback = None
+            self.navigation.navigate_to(Screen.MAIN_MENU)
+            self._render_current_screen()
+
+    def _handle_typewriter_key(self, key_code: int, char: str, modifiers: dict):
+        """Handle keyboard input for typewriter app"""
+        try:
+            from evdev import ecodes
+
+            # Alt key switches tabs
+            if modifiers.get('alt'):
+                self.typewriter_screen.toggle_mode()
+                self._render_current_screen()
+                return
+
+            # Escape key returns to main menu
+            if key_code == ecodes.KEY_ESC:
+                self.logger.info("🏠 Action: ESC - Returning to main menu from Typewriter")
+                if self.keyboard_handler:
+                    self.keyboard_handler.raw_key_callback = None
+                self.navigation.navigate_to(Screen.MAIN_MENU)
+                self._render_current_screen()
+                return
+
+            # Pass key to typewriter screen
+            self.typewriter_screen.handle_key(key_code, char, modifiers)
+            self._render_current_screen()
+
+        except Exception as e:
+            self.logger.error(f"Error handling typewriter key: {e}")
 
     def _open_book(self, book: dict):
         """
@@ -1063,6 +1122,8 @@ class PiBookApp:
                 image = self.todo_screen.render()
             elif self.navigation.is_on_screen(Screen.KLIPPER):
                 image = self.klipper_screen.render()
+            elif self.navigation.is_on_screen(Screen.TYPEWRITER):
+                image = self.typewriter_screen.render()
             elif self.navigation.is_on_screen(Screen.READER):
                 image = self.reader_screen.get_current_image()
 

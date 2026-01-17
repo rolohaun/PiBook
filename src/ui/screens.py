@@ -119,6 +119,12 @@ class MainMenuScreen:
                 'screen': 'klipper'
             },
             {
+                'name': 'Typewriter',
+                'icon_filename': 'typewriter.png',
+                'description': 'Terminal & Word Processor',
+                'screen': 'typewriter'
+            },
+            {
                 'name': 'Shutdown',
                 'icon_filename': 'shutdown.png',
                 'description': 'Power off device',
