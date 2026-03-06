@@ -35,7 +35,9 @@ sudo apt-get install -y \
     libjpeg-dev \
     git \
     i2c-tools \
-    build-essential
+    build-essential \
+    libcairo2 \
+    libcairo2-dev
 
 # Try to install mupdf (optional, may not be available on all systems)
 echo "Installing optional dependencies..."
