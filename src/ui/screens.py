@@ -240,7 +240,7 @@ class MainMenuScreen:
             self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage, is_charging)
 
         # Draw title centered at top
-        title_text = "PiBook"
+        title_text = "PiBook v1.0"
         try:
             bbox = draw.textbbox((0, 0), title_text, font=self.title_font)
             title_width = bbox[2] - bbox[0]
