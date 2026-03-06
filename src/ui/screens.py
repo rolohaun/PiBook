@@ -902,7 +902,7 @@ class ReaderScreen:
                            fill=0)
 
         # Percentage text
-        pct_text = f"{percentage}%"
+        pct_text = f"{int(percentage)}%"
         try:
             bbox = draw.textbbox((0, 0), pct_text, font=small_font)
             pct_width = bbox[2] - bbox[0]
