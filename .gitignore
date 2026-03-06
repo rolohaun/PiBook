@@ -48,6 +48,7 @@ output/
 *.png
 !assets/**/*.png
 !src/web/static/images/*.png
+!docs/**/*.png
 
 # Waveshare library (downloaded during install)
 lib/e-Paper/
