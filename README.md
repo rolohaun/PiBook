@@ -303,15 +303,6 @@ logging:
 - [x] CPU undervolting for power savings
 - [x] Sleep mode with configurable timeout
 
-## Future Enhancements
-
-- [ ] Chapter navigation via table of contents
-- [ ] Font size adjustment
-- [ ] PDF support (renderer supports PDFs)
-- [ ] Search within books
-- [ ] Dictionary lookup
-- [ ] Book metadata editing
-- [ ] Wi-Fi sync with Calibre
 
 ## License
 
