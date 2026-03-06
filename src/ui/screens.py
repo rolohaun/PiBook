@@ -84,11 +84,13 @@ class MainMenuScreen:
         try:
             self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", font_size)
             self.title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 36)
+            self.version_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 11)
             self.app_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 20)
             self.small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 16)
         except:
             self.font = ImageFont.load_default()
             self.title_font = ImageFont.load_default()
+            self.version_font = ImageFont.load_default()
             self.app_font = ImageFont.load_default()
             self.small_font = ImageFont.load_default()
 
@@ -240,15 +242,22 @@ class MainMenuScreen:
             self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage, is_charging)
 
         # Draw title centered at top
-        title_text = "PiBook v1.0"
+        title_text = "PiBook"
+        version_text = " v1.0"
         try:
             bbox = draw.textbbox((0, 0), title_text, font=self.title_font)
             title_width = bbox[2] - bbox[0]
+            v_bbox = draw.textbbox((0, 0), version_text, font=self.version_font)
+            version_width = v_bbox[2] - v_bbox[0]
         except:
             title_width = len(title_text) * 20
+            version_width = len(version_text) * 8
 
-        title_x = (self.width - title_width) // 2
-        draw.text((title_x, 30), title_text, font=self.title_font, fill=0)
+        total_width = title_width + version_width
+        start_x = (self.width - total_width) // 2
+
+        draw.text((start_x, 30), title_text, font=self.title_font, fill=0)
+        draw.text((start_x + title_width, 50), version_text, font=self.version_font, fill=0)
 
         # Calculate app icon layout (centered, grid style)
         icon_size = 120
