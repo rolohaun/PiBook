@@ -100,7 +100,10 @@ echo ""
 
 # Setup PiSugar Power Manager
 echo "Step 6/7: Installing PiSugar Power Manager..."
-curl http://cdn.pisugar.com/release/pisugar-power-manager.sh | sudo bash
+wget -O /tmp/pisugar-power-manager.sh http://cdn.pisugar.com/release/pisugar-power-manager.sh
+chmod +x /tmp/pisugar-power-manager.sh
+sudo /tmp/pisugar-power-manager.sh
+rm /tmp/pisugar-power-manager.sh
 echo "PiSugar Power Manager installed"
 echo ""
 
