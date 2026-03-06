@@ -19,7 +19,7 @@ class PiBookWebServer:
     Web server for remote control and file management
     """
 
-    def __init__(self, books_dir: str, app_instance, port: int = 5000):
+    def __init__(self, books_dir: str, app_instance, port: int = 5000, version: str = "v1.0"):
         """
         Initialize web server
 
@@ -27,11 +27,13 @@ class PiBookWebServer:
             books_dir: Path to books directory
             app_instance: PiBookApp instance for remote control
             port: Port to run server on
+            version: PiBook version string
         """
         self.logger = logging.getLogger(__name__)
         self.books_dir = books_dir
         self.app_instance = app_instance
         self.port = port
+        self.version = version
         
         # Configure Flask with template and static folders
         template_dir = os.path.join(os.path.dirname(__file__), 'templates')
@@ -55,7 +57,7 @@ class PiBookWebServer:
         def index():
             """Main page with file manager and controls"""
             settings_data = self._load_settings('settings.json')
-            return render_template('base.html', books=self._get_books(), settings=settings_data)
+            return render_template('base.html', books=self._get_books(), settings=settings_data, version=self.version)
 
         @self.flask_app.route('/upload', methods=['POST'])
         def upload():

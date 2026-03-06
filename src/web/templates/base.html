@@ -12,7 +12,8 @@
     <!-- Sidebar Navigation -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <h1><span style="font-size: 0.8em;">📖</span> PiBook</h1>
+            <h1><span style="font-size: 0.8em;">📖</span> PiBook <span style="font-size: 0.4em; color: #888;">{{ version
+                    }}</span></h1>
             <p>by Rolohaun</p>
         </div>
 
@@ -37,7 +38,8 @@
         </div>
 
         <div class="nav-item" data-section="klipper" onclick="switchSection('klipper')">
-            <span class="nav-icon"><img src="{{ url_for('static', filename='images/klipper.png') }}" alt="Klipper" style="width: 20px; height: 20px; vertical-align: middle;"></span>
+            <span class="nav-icon"><img src="{{ url_for('static', filename='images/klipper.png') }}" alt="Klipper"
+                    style="width: 20px; height: 20px; vertical-align: middle;"></span>
             <span class="nav-text">Klipper</span>
         </div>
 

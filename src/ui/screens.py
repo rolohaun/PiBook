@@ -62,7 +62,7 @@ class MainMenuScreen:
     Users can navigate with single button: press=next app, hold=select app
     """
 
-    def __init__(self, width: int = 800, height: int = 480, font_size: int = 24, battery_monitor=None, web_port: int = 5000):
+    def __init__(self, width: int = 800, height: int = 480, font_size: int = 24, battery_monitor=None, web_port: int = 5000, version: str = "v1.0"):
         """
         Initialize main menu screen
 
@@ -72,12 +72,14 @@ class MainMenuScreen:
             font_size: Base font size
             battery_monitor: Optional BatteryMonitor instance
             web_port: Web server port number
+            version: PiBook version string
         """
         self.width = width
         self.height = height
         self.font_size = font_size
         self.battery_monitor = battery_monitor
         self.web_port = web_port
+        self.version = version
         self.logger = logging.getLogger(__name__)
 
         # Load fonts
@@ -243,7 +245,7 @@ class MainMenuScreen:
 
         # Draw title centered at top
         title_text = "PiBook"
-        version_text = " v1.0"
+        version_text = f" {self.version}"
         try:
             bbox = draw.textbbox((0, 0), title_text, font=self.title_font)
             title_width = bbox[2] - bbox[0]

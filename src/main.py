@@ -13,6 +13,8 @@ import threading
 import time
 from pathlib import Path
 
+PIBOOK_VERSION = "v1.0"
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -148,7 +150,8 @@ class PiBookApp:
             height=display_height,
             font_size=self.config.get('main_menu.font_size', 24),
             battery_monitor=self.battery_monitor,
-            web_port=web_port
+            web_port=web_port,
+            version=PIBOOK_VERSION
         )
 
         self.library_screen = LibraryScreen(
@@ -324,7 +327,7 @@ class PiBookApp:
 
             # Start web server
             web_port = self.config.get('web.port', 5000)
-            self.web_server = PiBookWebServer(books_dir, self, web_port)
+            self.web_server = PiBookWebServer(books_dir, self, web_port, version=PIBOOK_VERSION)
             self.web_server.run()
             self.logger.info(f"Web interface available at http://<pi-ip>:{web_port}")
 
