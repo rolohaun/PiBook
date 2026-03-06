@@ -49,16 +49,16 @@ let currentLogType = null;
 
 function loadLogs(type) {
     currentLogType = type;
-    
+
     // Update active tab button style
     document.getElementById('tab-app-logs').style.background = type === 'app' ? '#2196F3' : '#e0e0e0';
     document.getElementById('tab-app-logs').style.color = type === 'app' ? '#fff' : '#333';
     document.getElementById('tab-system-logs').style.background = type === 'system' ? '#2196F3' : '#e0e0e0';
     document.getElementById('tab-system-logs').style.color = type === 'system' ? '#fff' : '#333';
-    
+
     const viewer = document.getElementById('log-viewer-content');
     viewer.innerHTML = `Loading ${type} logs...`;
-    
+
     fetch(`/api/logs/${type}`)
         .then(response => response.json())
         .then(data => {
@@ -233,7 +233,7 @@ function executeCommand() {
     // Add command to output
     appendToTerminal(`<span style="color: #4CAF50;">$ ${escapeHtml(command)}</span>`);
 
-    // Execute command
+    // Execute command using streaming response
     fetch('/terminal/execute', {
         method: 'POST',
         headers: {
@@ -241,37 +241,57 @@ function executeCommand() {
         },
         body: JSON.stringify({ command: command })
     })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                appendToTerminal(`<span style="color: #f44336;">Error: ${escapeHtml(data.error)}</span>`);
-            } else {
-                // Show stdout
-                if (data.stdout) {
-                    appendToTerminal(escapeHtml(data.stdout));
+        .then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Parse SSE events
+                    let eventEndIndex;
+                    while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+                        const eventString = buffer.substring(0, eventEndIndex);
+                        buffer = buffer.substring(eventEndIndex + 2);
+
+                        if (eventString.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(eventString.substring(6));
+
+                                if (data.error) {
+                                    appendToTerminal(`<span style="color: #f44336;">Error: ${escapeHtml(data.error)}</span>`);
+                                } else if (data.stdout !== undefined) {
+                                    // Append live output without extra spacing
+                                    appendToTerminal(escapeHtml(data.stdout).replace(/\n/g, ''), false);
+                                } else if (data.returncode !== undefined && data.returncode !== 0) {
+                                    appendToTerminal(`<br><span style="color: #f44336;">Exit code: ${data.returncode}</span><br>`);
+                                }
+                            } catch (e) {
+                                console.error('Error parsing SSE data:', e, eventString);
+                            }
+                        }
+                    }
                 }
-                // Show stderr in orange
-                if (data.stderr) {
-                    appendToTerminal(`<span style="color: #ff9800;">${escapeHtml(data.stderr)}</span>`);
-                }
-                // Show return code if non-zero
-                if (data.returncode !== 0) {
-                    appendToTerminal(`<span style="color: #f44336;">Exit code: ${data.returncode}</span>`);
-                }
+            } catch (error) {
+                appendToTerminal(`<span style="color: #f44336;">Stream error: ${escapeHtml(error.message)}</span><br>`);
             }
-            appendToTerminal(''); // Empty line for spacing
         })
         .catch(error => {
-            appendToTerminal(`<span style="color: #f44336;">Network error: ${escapeHtml(error.message)}</span>`);
+            appendToTerminal(`<span style="color: #f44336;">Network error: ${escapeHtml(error.message)}</span><br>`);
         });
 
     // Clear input
     input.value = '';
 }
 
-function appendToTerminal(text) {
+function appendToTerminal(text, addNewline = true) {
     const output = document.getElementById('terminal-output');
-    output.innerHTML += text + '<br>';
+    output.innerHTML += text + (addNewline ? '<br>' : '');
     // Auto-scroll to bottom
     output.scrollTop = output.scrollHeight;
 }

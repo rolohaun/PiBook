@@ -410,24 +410,42 @@ class PiBookWebServer:
                     command = 'bash /home/pi/PiBook/scripts/safe_update.sh'
                     self.logger.info("Intercepted git pull, using safe update script")
                 
-                # Execute command with timeout
+                # We will use text/event-stream for SSE to easily stream from Python to JS
                 import subprocess
-                result = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    cwd='/home/pi/PiBook'
-                )
+                from flask import Response
+                import json
                 
-                # Return output
-                return jsonify({
-                    'stdout': result.stdout,
-                    'stderr': result.stderr,
-                    'returncode': result.returncode,
-                    'command': command
-                })
+                def generate():
+                    try:
+                        # Use Popen to stream output
+                        process = subprocess.Popen(
+                            command,
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,  # Combine stderr and stdout
+                            text=True,
+                            cwd='/home/pi/PiBook',
+                            bufsize=1  # Line buffered
+                        )
+                        
+                        # Read output line by line as it is generated
+                        for line in iter(process.stdout.readline, ''):
+                            if line:
+                                # Send as SSE event data
+                                yield f"data: {json.dumps({'stdout': line})}\n\n"
+                                
+                        # Wait for process to finish and get return code
+                        process.stdout.close()
+                        returncode = process.wait()
+                        
+                        # Send final message with return code
+                        yield f"data: {json.dumps({'returncode': returncode})}\n\n"
+                        
+                    except Exception as e:
+                        self.logger.error(f"Error during command execution: {e}")
+                        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+                return Response(generate(), mimetype='text/event-stream')
 
             except subprocess.TimeoutExpired:
                 return jsonify({'error': 'Command timed out (30s limit)'}), 408
