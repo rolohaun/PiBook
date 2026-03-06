@@ -757,6 +757,7 @@ class ReaderScreen:
                 self.dpi = dpi
 
             # Initialize PillowTextRenderer
+            from src.reader.pillow_text_renderer import PillowTextRenderer
             self.renderer = PillowTextRenderer(
                 epub_path,
                 width=self.width,
