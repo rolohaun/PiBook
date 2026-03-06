@@ -18,12 +18,12 @@ if [ -f /proc/device-tree/model ]; then
 fi
 
 # Update system
-echo "Step 1/6: Updating system packages..."
+echo "Step 1/7: Updating system packages..."
 sudo apt-get update
 echo ""
 
 # Install system dependencies
-echo "Step 2/6: Installing system dependencies..."
+echo "Step 2/7: Installing system dependencies..."
 sudo apt-get install -y \
     python3-pip \
     python3-pil \
@@ -34,6 +34,7 @@ sudo apt-get install -y \
     libfreetype-dev \
     libjpeg-dev \
     git \
+    i2c-tools \
     build-essential
 
 # Try to install mupdf (optional, may not be available on all systems)
@@ -47,8 +48,8 @@ sudo apt-get install -y avahi-utils arp-scan nmap || echo "Some network tools no
 
 echo ""
 
-# Enable SPI interface
-echo "Step 3/6: Enabling SPI interface..."
+# Enable SPI and I2C interfaces
+echo "Step 3/7: Enabling SPI and I2C interfaces..."
 if ! grep -q "^dtparam=spi=on" /boot/config.txt; then
     echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
     echo "SPI enabled in /boot/config.txt"
@@ -56,12 +57,20 @@ else
     echo "SPI already enabled"
 fi
 
+if ! grep -q "^dtparam=i2c_arm=on" /boot/config.txt; then
+    echo "dtparam=i2c_arm=on" | sudo tee -a /boot/config.txt
+    echo "I2C enabled in /boot/config.txt"
+else
+    echo "I2C already enabled"
+fi
+
 # Alternative method using raspi-config
 sudo raspi-config nonint do_spi 0
+sudo raspi-config nonint do_i2c 0
 echo ""
 
 # Install Python dependencies
-echo "Step 4/6: Installing Python packages..."
+echo "Step 4/7: Installing Python packages..."
 # Use --break-system-packages for dedicated e-reader device
 pip3 install --break-system-packages -r requirements.txt
 echo ""
@@ -69,7 +78,7 @@ echo "Python packages installed successfully"
 echo ""
 
 # Setup Waveshare library
-echo "Step 5/6: Setting up Waveshare e-Paper library..."
+echo "Step 5/7: Setting up Waveshare e-Paper library..."
 if [ ! -d "lib/waveshare_epd" ]; then
     mkdir -p lib
     cd lib
@@ -89,8 +98,14 @@ else
 fi
 echo ""
 
+# Setup PiSugar Power Manager
+echo "Step 6/7: Installing PiSugar Power Manager..."
+curl http://cdn.pisugar.com/release/pisugar-power-manager.sh | sudo bash
+echo "PiSugar Power Manager installed"
+echo ""
+
 # Create directories
-echo "Step 6/6: Creating application directories..."
+echo "Step 7/7: Creating application directories..."
 mkdir -p books
 mkdir -p cache
 mkdir -p logs
@@ -103,7 +118,7 @@ echo ""
 chmod +x scripts/*.sh
 
 # Apply power optimizations
-echo "Step 7/7: Setting up power optimizations and permissions..."
+echo "Step 8/8: Setting up power optimizations and permissions..."
 sudo ./scripts/setup_power_optimization.sh
 sudo cp scripts/pibook-sudoers /etc/sudoers.d/pibook
 sudo chmod 0440 /etc/sudoers.d/pibook
