@@ -266,8 +266,8 @@ function executeCommand() {
                                 if (data.error) {
                                     appendToTerminal(`<span style="color: #f44336;">Error: ${escapeHtml(data.error)}</span>`);
                                 } else if (data.stdout !== undefined) {
-                                    // Append live output without extra spacing
-                                    appendToTerminal(escapeHtml(data.stdout).replace(/\n/g, ''), false);
+                                    // Append live output retaining newlines as HTML linebreaks
+                                    appendToTerminal(escapeHtml(data.stdout).replace(/\n/g, '<br>'), false);
                                 } else if (data.returncode !== undefined && data.returncode !== 0) {
                                     appendToTerminal(`<br><span style="color: #f44336;">Exit code: ${data.returncode}</span><br>`);
                                 }
