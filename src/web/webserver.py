@@ -85,7 +85,7 @@ class PiBookWebServer:
                 self.app_instance._render_current_screen()
 
             self.logger.info(f"Uploaded {uploaded_count} book(s)")
-            return redirect(url_for('index'))
+            return jsonify({'success': True, 'count': uploaded_count})
 
         @self.flask_app.route('/delete/<filename>')
         def delete(filename):
