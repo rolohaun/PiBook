@@ -52,6 +52,11 @@
             <span class="nav-icon">💻</span>
             <span class="nav-text">Terminal</span>
         </div>
+
+        <div class="nav-item" data-section="logs" onclick="switchSection('logs')">
+            <span class="nav-icon">📋</span>
+            <span class="nav-text">Logs</span>
+        </div>
     </div>
 
     <!-- Main Content -->
@@ -94,6 +99,11 @@
         <!-- Terminal Section -->
         <div id="terminal" class="content-section">
             {% include 'terminal.html' %}
+        </div>
+
+        <!-- Logs Section -->
+        <div id="logs" class="content-section">
+            {% include 'logs.html' %}
         </div>
     </div>
 

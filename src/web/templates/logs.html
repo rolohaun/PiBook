@@ -1,0 +1,19 @@
+<div class="card" style="margin-top: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.2em;">📋</span> System & Application Logs
+        </h2>
+        <button class="btn" onclick="refreshActiveLogs()" style="width: auto; padding: 8px 16px;">Refresh Logs</button>
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px;">
+        <button id="tab-app-logs" class="btn" style="background: #2196F3;" onclick="loadLogs('app')">Application
+            Logs</button>
+        <button id="tab-system-logs" class="btn btn-secondary" onclick="loadLogs('system')">System Logs</button>
+    </div>
+
+    <div class="terminal-container" style="height: 60vh; max-height: 600px; padding: 15px; overflow-y: auto;">
+        <pre id="log-viewer-content"
+            style="margin: 0; white-space: pre-wrap; font-family: monospace; font-size: 14px; color: #fff; max-width: 100%; word-wrap: break-word;">Loading logs...</pre>
+    </div>
+</div>

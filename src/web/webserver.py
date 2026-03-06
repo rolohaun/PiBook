@@ -428,6 +428,66 @@ class PiBookWebServer:
                     'returncode': result.returncode,
                     'command': command
                 })
+
+            except subprocess.TimeoutExpired:
+                return jsonify({'error': 'Command timed out (30s limit)'}), 408
+            except Exception as e:
+                self.logger.error(f"Terminal command failed: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        # Log Viewing APIs
+        @self.flask_app.route('/api/logs/app')
+        def view_app_logs():
+            """Get recent application logs"""
+            try:
+                # Default path, although we should prefer config value if accessible cleanly
+                log_path = self.app_instance.config.get('logging.file', '/home/pi/PiBook/logs/pibook.log')
+                
+                if not os.path.exists(log_path):
+                    return jsonify({'logs': f"Log file not found at {log_path}", 'type': 'app'})
+                
+                # Use tail to get last 200 lines efficiently
+                import subprocess
+                result = subprocess.run(
+                    ['tail', '-n', '200', log_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                
+                if result.returncode == 0:
+                    return jsonify({'logs': result.stdout, 'type': 'app'})
+                else:
+                    return jsonify({'logs': f"Error reading logs: {result.stderr}", 'type': 'app'})
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to read app logs: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/logs/system')
+        def view_system_logs():
+            """Get recent systemd service logs"""
+            try:
+                import subprocess
+                # Get last 200 lines from journalctl for the pibook service
+                result = subprocess.run(
+                    ['journalctl', '-u', 'pibook', '-n', '200', '--no-pager'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if result.returncode == 0:
+                    logs = result.stdout
+                    if not logs.strip():
+                        logs = "No system logs found for 'pibook' service. Is it running as a service?"
+                    return jsonify({'logs': logs, 'type': 'system'})
+                else:
+                    return jsonify({'logs': f"Error reading system logs: {result.stderr}", 'type': 'system'})
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to read system logs: {e}")
+                return jsonify({'error': str(e)}), 500
                 
             except subprocess.TimeoutExpired:
                 return jsonify({'error': 'Command timed out (30s limit)'}), 408

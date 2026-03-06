@@ -35,6 +35,51 @@ function switchSection(sectionId) {
         initIPScanner();
     } else if (sectionId === 'klipper') {
         initKlipper();
+    } else if (sectionId === 'logs') {
+        if (!currentLogType) {
+            loadLogs('app');
+        } else {
+            refreshActiveLogs();
+        }
+    }
+}
+
+// Logs Functions
+let currentLogType = null;
+
+function loadLogs(type) {
+    currentLogType = type;
+    
+    // Update active tab button style
+    document.getElementById('tab-app-logs').style.background = type === 'app' ? '#2196F3' : '#e0e0e0';
+    document.getElementById('tab-app-logs').style.color = type === 'app' ? '#fff' : '#333';
+    document.getElementById('tab-system-logs').style.background = type === 'system' ? '#2196F3' : '#e0e0e0';
+    document.getElementById('tab-system-logs').style.color = type === 'system' ? '#fff' : '#333';
+    
+    const viewer = document.getElementById('log-viewer-content');
+    viewer.innerHTML = `Loading ${type} logs...`;
+    
+    fetch(`/api/logs/${type}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                viewer.innerHTML = `<span style="color: #f44336;">Failed to load logs: ${escapeHtml(data.error)}</span>`;
+            } else {
+                viewer.innerHTML = escapeHtml(data.logs || 'No logs found.');
+                // Scroll to bottom to see latest logs
+                viewer.scrollTop = viewer.scrollHeight;
+            }
+        })
+        .catch(error => {
+            viewer.innerHTML = `<span style="color: #f44336;">Error fetching logs: ${escapeHtml(error.message)}</span>`;
+        });
+}
+
+function refreshActiveLogs() {
+    if (currentLogType) {
+        loadLogs(currentLogType);
+    } else {
+        loadLogs('app');
     }
 }
 
