@@ -46,12 +46,13 @@ class PillowTextRenderer:
     EPUB renderer using direct Pillow text drawing with Rich Text support.
     """
 
-    def __init__(self, epub_path: str, width: int = 800, height: int = 480, zoom_factor: float = 1.0, dpi: int = 150):
+    def __init__(self, epub_path: str, width: int = 800, height: int = 480, zoom_factor: float = 1.0, dpi: int = 150, progress_callback = None):
         self.logger = logging.getLogger(__name__)
         self.epub_path = epub_path
         self.width = width
         self.height = height
         self.zoom_factor = zoom_factor
+        self.progress_callback = progress_callback
         
         # Layout settings
         self.margin_left = 30
@@ -185,6 +186,9 @@ class PillowTextRenderer:
             self.logger.warning(f"Failed to save cache: {e}")
 
     def _load_epub(self):
+        if self.progress_callback:
+            self.progress_callback(5.0, "Opening EPUB file...")
+
         # Try cache first
         if self._load_cache():
             # Still need to load the book for images and fonts
@@ -195,13 +199,24 @@ class PillowTextRenderer:
 
         self.book = epub.read_epub(self.epub_path)
 
+        if self.progress_callback:
+            self.progress_callback(10.0, "Extracting images and fonts...")
+
         # First pass: Extract and cache all images and fonts from EPUB
         self._extract_images()
         self._extract_fonts()
 
         all_tokens = []
 
-        for item in self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+        docs = list(self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT))
+        total_docs = len(docs)
+        
+        for idx, item in enumerate(docs):
+            if self.progress_callback:
+                # Map chapter parsing from 15% to 80%
+                percent_done = 15.0 + (65.0 * (idx / max(1, total_docs)))
+                self.progress_callback(percent_done, f"Parsing chapter {idx + 1} of {total_docs}...")
+
             try:
                 content = item.get_content()
                 try:
@@ -215,6 +230,9 @@ class PillowTextRenderer:
                     all_tokens.append(TextToken("", "normal", new_paragraph=True))
             except Exception as e:
                 self.logger.warning(f"Chapter error: {e}")
+
+        if self.progress_callback:
+            self.progress_callback(85.0, "Formatting pages...")
 
         self._reflow_pages(all_tokens)
         self._save_cache()
@@ -464,10 +482,15 @@ class PillowTextRenderer:
         current_line_max_h = 0
         
         count = 0
+        total_tokens = len(tokens)
         for token in tokens:
             count += 1
-            if count % 10000 == 0:
-                self.logger.debug(f"Reflow progress: {count}/{len(tokens)}")
+            if count % 1000 == 0:
+                self.logger.debug(f"Reflow progress: {count}/{total_tokens}")
+                if self.progress_callback:
+                    # Reflow maps from 85% to 99%
+                    percent_done = 85.0 + (14.0 * (count / max(1, total_tokens)))
+                    self.progress_callback(percent_done, f"Formatting {count}/{total_tokens}...")
 
             # Handle table tokens
             if isinstance(token, TableToken):

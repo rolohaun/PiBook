@@ -1036,9 +1036,14 @@ class PiBookApp:
             # Show initial loading screen (0%)
             loading_img = self.reader_screen.show_loading_progress(0, "Loading book...")
             self.display.display_image(loading_img)
+            
+            # Setup interactive progress callback
+            def update_loading_progress(percent: float, message: str):
+                prog_img = self.reader_screen.show_loading_progress(percent, message)
+                self.display.display_image(prog_img)
 
             # Load EPUB
-            self.reader_screen.load_epub(book['path'])
+            self.reader_screen.load_epub(book['path'], progress_callback=update_loading_progress)
 
             # Check for saved progress and restore position
             saved_page = self.progress_manager.load_progress(book['path'])

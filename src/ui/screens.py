@@ -735,7 +735,7 @@ class ReaderScreen:
         self.PageCache = PageCache
         self.cache_size = cache_size
 
-    def load_epub(self, epub_path: str, zoom_factor: float = None, dpi: int = None):
+    def load_epub(self, epub_path: str, zoom_factor: float = None, dpi: int = None, progress_callback = None):
         """
         Load an EPUB file
 
@@ -743,6 +743,7 @@ class ReaderScreen:
             epub_path: Path to EPUB file
             zoom_factor: Optional zoom override (uses self.zoom_factor if not provided)
             dpi: Optional DPI override (uses self.dpi if not provided)
+            progress_callback: Optional callback fn(percent, message) for loading updates
         """
         try:
             # Close previous book if open
@@ -756,13 +757,13 @@ class ReaderScreen:
                 self.dpi = dpi
 
             # Initialize PillowTextRenderer
-            from src.reader.pillow_text_renderer import PillowTextRenderer
             self.renderer = PillowTextRenderer(
                 epub_path,
                 width=self.width,
                 height=self.height,
                 zoom_factor=self.zoom_factor,
-                dpi=self.dpi
+                dpi=self.dpi,
+                progress_callback=progress_callback
             )
             self.renderer_type = 'pillow'
             self.logger.info(f"Using PillowTextRenderer for: {epub_path}")
