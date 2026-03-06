@@ -51,20 +51,26 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 ### 1. Flash the SD Card
 Use Raspberry Pi Imager to flash your SD card.
 - **Operating System:** Choose **Raspberry Pi OS Lite (64-bit)**.
+
+![Choose Operating System](assets/imager_os.png)
+
 - **Device:** Select **Raspberry Pi Zero 2 W** (if prompted).
 - In the OS Customisation settings, ensure you apply the following:
-  - **Set hostname:** Choose a memorable hostname (e.g., `pibook`). This makes it easier to connect via SSH using the hostname (e.g., `pibook.local` via Putty or Terminal) without knowing the IP address.
+  - **Set hostname:** Choose a memorable hostname (e.g., `pibook`). This makes it easier to connect via SSH using the hostname (e.g., `pibook.local` via Putty) without knowing the IP address.
   - **Set username and password:** Make sure you remember these!
   - **Configure wireless LAN:** Enter your Wi-Fi SSID and password to connect to your network.
   - **Enable SSH:** Turn on SSH (password authentication).
 
 Once the flashing is finished, insert the SD card into your Pi and power it on.
 
+![Write Complete](assets/imager_finish.png)
+
 ### 2. Connect and Install Git
-SSH into your Pi using the hostname you configured (or using Putty):
-```bash
-ssh username@hostname.local
-```
+Use Putty to SSH into your Pi using the hostname you configured:
+- **Hostname:** `your-hostname.local` (e.g., `pibook.local`)
+- **Port:** 22
+- Log in with the username and password you set.
+
 Update your system and install `git`:
 ```bash
 sudo apt update
@@ -127,35 +133,6 @@ Connect a single button between GPIO 5 and GND:
 - **Long press** (≥ 0.8s): Toggle between library and reader
 - Same behavior as PiSugar2 custom button
 
-## Configuration
-
-Edit `config/config.yaml` to customize:
-
-```yaml
-display:
-  width: 480
-  height: 800
-  rotation: 90
-  partial_refresh: true
-  full_refresh_interval: 10  # Battery optimization
-
-reader:
-  page_cache_size: 3  # Optimized for battery life
-
-performance:
-  gc_threshold: 50
-  gc_on_page_turn: true  # Battery optimization
-
-power:
-  sleep_timeout: 120  # 2 minutes
-  cpu_scaling: true
-  wifi_power_save: true
-  undervolt: -2       # CPU voltage reduction (0 to -8)
-  boot_cores: 4       # CPU cores at boot (1-4)
-```
-
-Edit `config/gpio_mapping.yaml` to change button pins.
-
 ## Power Management
 
 PiBook includes extensive power optimization for maximum battery life on Pi Zero 2 W.
@@ -176,18 +153,7 @@ Access settings at `http://<pibook-ip>:5000/settings`:
 
 Both settings require a reboot to take effect.
 
-### Setup Scripts
 
-For initial power optimization setup:
-
-```bash
-# Apply boot-level optimizations (HDMI off, Bluetooth off, LEDs off, etc.)
-sudo ./scripts/setup_power_optimization.sh
-
-# Enable sudo permissions for web interface power controls
-sudo cp scripts/pibook-sudoers /etc/sudoers.d/pibook
-sudo chmod 0440 /etc/sudoers.d/pibook
-```
 
 ### Power Savings Reference
 

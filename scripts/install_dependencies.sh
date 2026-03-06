@@ -102,6 +102,14 @@ echo ""
 # Set permissions
 chmod +x scripts/*.sh
 
+# Apply power optimizations
+echo "Step 7/7: Setting up power optimizations and permissions..."
+sudo ./scripts/setup_power_optimization.sh
+sudo cp scripts/pibook-sudoers /etc/sudoers.d/pibook
+sudo chmod 0440 /etc/sudoers.d/pibook
+echo "Power optimizations applied."
+echo ""
+
 echo "=================================================="
 echo "Installation Complete!"
 echo "=================================================="
