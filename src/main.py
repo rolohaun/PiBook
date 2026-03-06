@@ -1035,12 +1035,12 @@ class PiBookApp:
 
             # Show initial loading screen (0%)
             loading_img = self.reader_screen.show_loading_progress(0, "Loading book...")
-            self.display.display_image(loading_img)
+            self.display.display_image(loading_img, skip_counter=True)
             
             # Setup interactive progress callback
             def update_loading_progress(percent: float, message: str):
                 prog_img = self.reader_screen.show_loading_progress(percent, message)
-                self.display.display_image(prog_img)
+                self.display.display_image(prog_img, skip_counter=True)
 
             # Load EPUB
             self.reader_screen.load_epub(book['path'], progress_callback=update_loading_progress)
@@ -1075,7 +1075,7 @@ class PiBookApp:
             
             # Show final loading (100%)
             loading_img = self.reader_screen.show_loading_progress(100, "Ready!")
-            self.display.display_image(loading_img)
+            self.display.display_image(loading_img, skip_counter=True)
             
             # Small delay to show completion
             time.sleep(0.3)
