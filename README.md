@@ -48,7 +48,30 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 
 ## Installation
 
-### Quick Install
+### 1. Flash the SD Card
+Use Raspberry Pi Imager to flash your SD card.
+- **Operating System:** Choose **Raspberry Pi OS Lite (64-bit)**.
+- **Device:** Select **Raspberry Pi Zero 2 W** (if prompted).
+- In the OS Customisation settings, ensure you apply the following:
+  - **Set hostname:** Choose a memorable hostname (e.g., `pibook`). This makes it easier to connect via SSH using the hostname (e.g., `pibook.local` via Putty or Terminal) without knowing the IP address.
+  - **Set username and password:** Make sure you remember these!
+  - **Configure wireless LAN:** Enter your Wi-Fi SSID and password to connect to your network.
+  - **Enable SSH:** Turn on SSH (password authentication).
+
+Once the flashing is finished, insert the SD card into your Pi and power it on.
+
+### 2. Connect and Install Git
+SSH into your Pi using the hostname you configured (or using Putty):
+```bash
+ssh username@hostname.local
+```
+Update your system and install `git`:
+```bash
+sudo apt update
+sudo apt install git -y
+```
+
+### 3. Quick Install
 
 ```bash
 # Clone the repository
@@ -63,19 +86,28 @@ chmod +x scripts/install_dependencies.sh
 sudo reboot
 ```
 
-### Add Books
+### 4. Run PiBook
 
-```bash
-# Copy your EPUB files to the books directory
-cp /path/to/your/*.epub /home/pi/PiBook/books/
-```
-
-### Run PiBook
-
+Reconnect to your Pi after the reboot and verify the script is working:
 ```bash
 cd /home/pi/PiBook
 python3 src/main.py
 ```
+
+### 5. Setup to Run on Reboot
+
+To configure PiBook to start automatically as a service when the Pi boots up:
+
+```bash
+sudo cp scripts/pibook.service /etc/systemd/system/
+sudo systemctl enable pibook.service
+sudo systemctl start pibook.service
+```
+
+### 6. Add Books
+
+Adding books is now done completely via the web interface. 
+Once PiBook is running, open a web browser on another computer or phone and navigate to `http://<your-hostname>.local:5000` (or `http://<pibook-ip>:5000`). From there, you can easily upload your EPUB files wirelessly.
 
 ## Button Wiring (GPIO)
 
@@ -170,22 +202,16 @@ Based on [Jeff Geerling's testing](https://www.jeffgeerling.com/blog/2021/disabl
 | 2 cores instead of 4 | ~25% power reduction |
 | Undervolt -4 | ~10-20% power reduction |
 
-## Running as a Service
+## Managing the Service
 
-To auto-start PiBook on boot:
+If you configured PiBook to run on boot (Step 5 in Installation), you can manage the service with the following commands:
 
-```bash
-sudo cp scripts/pibook.service /etc/systemd/system/
-sudo systemctl enable pibook.service
-sudo systemctl start pibook.service
-```
-
-Check status:
+Check service status:
 ```bash
 sudo systemctl status pibook.service
 ```
 
-View logs:
+View the background service logs:
 ```bash
 sudo journalctl -u pibook.service -f
 ```
