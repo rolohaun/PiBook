@@ -52,7 +52,7 @@ A Python-based E-reader for Raspberry Pi with Waveshare 7.5" e-ink display.
 Use Raspberry Pi Imager to flash your SD card.
 - **Operating System:** Choose **Raspberry Pi OS Lite (64-bit)**.
 
-![Choose Operating System](assets/imager_os.png)
+![Choose Operating System](docs/setup_images/imager_os.png)
 
 - **Device:** Select **Raspberry Pi Zero 2 W** (if prompted).
 - In the OS Customisation settings, ensure you apply the following:
@@ -63,7 +63,7 @@ Use Raspberry Pi Imager to flash your SD card.
 
 Once the flashing is finished, insert the SD card into your Pi and power it on.
 
-![Write Complete](assets/imager_finish.png)
+![Write Complete](docs/setup_images/imager_finish.png)
 
 ### 2. Connect and Install Git
 Use Putty to SSH into your Pi using the hostname you configured:
@@ -105,6 +105,7 @@ python3 src/main.py
 To configure PiBook to start automatically as a service when the Pi boots up:
 
 ```bash
+cd /home/pi/PiBook
 sudo cp scripts/pibook.service /etc/systemd/system/
 sudo systemctl enable pibook.service
 sudo systemctl start pibook.service
