@@ -634,10 +634,13 @@ class LibraryScreen:
             book = self.books[i]
             is_selected = (i == self.current_index)
 
-            # Get or create cover
-            cover = self.cover_extractor.get_cover(book['path'], self.cover_size)
-            if not cover:
+            # Get or create cover (skip for __home__ sentinel entry)
+            if book['path'] == '__home__':
                 cover = self.cover_extractor.create_fallback_cover(self.cover_size)
+            else:
+                cover = self.cover_extractor.get_cover(book['path'], self.cover_size)
+                if not cover:
+                    cover = self.cover_extractor.create_fallback_cover(self.cover_size)
             
             # Draw cover
             cover_x = 40
