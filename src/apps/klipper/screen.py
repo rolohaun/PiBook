@@ -325,14 +325,15 @@ class KlipperScreen:
             draw.polygon(bolt_points, fill=1, outline=0)
 
         percentage_text = f"{percentage}%"
+        font = ImageFont.load_default()
         try:
-            bbox = draw.textbbox((0, 0), percentage_text, font=self.font)
+            bbox = draw.textbbox((0, 0), percentage_text, font=font)
             text_width = bbox[2] - bbox[0]
         except:
             text_width = len(percentage_text) * 8
 
         text_x = battery_x - text_width - 5
-        draw.text((text_x, y), percentage_text, font=self.font, fill=0)
+        draw.text((text_x, y), percentage_text, font=font, fill=0)
 
     def render(self) -> Image.Image:
         """Render the Klipper screen"""
