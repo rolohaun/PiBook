@@ -145,6 +145,18 @@ class PiSugar2Backend(BatteryBackend):
     
     def get_name(self) -> str:
         return "PiSugar2"
+    
+    def get_rtc_time(self) -> Optional[str]:
+        """Get current time from PiSugar2 RTC. Returns ISO string or None."""
+        response = self._send_command("get rtc_time")
+        if response:
+            try:
+                # Response format: "rtc_time: 2024-01-15T14:30:00+00:00"
+                time_str = response.split(":", 1)[-1].strip()
+                return time_str
+            except:
+                pass
+        return None
 
 
 class ADS1115Backend(BatteryBackend):
@@ -447,3 +459,27 @@ class BatteryMonitor:
     def hardware_available(self) -> bool:
         """For backward compatibility"""
         return not isinstance(self.backend, MockBackend)
+
+    def get_time(self):
+        """
+        Get current date and time from PiSugar2 RTC, falling back to system time.
+
+        Returns:
+            datetime object representing the current time
+        """
+        from datetime import datetime
+        # Try PiSugar2 RTC first
+        if isinstance(self.backend, PiSugar2Backend):
+            try:
+                rtc_str = self.backend.get_rtc_time()
+                if rtc_str:
+                    # Handle ISO format with or without timezone suffix
+                    # Strip timezone offset if present (e.g., "+00:00")
+                    clean = rtc_str.split('+')[0].split('-')[0] if 'T' in rtc_str else rtc_str
+                    # Re-parse cleanly: "2024-01-15T14:30:00"
+                    clean = rtc_str[:19]
+                    return datetime.fromisoformat(clean)
+            except Exception:
+                pass
+        # Fallback: use system clock
+        return datetime.now()

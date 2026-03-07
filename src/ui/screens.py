@@ -244,7 +244,31 @@ class MainMenuScreen:
             is_charging = self.battery_monitor.is_charging()
             self._draw_battery_icon(draw, self.width - 10, 5, battery_percentage, is_charging)
 
-        # Draw title centered at top
+        # Draw date/time in top-left corner
+        try:
+            if self.battery_monitor:
+                now = self.battery_monitor.get_time()
+            else:
+                from datetime import datetime
+                now = datetime.now()
+            time_str = now.strftime("%-I:%M %p")   # e.g. "3:07 PM"  (no leading zero)
+            date_str = now.strftime("%b %-d, %Y")   # e.g. "Mar 6, 2026"
+        except Exception:
+            from datetime import datetime
+            now = datetime.now()
+            time_str = now.strftime("%I:%M %p").lstrip("0")
+            date_str = now.strftime("%b %d, %Y")
+
+        clock_font = ImageFont.load_default()
+        try:
+            t_bbox = draw.textbbox((0, 0), time_str, font=clock_font)
+            time_h = t_bbox[3] - t_bbox[1]
+        except Exception:
+            time_h = 10
+        draw.text((10, 5), time_str, font=clock_font, fill=0)
+        draw.text((10, 5 + time_h + 3), date_str, font=clock_font, fill=0)
+
+
         title_text = "PiBook"
         version_text = f" {self.version}"
         try:
