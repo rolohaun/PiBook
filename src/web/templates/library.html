@@ -102,3 +102,19 @@
 </form>
 
 <div id="reader-settings-message" style="margin-top: 24px; display: none;"></div>
+
+<!-- Reading Progress Reset -->
+<h3 style="margin-top: 40px;">📍 Reading Positions</h3>
+<p style="color: #666; margin-bottom: 16px;">Manage your saved reading positions. Reset a book to start from the
+    beginning.</p>
+
+<div id="progress-list-container">
+    <p style="color: #888;">Loading saved positions...</p>
+</div>
+
+<div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+    <button class="btn" onclick="loadReadingProgress()">🔄 Refresh</button>
+    <button class="btn btn-danger" onclick="resetAllProgress()">🗑️ Reset All Positions</button>
+</div>
+
+<div id="progress-message" style="margin-top: 16px; display: none;"></div>

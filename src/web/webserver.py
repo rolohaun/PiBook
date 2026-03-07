@@ -103,6 +103,55 @@ class PiBookWebServer:
 
             return redirect(url_for('index'))
 
+        @self.flask_app.route('/api/progress/list')
+        def list_progress():
+            """List all saved reading positions"""
+            try:
+                if not hasattr(self.app_instance, 'progress_manager'):
+                    return jsonify({'error': 'Progress manager not available'}), 500
+
+                all_progress = self.app_instance.progress_manager.get_all_progress()
+                result = []
+                for book_path, progress in all_progress.items():
+                    result.append({
+                        'path': book_path,
+                        'filename': os.path.basename(book_path),
+                        'current_page': progress['current_page'] + 1,  # 1-indexed for display
+                        'total_pages': progress['total_pages'],
+                        'last_read': progress.get('last_read', 'Unknown')
+                    })
+                # Sort by filename
+                result.sort(key=lambda x: x['filename'].lower())
+                return jsonify({'progress': result})
+            except Exception as e:
+                self.logger.error(f"Error listing progress: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.flask_app.route('/api/progress/reset', methods=['POST'])
+        def reset_progress():
+            """Reset reading position for a book or all books"""
+            try:
+                if not hasattr(self.app_instance, 'progress_manager'):
+                    return jsonify({'error': 'Progress manager not available'}), 500
+
+                data = request.get_json() or {}
+                book_path = data.get('path')
+
+                if book_path == '__all__':
+                    self.app_instance.progress_manager.clear_all_progress()
+                    self.logger.info("Reset all reading positions via web interface")
+                    return jsonify({'status': 'success', 'message': 'All reading positions reset'})
+                elif book_path:
+                    self.app_instance.progress_manager.clear_progress(book_path)
+                    self.logger.info(f"Reset reading position for {os.path.basename(book_path)} via web interface")
+                    return jsonify({'status': 'success', 'message': f'Reset position for {os.path.basename(book_path)}'})
+                else:
+                    return jsonify({'error': 'No book path provided'}), 400
+
+            except Exception as e:
+                self.logger.error(f"Error resetting progress: {e}")
+                return jsonify({'error': str(e)}), 500
+
         @self.flask_app.route('/rename', methods=['POST'])
         def rename():
             """Rename EPUB file"""

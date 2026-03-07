@@ -35,6 +35,8 @@ function switchSection(sectionId) {
         initIPScanner();
     } else if (sectionId === 'klipper') {
         initKlipper();
+    } else if (sectionId === 'library') {
+        loadReadingProgress();
     } else if (sectionId === 'logs') {
         if (!currentLogType) {
             loadLogs('app');
@@ -994,4 +996,99 @@ function removeDevice(mac) {
             console.error('Device removal failed:', error);
             alert('Failed to remove device');
         });
+}
+
+// Reading Progress Functions
+function loadReadingProgress() {
+    const container = document.getElementById('progress-list-container');
+    if (!container) return;
+
+    container.innerHTML = '<p style="color: #888;">Loading...</p>';
+
+    fetch('/api/progress/list')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                container.innerHTML = '<p style="color: #c00;">Error: ' + data.error + '</p>';
+                return;
+            }
+
+            if (!data.progress || data.progress.length === 0) {
+                container.innerHTML = '<p style="color: #888;">No saved reading positions found.</p>';
+                return;
+            }
+
+            let html = '<table style="width:100%; border-collapse: collapse;">';
+            html += '<thead><tr>';
+            html += '<th style="text-align:left; padding: 8px; border-bottom: 2px solid #ddd;">Book</th>';
+            html += '<th style="text-align:center; padding: 8px; border-bottom: 2px solid #ddd;">Progress</th>';
+            html += '<th style="text-align:right; padding: 8px; border-bottom: 2px solid #ddd;">Action</th>';
+            html += '</tr></thead><tbody>';
+
+            data.progress.forEach(function (item) {
+                const pct = Math.round((item.current_page / item.total_pages) * 100);
+                const displayName = item.filename.replace('.epub', '');
+                const safePath = encodeURIComponent(item.path);
+                html += '<tr>';
+                html += '<td style="padding: 10px 8px; border-bottom: 1px solid #eee; font-size: 0.9em;">' + displayName + '</td>';
+                html += '<td style="padding: 10px 8px; border-bottom: 1px solid #eee; text-align:center; color: #666;">Page ' + item.current_page + '/' + item.total_pages + ' (' + pct + '%)</td>';
+                html += '<td style="padding: 10px 8px; border-bottom: 1px solid #eee; text-align:right;">';
+                html += '<button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;" onclick="resetBookProgress(\'' + safePath + '\')">Reset</button>';
+                html += '</td></tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        })
+        .catch(function (err) {
+            container.innerHTML = '<p style="color: #c00;">Failed to load progress: ' + err.message + '</p>';
+        });
+}
+
+function resetBookProgress(encodedPath) {
+    if (!confirm('Reset reading position for this book?')) return;
+    const bookPath = decodeURIComponent(encodedPath);
+
+    fetch('/api/progress/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: bookPath })
+    })
+        .then(response => response.json())
+        .then(function (data) {
+            showProgressMessage(
+                data.status === 'success' ? '✓ ' + data.message : '❌ ' + (data.error || 'Unknown error'),
+                data.status === 'success'
+            );
+            loadReadingProgress();
+        })
+        .catch(function (err) { showProgressMessage('❌ Error: ' + err.message, false); });
+}
+
+function resetAllProgress() {
+    if (!confirm('Reset ALL saved reading positions? This cannot be undone.')) return;
+
+    fetch('/api/progress/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '__all__' })
+    })
+        .then(response => response.json())
+        .then(function (data) {
+            showProgressMessage(
+                data.status === 'success' ? '✓ ' + data.message : '❌ ' + (data.error || 'Unknown error'),
+                data.status === 'success'
+            );
+            loadReadingProgress();
+        })
+        .catch(function (err) { showProgressMessage('❌ Error: ' + err.message, false); });
+}
+
+function showProgressMessage(msg, success) {
+    const el = document.getElementById('progress-message');
+    if (!el) return;
+    el.className = success ? 'message success' : 'message error';
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(function () { el.style.display = 'none'; }, 4000);
 }
