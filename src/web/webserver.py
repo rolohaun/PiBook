@@ -292,18 +292,21 @@ class PiBookWebServer:
                 # Get JSON data from request
                 data = request.get_json()
                 
+                # Fetch current settings to use as defaults for missing fields
+                current_settings = self.app_instance.settings
+                
                 settings_data = {
-                    'zoom': float(data.get('zoom', 1.0)),
-                    'full_refresh_interval': int(data.get('full_refresh_interval', 10)),
-                    'show_page_numbers': data.get('show_page_numbers', False),
-                    'wifi_while_reading': data.get('wifi_while_reading', False),
-                    'sleep_enabled': data.get('sleep_enabled', False),
-                    'sleep_message': data.get('sleep_message', 'Shh I\'m sleeping'),
-                    'sleep_timeout': int(data.get('sleep_timeout', 120)),
-                    'shutdown_message': data.get('shutdown_message', 'OFF'),
-                    'items_per_page': int(data.get('items_per_page', 4)),
-                    'undervolt': int(data.get('undervolt', -2)),
-                    'boot_cores': int(data.get('boot_cores', 4))
+                    'zoom': float(data.get('zoom', current_settings.get('zoom', 1.0))),
+                    'full_refresh_interval': int(data.get('full_refresh_interval', current_settings.get('full_refresh_interval', 10))),
+                    'show_page_numbers': data.get('show_page_numbers', current_settings.get('show_page_numbers', False)),
+                    'wifi_while_reading': data.get('wifi_while_reading', current_settings.get('wifi_while_reading', False)),
+                    'sleep_enabled': data.get('sleep_enabled', current_settings.get('sleep_enabled', False)),
+                    'sleep_message': data.get('sleep_message', current_settings.get('sleep_message', "Shh I'm sleeping")),
+                    'sleep_timeout': int(data.get('sleep_timeout', current_settings.get('sleep_timeout', 120))),
+                    'shutdown_message': data.get('shutdown_message', current_settings.get('shutdown_message', 'OFF')),
+                    'items_per_page': int(data.get('items_per_page', current_settings.get('items_per_page', 4))),
+                    'undervolt': int(data.get('undervolt', current_settings.get('undervolt', -2))),
+                    'boot_cores': int(data.get('boot_cores', current_settings.get('boot_cores', 4)))
                 }
 
                 self._save_settings(settings_data)

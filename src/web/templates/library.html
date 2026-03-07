@@ -53,3 +53,52 @@
     <p>📚 No books yet. Upload an EPUB to get started!</p>
 </div>
 {% endif %}
+
+<!-- Reader Settings -->
+<h3 style="margin-top: 40px;">⚙️ Reading Settings</h3>
+<p style="color: #666; margin-bottom: 24px;">Configure your reading experience</p>
+
+<form id="reader-settings-form">
+    <div class="form-group">
+        <label for="zoom">Zoom Level</label>
+        <input type="number" id="zoom" name="zoom" value="{{ settings.zoom }}" min="0.5" max="2.0" step="0.1">
+        <p class="help-text">Text size (0.5-2.0). 1.0 = fit to screen, less than 1.0 = smaller, greater than 1.0 =
+            larger</p>
+    </div>
+
+    <div class="form-group">
+        <label for="full_refresh_interval">Full Refresh Interval</label>
+        <input type="number" id="full_refresh_interval" name="full_refresh_interval"
+            value="{{ settings.full_refresh_interval }}" min="1" max="20" step="1">
+        <p class="help-text">Number of page turns before full refresh to clear ghosting (1-20)</p>
+    </div>
+
+    <div class="form-group">
+        <div class="checkbox-group">
+            <input type="checkbox" id="show_page_numbers" name="show_page_numbers" {% if settings.show_page_numbers
+                %}checked{% endif %}>
+            <label for="show_page_numbers" style="margin: 0;">Show Page Numbers</label>
+        </div>
+        <p class="help-text">Display "Page X of Y" at bottom of screen when reading</p>
+    </div>
+
+    <div class="form-group">
+        <label for="items_per_page">Books Per Page</label>
+        <input type="number" id="items_per_page" name="items_per_page" value="{{ settings.items_per_page }}" min="3"
+            max="6" step="1">
+        <p class="help-text">Number of books shown on library screen (3-6)</p>
+    </div>
+
+    <div class="form-group">
+        <div class="checkbox-group">
+            <input type="checkbox" id="wifi_while_reading" name="wifi_while_reading" {% if settings.wifi_while_reading
+                %}checked{% endif %}>
+            <label for="wifi_while_reading" style="margin: 0;">Keep WiFi On While Reading</label>
+        </div>
+        <p class="help-text">🔋 Uncheck to save battery (WiFi turns off when reading, on when in library)</p>
+    </div>
+
+    <button type="submit" class="btn">Save Reading Settings</button>
+</form>
+
+<div id="reader-settings-message" style="margin-top: 24px; display: none;"></div>

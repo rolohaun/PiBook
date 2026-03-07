@@ -128,73 +128,81 @@ function deleteFile(filename) {
         });
 }
 
-// Settings Form
+// Settings Form(s)
 document.addEventListener('DOMContentLoaded', function () {
-    const settingsForm = document.getElementById('settings-form');
-    if (settingsForm) {
-        settingsForm.addEventListener('submit', function (e) {
-            e.preventDefault();
+    const settingForms = [
+        { form: document.getElementById('settings-form'), msgId: 'settings-message' },
+        { form: document.getElementById('reader-settings-form'), msgId: 'reader-settings-message' }
+    ];
 
-            const formData = new FormData(this);
-            const data = {};
+    settingForms.forEach(({ form, msgId }) => {
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
 
-            // Convert form data to object
-            for (let [key, value] of formData.entries()) {
-                if (key === 'show_page_numbers' || key === 'wifi_while_reading' || key === 'sleep_enabled') {
-                    data[key] = true;
-                } else {
-                    data[key] = isNaN(value) ? value : parseFloat(value);
+                const formData = new FormData(this);
+                const data = {};
+
+                // Convert form data to object
+                for (let [key, value] of formData.entries()) {
+                    if (key === 'show_page_numbers' || key === 'wifi_while_reading' || key === 'sleep_enabled' || key === 'bluetooth_enabled') {
+                        data[key] = true;
+                    } else {
+                        data[key] = isNaN(value) ? value : parseFloat(value);
+                    }
                 }
-            }
 
-            // Add unchecked checkboxes as false
-            ['show_page_numbers', 'wifi_while_reading', 'sleep_enabled'].forEach(field => {
-                if (!(field in data)) {
-                    data[field] = false;
-                }
-            });
+                // Add unchecked checkboxes as false, ONLY if they exist in this specific form
+                const allCheckboxIds = ['show_page_numbers', 'wifi_while_reading', 'sleep_enabled', 'bluetooth_enabled'];
+                allCheckboxIds.forEach(field => {
+                    const checkboxExistsInForm = this.querySelector(`input[name="${field}"], input[id="${field}"]`);
+                    if (checkboxExistsInForm && !(field in data)) {
+                        data[field] = false; // It exists in the form, but wasn't checked
+                    }
+                });
 
-            // Save settings
-            fetch('/save_settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-                .then(response => response.json())
-                .then(result => {
-                    const messageDiv = document.getElementById('settings-message');
-                    if (result.status === 'success') {
-                        messageDiv.className = 'message success';
-                        messageDiv.innerHTML = '<strong>✓ Settings saved successfully!</strong><br>Changes will take effect on next restart.';
+                // Save settings
+                fetch('/save_settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        const messageDiv = document.getElementById(msgId);
+                        if (result.status === 'success') {
+                            messageDiv.className = 'message success';
+                            messageDiv.innerHTML = '<strong>✓ Settings saved successfully!</strong><br>Changes will take effect on next restart.';
+                            messageDiv.style.display = 'block';
+                            messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                            // Reload CPU voltage after short delay
+                            setTimeout(() => {
+                                fetch('/api/cpu_voltage')
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        const statusEl = document.getElementById('voltage-status');
+                                        if (statusEl && data.voltage) {
+                                            statusEl.textContent = 'Current CPU Voltage: ' + data.voltage + ' (Undervolt: ' + data.undervolt_setting + ')';
+                                        }
+                                    });
+                            }, 500);
+                        } else {
+                            throw new Error(result.error || 'Save failed');
+                        }
+                    })
+                    .catch(error => {
+                        const messageDiv = document.getElementById(msgId);
+                        messageDiv.className = 'message error';
+                        messageDiv.innerHTML = '<strong>❌ Error saving settings!</strong><br>' + error.message;
                         messageDiv.style.display = 'block';
                         messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-                        // Reload CPU voltage after short delay
-                        setTimeout(() => {
-                            fetch('/api/cpu_voltage')
-                                .then(response => response.json())
-                                .then(data => {
-                                    const statusEl = document.getElementById('voltage-status');
-                                    if (statusEl && data.voltage) {
-                                        statusEl.textContent = 'Current CPU Voltage: ' + data.voltage + ' (Undervolt: ' + data.undervolt_setting + ')';
-                                    }
-                                });
-                        }, 500);
-                    } else {
-                        throw new Error(result.error || 'Save failed');
-                    }
-                })
-                .catch(error => {
-                    const messageDiv = document.getElementById('settings-message');
-                    messageDiv.className = 'message error';
-                    messageDiv.innerHTML = '<strong>❌ Error saving settings!</strong><br>' + error.message;
-                    messageDiv.style.display = 'block';
-                    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                });
-        });
-    }
+                    });
+            });
+        }
+    });
 
     // Load current CPU voltage
     fetch('/api/cpu_voltage')
