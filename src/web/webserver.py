@@ -316,7 +316,11 @@ class PiBookWebServer:
                 # Apply settings to display driver
                 self.app_instance.display.set_full_refresh_interval(settings_data['full_refresh_interval'])
 
-                # Apply settings to reader screen if available
+                # Always update reader screen's base properties so future books load with them
+                self.app_instance.reader_screen.zoom_factor = settings_data['zoom']
+                self.app_instance.reader_screen.show_page_numbers = settings_data['show_page_numbers']
+
+                # Apply settings to reader screen if a book is currently open
                 if hasattr(self.app_instance.reader_screen, 'renderer') and self.app_instance.reader_screen.renderer:
                     # Reload current book with new settings
                     current_page = self.app_instance.reader_screen.current_page
@@ -324,7 +328,6 @@ class PiBookWebServer:
                     self.app_instance.reader_screen.close()
                     self.app_instance.reader_screen.load_epub(epub_path, zoom_factor=settings_data['zoom'], dpi=settings_data['dpi'])
                     self.app_instance.reader_screen.current_page = current_page
-                    self.app_instance.reader_screen.show_page_numbers = settings_data['show_page_numbers']
                     self.app_instance._render_current_screen()
                 
                 # Update config with WiFi setting
