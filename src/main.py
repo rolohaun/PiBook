@@ -506,17 +506,40 @@ class PiBookApp:
 
                     last_scanning_state = current_scanning
 
-                # Refresh Klipper screen while scanning AND once when it completes
+                # Refresh Klipper screen while scanning AND once when it completes.
+                # Also trigger a status-only auto-refresh every 3 minutes.
                 if self.navigation.is_on_screen(Screen.KLIPPER) and not self.power_manager.is_sleeping:
                     current_klipper_scanning = self.klipper_screen.scanning
 
-                    # Refresh if currently scanning OR just finished scanning
-                    if current_klipper_scanning or (last_klipper_scanning_state and not current_klipper_scanning):
+                    # --- Periodic status refresh (every 3 minutes) ---
+                    klipper_has_printers = len(self.klipper_screen.printers) > 0
+                    if klipper_has_printers and not current_klipper_scanning:
+                        elapsed = current_time - self.klipper_screen.last_status_refresh
+                        if (self.klipper_screen.last_status_refresh == 0 or
+                                elapsed >= self.klipper_screen.STATUS_REFRESH_INTERVAL):
+                            self.logger.info("Triggering Klipper 3-minute status refresh")
+                            self.klipper_screen.refresh_all_printers()
+
+                    # --- Refresh display while scanning, just-finished, or during/after status refresh ---
+                    needs_display_update = (
+                        current_klipper_scanning
+                        or (last_klipper_scanning_state and not current_klipper_scanning)
+                        or self.klipper_screen.refreshing
+                    )
+                    # Also do one final display update when a status refresh just finished
+                    klipper_just_refreshed = (
+                        not self.klipper_screen.refreshing
+                        and getattr(self, '_last_klipper_refreshing', False)
+                    )
+                    self._last_klipper_refreshing = self.klipper_screen.refreshing
+
+                    if needs_display_update or klipper_just_refreshed:
                         try:
-                            # Force partial refresh during scanning (no full refresh needed)
                             self._render_current_screen(force_partial=True)
                             if not current_klipper_scanning and last_klipper_scanning_state:
                                 self.logger.info("Klipper scan completed - final refresh done")
+                            if klipper_just_refreshed:
+                                self.logger.info("Klipper status refresh done - display updated")
                         except Exception as scan_error:
                             self.logger.error(f"Error refreshing Klipper screen: {scan_error}", exc_info=True)
 

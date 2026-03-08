@@ -53,6 +53,12 @@ class KlipperScreen:
         self.current_index = 0  # Currently selected printer
         self.items_per_page = 3  # Printers per page (more info per printer)
 
+        # Auto-refresh state
+        import time as _time
+        self.last_status_refresh: float = 0.0   # epoch timestamp of last status poll
+        self.refreshing: bool = False            # True while background status refresh is running
+        self.STATUS_REFRESH_INTERVAL: int = 180 # 3 minutes
+
     def start_scan(self):
         """Start scanning for Klipper printers in background"""
         import threading
@@ -248,6 +254,35 @@ class KlipperScreen:
             new_info = self._get_printer_info(ip)
             if new_info:
                 self.printers[index] = new_info
+
+    def refresh_all_printers(self):
+        """
+        Refresh status for all known printers in a background thread.
+        Only polls temperatures/print-state — does not re-scan the network.
+        Updates last_status_refresh when done.
+        """
+        import threading
+        if self.refreshing or self.scanning or not self.printers:
+            return
+
+        def _do_refresh():
+            import time as _time
+            self.refreshing = True
+            self.logger.info(f"Auto-refreshing status for {len(self.printers)} Klipper printer(s)")
+            try:
+                for i in range(len(self.printers)):
+                    ip = self.printers[i]['ip']
+                    new_info = self._get_printer_info(ip)
+                    if new_info:
+                        self.printers[i] = new_info
+            except Exception as e:
+                self.logger.error(f"Klipper auto-refresh error: {e}")
+            finally:
+                self.last_status_refresh = _time.time()
+                self.refreshing = False
+                self.logger.info("Klipper status refresh complete")
+
+        threading.Thread(target=_do_refresh, daemon=True).start()
 
     def next_item(self):
         """Move to next printer"""
@@ -446,7 +481,7 @@ class KlipperScreen:
                 # Print progress if printing
                 if state == 'printing' and printer['progress'] is not None:
                     progress_pct = printer['progress'] * 100
-                    progress_text = f"Progress: {progress_pct:.1f}%"
+                    progress_text = f"Progress: {progress_pct:.0f}%"
                     draw.text((15, y_offset + 85), progress_text, font=self.small_font, fill=0)
 
                     # Small progress bar
@@ -465,9 +500,14 @@ class KlipperScreen:
                             fill=0
                         )
 
-                    if printer['filename']:
-                        draw.text((prog_bar_x + prog_bar_width + 10, y_offset + 85),
-                                  printer['filename'][:20], font=self.small_font, fill=0)
+                    if printer.get('filename'):
+                        # Strip path, trim to available width
+                        fname = printer['filename'].split('/')[-1]
+                        # Truncate to avoid overflow
+                        max_chars = 28
+                        display_fname = fname if len(fname) <= max_chars else fname[:max_chars - 2] + '..'
+                        draw.text((15, y_offset + 105),
+                                  display_fname, font=self.small_font, fill=0)
 
                 y_offset += card_height + 10
 
@@ -479,8 +519,33 @@ class KlipperScreen:
                 page_width = page_bbox[2] - page_bbox[0]
                 draw.text(((self.width - page_width) // 2, self.height - 50), page_text, font=self.small_font, fill=0)
 
+        # Draw 'Refreshing...' indicator during auto-refresh
+        if self.refreshing:
+            ref_text = "Refreshing..."
+            try:
+                ref_bbox = draw.textbbox((0, 0), ref_text, font=self.small_font)
+                ref_w = ref_bbox[2] - ref_bbox[0]
+            except Exception:
+                ref_w = len(ref_text) * 7
+            draw.text(((self.width - ref_w) // 2, self.height - 45), ref_text, font=self.small_font, fill=0)
+        elif self.last_status_refresh > 0 and len(self.printers) > 0:
+            import time as _time
+            from datetime import datetime
+            ago_secs = int(_time.time() - self.last_status_refresh)
+            if ago_secs < 60:
+                ago_str = f"{ago_secs}s ago"
+            else:
+                ago_str = f"{ago_secs // 60}m ago"
+            upd_text = f"Updated {ago_str}"
+            try:
+                upd_bbox = draw.textbbox((0, 0), upd_text, font=self.small_font)
+                upd_w = upd_bbox[2] - upd_bbox[0]
+            except Exception:
+                upd_w = len(upd_text) * 7
+            draw.text(((self.width - upd_w) // 2, self.height - 45), upd_text, font=self.small_font, fill=0)
+
         # Draw instructions
-        instruction = "NEXT: Navigate | HOLD: Scan/Refresh | GPIO5: Menu"
+        instruction = "NEXT: Navigate | HOLD: Scan | Auto-refresh: 3min"
         try:
             instr_bbox = draw.textbbox((0, 0), instruction, font=self.small_font)
             instr_width = instr_bbox[2] - instr_bbox[0]
