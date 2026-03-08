@@ -444,7 +444,7 @@ class KlipperScreen:
             end_idx = min(start_idx + self.items_per_page, len(self.printers))
 
             # Draw printer cards
-            card_height = 120
+            card_height = 150
             for i in range(start_idx, end_idx):
                 printer = self.printers[i]
                 is_selected = (i == self.current_index)
@@ -504,7 +504,7 @@ class KlipperScreen:
                         # Strip path, trim to available width
                         fname = printer['filename'].split('/')[-1]
                         # Truncate to avoid overflow
-                        max_chars = 28
+                        max_chars = 45
                         display_fname = fname if len(fname) <= max_chars else fname[:max_chars - 2] + '..'
                         draw.text((15, y_offset + 105),
                                   display_fname, font=self.small_font, fill=0)
